@@ -1,80 +1,73 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Mail, Phone, MapPin, ShieldCheck } from 'lucide-react';
+import { Mail, Phone, MapPin } from 'lucide-react';
 
 export const Footer = () => {
   return (
-    <footer className="bg-slate-950 text-slate-300 border-t border-red-900/40 pt-16 pb-12">
+    <footer className="bg-white text-slate-600 border-t border-slate-200 pt-12 pb-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-10 pb-12 border-b border-slate-800">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8 pb-10 border-b border-slate-100">
           
           {/* Brand Col */}
-          <div className="lg:col-span-2 space-y-4">
-            <Link to="/" className="flex items-center gap-3">
+          <div className="lg:col-span-2 space-y-3">
+            <Link to="/" className="flex items-center gap-2.5">
               <img
-                src="/ju-alumni-logo.svg"
-                alt="JU ALUMNI Logo"
-                className="h-16 w-auto object-contain"
+                src="/ju-alumni-logo.jpg"
+                alt="JECRC Alumni Logo"
+                className="h-9 w-9 object-contain rounded-md"
               />
               <div>
-                <span className="text-2xl font-black text-white tracking-tight">
-                  Alum<span className="text-red-500">Bridge</span>
+                <span className="text-base font-bold text-slate-900 tracking-tight">
+                  JECRC <span className="text-red-700">Community</span>
                 </span>
-                <span className="text-xs text-red-400 block font-extrabold">
-                  Let's Unite, Grow Together
+                <span className="text-[11px] text-slate-500 block font-medium">
+                  Alumni Association
                 </span>
               </div>
             </Link>
 
-            <p className="text-slate-400 text-sm leading-relaxed max-w-sm">
-              Connecting JECRC University students with accomplished graduates for 1-on-1 mentorship, career guidance, resume reviews, placement preparation, and industry referrals.
+            <p className="text-slate-500 text-xs leading-relaxed max-w-sm">
+              Connecting JECRC University students with graduates for professional networking, mentorship, placement preparation, and alumni opportunities.
             </p>
-
-            <div className="flex items-center gap-3 pt-2">
-              <div className="flex items-center gap-1.5 text-xs text-red-400 bg-red-950/60 border border-red-800/80 px-3 py-1.5 rounded-full font-bold">
-                <ShieldCheck className="w-4 h-4 text-red-400" />
-                <span>Verified JECRC Alumni Network</span>
-              </div>
-            </div>
           </div>
 
           {/* Quick Links */}
           <div>
-            <h4 className="text-sm font-black uppercase tracking-wider text-white mb-4">Platform</h4>
-            <ul className="space-y-2.5 text-sm">
-              <li><Link to="/" className="hover:text-red-400 transition-colors">Home</Link></li>
-              <li><Link to="/explore" className="hover:text-red-400 transition-colors">Explore Alumni Directory</Link></li>
-              <li><Link to="/find-mentor" className="hover:text-red-400 transition-colors">Find a Mentor</Link></li>
-              <li><Link to="/events" className="hover:text-red-400 transition-colors">Upcoming JU Events</Link></li>
-              <li><Link to="/about" className="hover:text-red-400 transition-colors">About JU Network</Link></li>
+            <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider mb-3">Platform</h4>
+            <ul className="space-y-2 text-xs">
+              <li><Link to="/" className="hover:text-red-700 transition-colors">Community Feed</Link></li>
+              <li><Link to="/explore" className="hover:text-red-700 transition-colors">Explore Alumni</Link></li>
+              <li><Link to="/find-mentor" className="hover:text-red-700 transition-colors">Find a Mentor</Link></li>
+              <li><Link to="/events" className="hover:text-red-700 transition-colors">Campus Events</Link></li>
+              <li><Link to="/about" className="hover:text-red-700 transition-colors">About Network</Link></li>
             </ul>
           </div>
 
-          {/* User Portals */}
+          {/* Portals */}
           <div>
-            <h4 className="text-sm font-black uppercase tracking-wider text-white mb-4">Portals</h4>
-            <ul className="space-y-2.5 text-sm">
-              <li><Link to="/student-dashboard" className="hover:text-red-400 transition-colors">Student Portal</Link></li>
-              <li><Link to="/alumni-dashboard" className="hover:text-red-400 transition-colors">Alumni Mentor Hub</Link></li>
-              <li><Link to="/admin" className="hover:text-red-400 transition-colors">JU Admin Portal</Link></li>
-              <li><Link to="/my-connections" className="hover:text-red-400 transition-colors">My Connections</Link></li>
+            <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider mb-3">Portals</h4>
+            <ul className="space-y-2 text-xs">
+              <li><Link to="/student-dashboard" className="hover:text-red-700 transition-colors">Student Portal</Link></li>
+              <li><Link to="/alumni-dashboard" className="hover:text-red-700 transition-colors">Alumni Dashboard</Link></li>
+              <li><Link to="/admin" className="hover:text-red-700 transition-colors">Administration</Link></li>
+              <li><Link to="/my-connections" className="hover:text-red-700 transition-colors">Connections & Messages</Link></li>
             </ul>
           </div>
 
-          {/* University Info */}
+          {/* Contact */}
           <div>
-            <h4 className="text-sm font-black uppercase tracking-wider text-white mb-4">JECRC University</h4>
-            <ul className="space-y-3 text-sm text-slate-400">
-              <li className="flex items-start gap-2.5">
-                <MapPin className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
-                <span>Directorate of Alumni Relations, JECRC University, Vidhani, Sitapura Ext, Jaipur, Rajasthan 303905</span>
+            <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider mb-3">JECRC University</h4>
+            <ul className="space-y-2.5 text-xs text-slate-500">
+              <li className="flex items-start gap-2">
+                <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
+                <span>Directorate of Alumni Relations, JECRC University, Jaipur 303905</span>
               </li>
-              <li className="flex items-center gap-2.5">
-                <Mail className="w-4 h-4 text-red-500 shrink-0" />
+              <li className="flex items-center gap-2">
+                <Mail className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                 <span>alumni@jecrcu.edu.in</span>
               </li>
-              <li className="flex items-center gap-2.5">
-                <Phone className="w-4 h-4 text-red-500 shrink-0" />
+              <li className="flex items-center gap-2">
+                <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                 <span>+91 141 277 0232</span>
               </li>
             </ul>
@@ -82,12 +75,12 @@ export const Footer = () => {
         </div>
 
         {/* Sub-footer */}
-        <div className="pt-8 flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-slate-500">
-          <p>© 2026 AlumBridge • JU ALUMNI ASSOCIATION (JECRC University). Let's Unite, Grow Together.</p>
-          <div className="flex items-center gap-6">
-            <a href="#" className="hover:text-slate-400">Privacy Policy</a>
-            <a href="#" className="hover:text-slate-400">Mentorship Guidelines</a>
-            <a href="#" className="hover:text-slate-400">JECRC Honor Code</a>
+        <div className="pt-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-[11px] text-slate-400">
+          <p>© {new Date().getFullYear()} JECRC Community • JECRC Alumni Association.</p>
+          <div className="flex items-center gap-4">
+            <a href="#" className="hover:text-slate-600">Privacy Policy</a>
+            <a href="#" className="hover:text-slate-600">Terms of Service</a>
+            <a href="#" className="hover:text-slate-600">Honor Code</a>
           </div>
         </div>
       </div>

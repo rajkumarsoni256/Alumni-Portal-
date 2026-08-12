@@ -46,9 +46,9 @@ export const LandingPage = () => {
               {/* JU Alumni Crest Badge Banner */}
               <div className="inline-flex items-center gap-3 bg-white/95 backdrop-blur-md px-4 py-2 rounded-2xl border-2 border-red-200 shadow-md animate-float">
                 <img
-                  src="/ju-alumni-logo.svg"
-                  alt="JU ALUMNI Logo"
-                  className="w-10 h-10 object-contain"
+                  src="/ju-alumni-logo.jpg"
+                  alt="JECRC Alumni Association Logo"
+                  className="h-10 sm:h-12 w-auto object-contain rounded-md"
                 />
                 <div className="text-left">
                   <span className="text-xs font-black text-red-900 block leading-tight">JU ALUMNI ASSOCIATION</span>

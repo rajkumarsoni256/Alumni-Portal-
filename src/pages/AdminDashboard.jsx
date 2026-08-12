@@ -8,12 +8,9 @@ import {
   GraduationCap, 
   UserCheck, 
   CheckCircle2, 
-  Calendar, 
   Check, 
   X, 
-  Sparkles,
-  Activity,
-  Award
+  Sparkles
 } from 'lucide-react';
 
 export const AdminDashboard = () => {
@@ -31,103 +28,83 @@ export const AdminDashboard = () => {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-10">
-      {/* Admin Greeting */}
-      <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white rounded-3xl p-6 sm:p-8 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-6 relative overflow-hidden">
-        <div className="space-y-2 relative z-10">
-          <div className="inline-flex items-center gap-2 bg-indigo-500/20 text-indigo-300 border border-indigo-400/30 px-3 py-1 rounded-full text-xs font-bold">
-            <Shield className="w-3.5 h-3.5" />
-            <span>Apex University Alumni Relations Office</span>
-          </div>
-          <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight">
-            University Administrator Dashboard
-          </h1>
-          <p className="text-sm text-slate-300">
-            Real-time alumni networking analytics, student career interest monitoring, & verification approvals.
-          </p>
-        </div>
-
-        <div className="bg-white/10 backdrop-blur-md px-5 py-3 rounded-2xl border border-white/20 text-xs text-slate-200">
-          <span className="block text-[11px] text-slate-400">Network System Health</span>
-          <span className="font-bold text-emerald-400 text-sm">Optimal (100% Operational)</span>
-        </div>
-      </div>
-
-      {/* 5 Metric Summary Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+    <div className="min-h-screen bg-slate-100/75 py-5">
+      <div className="max-w-6xl mx-auto px-3 sm:px-4 lg:px-6 space-y-4">
         
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-1">
-          <div className="flex items-center justify-between text-slate-500">
-            <span className="text-[11px] font-bold uppercase">Total Students</span>
-            <GraduationCap className="w-4 h-4 text-indigo-600" />
+        {/* Header Title */}
+        <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="space-y-0.5">
+            <div className="flex items-center gap-2">
+              <h1 className="text-lg font-bold text-slate-900">JECRC Directorate Administration</h1>
+              <span className="text-xs font-semibold text-red-700 bg-red-50 border border-red-200 px-2 py-0.2 rounded-full">
+                Admin Console
+              </span>
+            </div>
+            <p className="text-xs text-slate-500">
+              Alumni relations metrics, student interest analytics, and verification approvals.
+            </p>
           </div>
-          <p className="text-2xl sm:text-3xl font-extrabold text-slate-900">
-            {MOCK_ADMIN_STATS.totalStudents.toLocaleString()}
-          </p>
-          <span className="text-[10px] text-emerald-600 font-semibold">+8% this term</span>
+
+          <div className="text-xs text-slate-600 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg self-start sm:self-auto">
+            <span>System Status: <strong className="text-emerald-700">Operational</strong></span>
+          </div>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-1">
-          <div className="flex items-center justify-between text-slate-500">
-            <span className="text-[11px] font-bold uppercase">Total Alumni</span>
-            <UserCheck className="w-4 h-4 text-purple-600" />
+        {/* 5 Metric Cards */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+          <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-2xs space-y-1">
+            <span className="text-[10px] font-bold uppercase text-slate-400">Total Students</span>
+            <p className="text-xl font-bold text-slate-900">
+              {MOCK_ADMIN_STATS.totalStudents.toLocaleString()}
+            </p>
+            <span className="text-[10px] text-emerald-600 font-medium">+8% this year</span>
           </div>
-          <p className="text-2xl sm:text-3xl font-extrabold text-slate-900">
-            {MOCK_ADMIN_STATS.totalAlumni.toLocaleString()}
-          </p>
-          <span className="text-[10px] text-indigo-600 font-semibold">Across 40+ countries</span>
+
+          <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-2xs space-y-1">
+            <span className="text-[10px] font-bold uppercase text-slate-400">Total Alumni</span>
+            <p className="text-xl font-bold text-slate-900">
+              {MOCK_ADMIN_STATS.totalAlumni.toLocaleString()}
+            </p>
+            <span className="text-[10px] text-slate-500 font-medium">Across 40+ countries</span>
+          </div>
+
+          <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-2xs space-y-1">
+            <span className="text-[10px] font-bold uppercase text-slate-400">Active Mentors</span>
+            <p className="text-xl font-bold text-slate-900">
+              {MOCK_ADMIN_STATS.activeMentors}
+            </p>
+            <span className="text-[10px] text-emerald-600 font-medium">Available for 1-on-1s</span>
+          </div>
+
+          <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-2xs space-y-1">
+            <span className="text-[10px] font-bold uppercase text-slate-400">Mentorship Pairings</span>
+            <p className="text-xl font-bold text-slate-900">
+              {MOCK_ADMIN_STATS.mentorshipConnections.toLocaleString()}
+            </p>
+            <span className="text-[10px] text-slate-500 font-medium">Completed</span>
+          </div>
+
+          <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-2xs space-y-1">
+            <span className="text-[10px] font-bold uppercase text-slate-400">Avg Satisfaction</span>
+            <p className="text-xl font-bold text-slate-900">
+              {MOCK_ADMIN_STATS.avgSessionRating}★
+            </p>
+            <span className="text-[10px] text-emerald-600 font-medium">98% positive rating</span>
+          </div>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-1">
-          <div className="flex items-center justify-between text-slate-500">
-            <span className="text-[11px] font-bold uppercase">Active Mentors</span>
-            <Sparkles className="w-4 h-4 text-amber-500" />
-          </div>
-          <p className="text-2xl sm:text-3xl font-extrabold text-slate-900">
-            {MOCK_ADMIN_STATS.activeMentors}
-          </p>
-          <span className="text-[10px] text-emerald-600 font-semibold">Available for 1-on-1s</span>
-        </div>
+        {/* Charts Section */}
+        <AdminCharts />
 
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-1">
-          <div className="flex items-center justify-between text-slate-500">
-            <span className="text-[11px] font-bold uppercase">Mentorship Pairings</span>
-            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-          </div>
-          <p className="text-2xl sm:text-3xl font-extrabold text-slate-900">
-            {MOCK_ADMIN_STATS.mentorshipConnections.toLocaleString()}
-          </p>
-          <span className="text-[10px] text-slate-500 font-semibold">Completed Sessions</span>
-        </div>
-
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-1 col-span-2 lg:col-span-1">
-          <div className="flex items-center justify-between text-slate-500">
-            <span className="text-[11px] font-bold uppercase">Upcoming Events</span>
-            <Calendar className="w-4 h-4 text-indigo-600" />
-          </div>
-          <p className="text-2xl sm:text-3xl font-extrabold text-slate-900">
-            {MOCK_ADMIN_STATS.upcomingEvents}
-          </p>
-          <span className="text-[10px] text-indigo-600 font-semibold">Workshops & Talks</span>
-        </div>
-
-      </div>
-
-      {/* Visualizations Section */}
-      <AdminCharts />
-
-      {/* Grid: Pending Alumni Verification & Recent Activity */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        
-        {/* Pending Verifications Table (7 cols) */}
-        <div className="lg:col-span-7 bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-5">
+        {/* Pending Alumni Verifications Table */}
+        <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-2xs space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="font-bold text-slate-900 text-lg">Pending Alumni Verification</h3>
-              <p className="text-xs text-slate-500">Verify degree certificates & company employment</p>
+              <h2 className="text-sm font-bold text-slate-900">Alumni Verification Queue</h2>
+              <p className="text-xs text-slate-500">Review degree and employment details before granting verified alumni badge.</p>
             </div>
-            <span className="text-xs font-bold text-amber-700 bg-amber-50 px-2.5 py-1 rounded-full border border-amber-200">
-              {verifications.length} Pending Approval
+            <span className="text-xs font-semibold text-slate-600 bg-slate-100 px-2 py-0.5 rounded">
+              {verifications.length} pending
             </span>
           </div>
 
@@ -135,36 +112,58 @@ export const AdminDashboard = () => {
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
-                  <tr className="border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider">
-                    <th className="py-3 px-2">Alumni Name</th>
-                    <th className="py-3 px-2">Degree</th>
-                    <th className="py-3 px-2">Current Role</th>
-                    <th className="py-3 px-2 text-right">Actions</th>
+                  <tr className="border-b border-slate-200 text-slate-400 uppercase text-[10px]">
+                    <th className="py-2.5 px-3">Alumni Candidate</th>
+                    <th className="py-2.5 px-3">Role & Company</th>
+                    <th className="py-2.5 px-3">Graduation</th>
+                    <th className="py-2.5 px-3">Document Proof</th>
+                    <th className="py-2.5 px-3 text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
-                  {verifications.map((item) => (
-                    <tr key={item.id} className="hover:bg-slate-50">
-                      <td className="py-3 px-2 font-bold text-slate-900">{item.name}</td>
-                      <td className="py-3 px-2 text-slate-600">{item.degree}</td>
-                      <td className="py-3 px-2 font-semibold text-indigo-600">
-                        {item.role} @ {item.company}
+                <tbody className="divide-y divide-slate-100">
+                  {verifications.map((v) => (
+                    <tr key={v.id} className="hover:bg-slate-50 transition-colors">
+                      <td className="py-3 px-3">
+                        <div className="flex items-center gap-2.5">
+                          <img
+                            src={v.avatar}
+                            alt={v.name}
+                            className="w-8 h-8 rounded-full object-cover border border-slate-200"
+                          />
+                          <div>
+                            <span className="font-bold text-slate-900 block">{v.name}</span>
+                            <span className="text-[11px] text-slate-400">{v.email}</span>
+                          </div>
+                        </div>
                       </td>
-                      <td className="py-3 px-2 text-right">
+                      <td className="py-3 px-3">
+                        <span className="font-semibold text-slate-800 block">{v.currentRole}</span>
+                        <span className="text-[11px] text-slate-500">{v.company}</span>
+                      </td>
+                      <td className="py-3 px-3">
+                        <span className="font-medium text-slate-800 block">{v.degree}</span>
+                        <span className="text-[11px] text-slate-400">Class of {v.batch}</span>
+                      </td>
+                      <td className="py-3 px-3">
+                        <span className="text-slate-700 bg-slate-100 px-2 py-0.5 rounded text-[11px]">
+                          {v.proofDocument}
+                        </span>
+                      </td>
+                      <td className="py-3 px-3 text-right">
                         <div className="flex items-center justify-end gap-1.5">
                           <button
-                            onClick={() => handleVerify(item.id, true)}
-                            className="p-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold"
-                            title="Approve & Verify"
+                            onClick={() => handleVerify(v.id, true)}
+                            className="px-2.5 py-1 rounded text-xs font-semibold text-white bg-emerald-700 hover:bg-emerald-800 transition-colors inline-flex items-center gap-1 cursor-pointer"
                           >
-                            <Check className="w-4 h-4" />
+                            <Check className="w-3 h-3" />
+                            <span>Approve</span>
                           </button>
                           <button
-                            onClick={() => handleVerify(item.id, false)}
-                            className="p-1.5 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold"
-                            title="Decline"
+                            onClick={() => handleVerify(v.id, false)}
+                            className="px-2.5 py-1 rounded text-xs font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors inline-flex items-center gap-1 cursor-pointer"
                           >
-                            <X className="w-4 h-4" />
+                            <X className="w-3 h-3" />
+                            <span>Decline</span>
                           </button>
                         </div>
                       </td>
@@ -174,33 +173,10 @@ export const AdminDashboard = () => {
               </table>
             </div>
           ) : (
-            <div className="p-8 text-center text-xs text-slate-500 bg-slate-50 rounded-2xl border border-slate-100">
-              All pending alumni verification requests have been processed!
+            <div className="p-6 text-center text-xs text-slate-500 bg-slate-50 rounded-lg border border-slate-100">
+              All alumni verification requests have been processed.
             </div>
           )}
-        </div>
-
-        {/* Recent Network Activity Feed (5 cols) */}
-        <div className="lg:col-span-5 bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-5">
-          <div className="flex items-center gap-2">
-            <Activity className="w-5 h-5 text-indigo-600" />
-            <div>
-              <h3 className="font-bold text-slate-900 text-lg">Live Platform Activity</h3>
-              <p className="text-xs text-slate-500">Real-time mentorship & event logs</p>
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            {MOCK_ADMIN_STATS.recentActivity.map((act, idx) => (
-              <div key={idx} className="flex items-start gap-3 p-3 rounded-2xl bg-slate-50 border border-slate-100 text-xs">
-                <span className="w-2 h-2 rounded-full bg-indigo-600 shrink-0 mt-1.5" />
-                <div className="space-y-0.5">
-                  <p className="text-slate-800 font-medium leading-snug">{act.text}</p>
-                  <span className="text-[10px] text-slate-400 font-bold">{act.time}</span>
-                </div>
-              </div>
-            ))}
-          </div>
         </div>
 
       </div>
