@@ -1,72 +1,54 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { UserCheck, Shield, GraduationCap } from 'lucide-react';
 
 export const QuickRoleBar = () => {
   const { activeRole, setActiveRole } = useApp();
-  const navigate = useNavigate();
-  const location = useLocation();
-
-  const handleRoleChange = (role) => {
-    setActiveRole(role);
-    if (role === 'student' && !location.pathname.startsWith('/student-dashboard')) {
-      navigate('/student-dashboard');
-    } else if (role === 'alumni' && !location.pathname.startsWith('/alumni-dashboard')) {
-      navigate('/alumni-dashboard');
-    } else if (role === 'admin' && !location.pathname.startsWith('/admin')) {
-      navigate('/admin');
-    }
-  };
 
   return (
-    <div className="bg-slate-950 text-slate-200 border-b border-red-900/50 text-xs py-2 px-4">
-      <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2 font-medium">
-          <span className="flex h-2 w-2 rounded-full bg-red-500 animate-ping"></span>
-          <span className="text-slate-400">JECRC University Prototype Mode:</span>
-          <span className="font-extrabold text-white capitalize bg-red-900/70 border border-red-700/60 px-2.5 py-0.5 rounded-md">
-            {activeRole === 'student' && '🎓 JU Student (Raj Kumar)'}
-            {activeRole === 'alumni' && '💼 JU Alumni Mentor (Priya Sharma)'}
-            {activeRole === 'admin' && '🏛️ JECRC Admin Director'}
+    <div className="bg-slate-900 text-slate-300 text-[11px] py-1 px-4 border-b border-slate-800">
+      <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+          <span className="text-slate-400">Role View:</span>
+          <span className="font-semibold text-white">
+            {activeRole === 'student' && 'Student (Tokir Khan)'}
+            {activeRole === 'alumni' && 'Alumni (Priya Sharma)'}
+            {activeRole === 'admin' && 'Admin'}
           </span>
         </div>
 
-        <div className="flex items-center gap-2">
-          <span className="text-slate-400 hidden md:inline">Switch Role:</span>
-          <div className="flex items-center bg-slate-900 rounded-lg p-1 border border-slate-800">
+        <div className="flex items-center gap-1.5">
+          <span className="text-slate-400 text-[10px]">Switch:</span>
+          <div className="flex items-center gap-0.5 bg-slate-800 rounded p-0.5">
             <button
-              onClick={() => handleRoleChange('student')}
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md transition-all font-bold ${
+              onClick={() => setActiveRole('student')}
+              className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors cursor-pointer ${
                 activeRole === 'student'
-                  ? 'bg-red-600 text-white shadow-sm'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                  ? 'bg-slate-950 text-white font-semibold'
+                  : 'text-slate-400 hover:text-slate-200'
               }`}
             >
-              <GraduationCap className="w-3.5 h-3.5" />
-              <span>Student</span>
+              Student
             </button>
             <button
-              onClick={() => handleRoleChange('alumni')}
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md transition-all font-bold ${
+              onClick={() => setActiveRole('alumni')}
+              className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors cursor-pointer ${
                 activeRole === 'alumni'
-                  ? 'bg-red-600 text-white shadow-sm'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                  ? 'bg-slate-950 text-white font-semibold'
+                  : 'text-slate-400 hover:text-slate-200'
               }`}
             >
-              <UserCheck className="w-3.5 h-3.5" />
-              <span>Alumni</span>
+              Alumni
             </button>
             <button
-              onClick={() => handleRoleChange('admin')}
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md transition-all font-bold ${
+              onClick={() => setActiveRole('admin')}
+              className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors cursor-pointer ${
                 activeRole === 'admin'
-                  ? 'bg-red-600 text-white shadow-sm'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                  ? 'bg-slate-950 text-white font-semibold'
+                  : 'text-slate-400 hover:text-slate-200'
               }`}
             >
-              <Shield className="w-3.5 h-3.5" />
-              <span>Admin</span>
+              Admin
             </button>
           </div>
         </div>

@@ -24,16 +24,22 @@ export const INDUSTRIES = [
 
 export const MOCK_STUDENT = {
   id: "st_101",
-  name: "Raj Kumar",
-  role: "Computer Science Student",
+  name: "Tokir Khan",
+  role: "Student",
   degree: "B.Tech Computer Science & Engineering",
+  specialization: "AI & Machine Learning",
+  year: "3rd Year",
+  headline: "B.Tech CSE (AI-ML) | 3rd Year • Seeking SDE / AI Internships",
   graduationYear: 2026,
+  batch: "JECRC CSE • 2026",
   university: "JECRC University, Jaipur",
-  avatar: "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&q=80&w=300",
-  email: "raj.kumar@jecrcu.edu.in",
-  completionPercentage: 82,
-  interests: ["AI & Machine Learning", "Web Development", "Cloud Computing"],
-  targetCompanies: ["Google", "Microsoft", "Uber", "Stripe"],
+  avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=300",
+  email: "tokir.khan@jecrcu.edu.in",
+  completionPercentage: 88,
+  connectionsCount: 48,
+  profileViewsCount: 184,
+  interests: ["AI & Machine Learning", "Full Stack Web", "Distributed Systems"],
+  targetCompanies: ["Google", "Microsoft", "Stripe", "Amazon"],
   careerGoal: "Software Engineer / AI Product Specialist",
   savedAlumniIds: ["alm_1", "alm_3"],
 };
@@ -461,3 +467,399 @@ export const MOCK_ADMIN_STATS = {
     { id: "v_3", name: "Tanya Sen", degree: "B.Des 2021", company: "Razorpay", role: "Product Designer", status: "Pending Verification" }
   ]
 };
+
+// Unified Users Lookup Dictionary
+export const MOCK_USERS = {
+  st_101: {
+    id: "st_101",
+    name: "Tokir Khan",
+    role: "Student",
+    headline: "B.Tech CSE (AI-ML) | 3rd Year • Seeking SDE Internships",
+    batch: "JECRC CSE • 2026",
+    avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=300",
+    verified: false,
+    isAlumni: false,
+    company: "JECRC University",
+    connectionsCount: 48,
+    profileViewsCount: 184,
+  },
+  alm_1: {
+    id: "alm_1",
+    name: "Priya Sharma",
+    role: "Senior AI Engineer",
+    headline: "Senior AI Engineer @ Google | LLMs & Distributed Systems",
+    batch: "JECRC CSE • 2018",
+    avatar: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=300",
+    verified: true,
+    isAlumni: true,
+    company: "Google",
+    connectionsCount: 1420,
+    profileViewsCount: 890,
+  },
+  alm_2: {
+    id: "alm_2",
+    name: "Arjun Verma",
+    role: "Staff Frontend Architect",
+    headline: "Staff Frontend Architect @ Stripe | Web Performance & React Core",
+    batch: "JECRC IT • 2017",
+    avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=300",
+    verified: true,
+    isAlumni: true,
+    company: "Stripe",
+    connectionsCount: 980,
+    profileViewsCount: 650,
+  },
+  alm_3: {
+    id: "alm_3",
+    name: "Sneha Reddy",
+    role: "Lead Data Scientist",
+    headline: "Lead Data Scientist @ AWS | Big Data & Predictive AI",
+    batch: "JECRC Data Eng • 2019",
+    avatar: "https://images.unsplash.com/photo-1580489944761-15a19d654956?auto=format&fit=crop&q=80&w=300",
+    verified: true,
+    isAlumni: true,
+    company: "Amazon Web Services",
+    connectionsCount: 760,
+    profileViewsCount: 520,
+  },
+  alm_4: {
+    id: "alm_4",
+    name: "Vikramaditya Rao",
+    role: "Principal Product Manager",
+    headline: "Principal PM @ Microsoft | Ex-Uber | AI Copilot Ecosystem",
+    batch: "JECRC ECE • 2015",
+    avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=300",
+    verified: true,
+    isAlumni: true,
+    company: "Microsoft",
+    connectionsCount: 2100,
+    profileViewsCount: 1240,
+  },
+  alm_5: {
+    id: "alm_5",
+    name: "Ananya Iyer",
+    role: "Lead UX Architect",
+    headline: "Lead UX Architect @ Adobe | Design Systems & Micro-Interactions",
+    batch: "JECRC Design • 2020",
+    avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=300",
+    verified: true,
+    isAlumni: true,
+    company: "Adobe",
+    connectionsCount: 610,
+    profileViewsCount: 430,
+  },
+  alm_6: {
+    id: "alm_6",
+    name: "Rohan Kapoor",
+    role: "Cybersecurity Director",
+    headline: "Cybersecurity Director @ PwC | Cloud Security & Zero-Trust",
+    batch: "JECRC CSE • 2016",
+    avatar: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&q=80&w=300",
+    verified: true,
+    isAlumni: true,
+    company: "PwC",
+    connectionsCount: 890,
+    profileViewsCount: 390,
+  },
+  alm_7: {
+    id: "alm_7",
+    name: "Aman Gupta",
+    role: "Software Engineer",
+    headline: "Software Engineer @ Amazon | High-Scale Distributed Systems",
+    batch: "JECRC CSE • 2020",
+    avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=300",
+    verified: true,
+    isAlumni: true,
+    company: "Amazon",
+    connectionsCount: 540,
+    profileViewsCount: 310,
+  },
+  st_102: {
+    id: "st_102",
+    name: "Meera Nair",
+    role: "Student",
+    headline: "B.Tech IT | 4th Year • Placed @ Cisco | Open Source Enthusiast",
+    batch: "JECRC IT • 2025",
+    avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=300",
+    verified: false,
+    isAlumni: false,
+    company: "JECRC University",
+    connectionsCount: 110,
+    profileViewsCount: 220,
+  },
+};
+
+// Initial Community Feed Posts
+export const MOCK_COMMUNITY_POSTS = [
+  {
+    id: "post_1",
+    authorId: "alm_1",
+    createdAt: "2 hours ago",
+    timestamp: Date.now() - 7200000,
+    content: "Excited to share that our team at Google just open-sourced a major benchmark for foundation model reasoning! 🚀\n\nFor all JECRC juniors preparing for upcoming off-campus and on-campus SDE/AI internships: focus deeply on your fundamentals in data structures, concurrency, and building end-to-end projects rather than just tutorial-hopping.\n\nHappy to review resumes of 3rd and 4th-year JECRC students this weekend. Drop your questions below!",
+    type: "ACHIEVEMENT",
+    category: "alumni",
+    image: "https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&q=80&w=1200",
+    achievementData: {
+      badge: "Google Milestone",
+      title: "Foundation Model Benchmark Open-Sourced",
+      subtext: "Authored by Google Deep Learning Team"
+    },
+    likes: 148,
+    likedByCurrentUser: false,
+    savedByCurrentUser: true,
+    commentsCount: 24,
+    sharesCount: 14,
+    tags: ["#Google", "#AIandML", "#JECRCAlumni", "#Internships2026"],
+    comments: [
+      {
+        id: "c_101",
+        authorId: "st_101",
+        createdAt: "1 hour ago",
+        content: "Congratulations Priya ma'am! Truly inspiring for all of us in 3rd year. I'd love your feedback on my LLM latency optimization project when you have a moment.",
+        likes: 12,
+        likedByCurrentUser: false,
+        replies: [
+          {
+            id: "r_101",
+            authorId: "alm_1",
+            createdAt: "45 mins ago",
+            content: "Thank you Tokir! Send across the GitHub repo in messages or schedule via the Mentorship tab. Happy to review.",
+            likes: 5,
+            likedByCurrentUser: false,
+          }
+        ]
+      },
+      {
+        id: "c_102",
+        authorId: "st_102",
+        createdAt: "30 mins ago",
+        content: "Amazing achievement! What are the top 3 core topics you recommend for freshers targeting Google ML roles?",
+        likes: 8,
+        likedByCurrentUser: false,
+        replies: []
+      }
+    ]
+  },
+  {
+    id: "post_2",
+    authorId: "alm_2",
+    createdAt: "4 hours ago",
+    timestamp: Date.now() - 14400000,
+    content: "🚨 We are actively hiring 2 Backend Engineering Interns and 1 Frontend Intern for our Stripe Bangalore hub!\n\nEligibility: JECRC pre-final and final year students (Batch 2026 / 2027).\nStipend: ₹60,000/month + complete remote flexibility option.\nStack: TypeScript, Go, React, Distributed Systems.\n\nI will be personally referring standout candidates from our JECRC community. Check out the details below and feel free to reach out!",
+    type: "JOB",
+    category: "jobs",
+    jobData: {
+      title: "Software Engineer Intern (Frontend & Backend)",
+      company: "Stripe",
+      location: "Bengaluru, India (Hybrid / Remote Available)",
+      type: "Internship",
+      stipend: "₹60,000 / month",
+      batch: "Class of 2026 & 2027",
+      deadline: "Aug 30, 2026",
+      applyLink: "https://stripe.com/jobs"
+    },
+    likes: 215,
+    likedByCurrentUser: false,
+    savedByCurrentUser: false,
+    commentsCount: 46,
+    sharesCount: 38,
+    tags: ["#Hiring", "#Internships", "#Stripe", "#Placements2026"],
+    comments: [
+      {
+        id: "c_201",
+        authorId: "st_101",
+        createdAt: "3 hours ago",
+        content: "Thank you Arjun sir! Just submitted my resume. Stripe's engineering culture and developer tools are legendary.",
+        likes: 9,
+        likedByCurrentUser: false,
+        replies: [
+          {
+            id: "r_201",
+            authorId: "alm_2",
+            createdAt: "2 hours ago",
+            content: "Best of luck Tokir! Make sure your GitHub and deployment links are clearly highlighted.",
+            likes: 4,
+            likedByCurrentUser: false,
+          }
+        ]
+      }
+    ]
+  },
+  {
+    id: "post_3",
+    authorId: "st_101",
+    createdAt: "6 hours ago",
+    timestamp: Date.now() - 21600000,
+    content: "Just shipped 'NeuroPulse' — an AI-powered code latency analyzer built during the JU Smart Hackathon! 💻⚡\n\nIntegrated AST parsing with local LLM summarization to detect asynchronous bottlenecks in React applications. Proud to share that our team won 1st Place in the Open Innovation Track!\n\nHuge thanks to Priya Sharma ma'am for mentoring us on model quantization. The open-source repo is live on GitHub! Would love feedback from fellow alumni and seniors.",
+    type: "ACHIEVEMENT",
+    category: "student",
+    image: "https://images.unsplash.com/photo-1555066931-4365d14bab8c?auto=format&fit=crop&q=80&w=1200",
+    achievementData: {
+      badge: "Hackathon Winner",
+      title: "1st Place - JU Smart Hackathon 2026",
+      subtext: "Built NeuroPulse AI Performance Profiler"
+    },
+    likes: 89,
+    likedByCurrentUser: true,
+    savedByCurrentUser: false,
+    commentsCount: 18,
+    sharesCount: 9,
+    tags: ["#StudentProject", "#React", "#OpenSource", "#AI", "#Hackathon"],
+    comments: [
+      {
+        id: "c_301",
+        authorId: "alm_1",
+        createdAt: "5 hours ago",
+        content: "Super proud of you and the team Tokir! The architecture looked very clean. Keep shipping!",
+        likes: 14,
+        likedByCurrentUser: false,
+        replies: []
+      },
+      {
+        id: "c_302",
+        authorId: "alm_2",
+        createdAt: "4 hours ago",
+        content: "Very impressive AST analysis for a 3rd-year project. Stars on GitHub incoming!",
+        likes: 11,
+        likedByCurrentUser: false,
+        replies: []
+      }
+    ]
+  },
+  {
+    id: "post_4",
+    authorId: "alm_3",
+    createdAt: "1 day ago",
+    timestamp: Date.now() - 86400000,
+    content: "Hosting an exclusive virtual AMA & Roadmap session this Saturday: 'Breaking into Cloud AI & Data Engineering at Scale'. ☁️📊\n\nWe'll cover:\n1. What cloud engineering teams at Amazon look for in freshers\n2. Building real-time data pipelines with AWS Redshift & S3\n3. Live resume teardowns & mock interview tips\n\nFree for all JECRC students. RSVP directly from the Events tab!",
+    type: "TEXT",
+    category: "alumni",
+    likes: 94,
+    likedByCurrentUser: false,
+    savedByCurrentUser: false,
+    commentsCount: 11,
+    sharesCount: 15,
+    tags: ["#AWS", "#DataScience", "#CareerGuidance", "#JECRCEvents"],
+    comments: [
+      {
+        id: "c_401",
+        authorId: "st_102",
+        createdAt: "20 hours ago",
+        content: "Already registered! Looking forward to learning about distributed pipeline optimizations.",
+        likes: 6,
+        likedByCurrentUser: false,
+        replies: []
+      }
+    ]
+  },
+  {
+    id: "post_5",
+    authorId: "alm_4",
+    createdAt: "2 days ago",
+    timestamp: Date.now() - 172800000,
+    content: "One crucial piece of advice for engineering students aspiring for Product & Leadership roles:\n\nCode builds the product, but understanding the customer builds the business. Always ask 'Why does this problem exist?' before diving into 'How should we build it?'.\n\nKudos to the JECRC E-Cell for organizing a stellar design thinking workshop this week.",
+    type: "TEXT",
+    category: "alumni",
+    likes: 132,
+    likedByCurrentUser: false,
+    savedByCurrentUser: false,
+    commentsCount: 14,
+    sharesCount: 7,
+    tags: ["#ProductManagement", "#Leadership", "#CareerTips"],
+    comments: []
+  }
+];
+
+// Suggested Connections (People You May Know)
+export const MOCK_SUGGESTED_PEOPLE = [
+  {
+    id: "alm_7",
+    name: "Aman Gupta",
+    role: "Software Engineer @ Amazon",
+    batch: "JECRC CSE • 2020",
+    avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=300",
+    mutualCount: 14,
+    connectionStatus: "none", // 'none' | 'pending' | 'connected'
+  },
+  {
+    id: "alm_5",
+    name: "Ananya Iyer",
+    role: "Lead UX Architect @ Adobe",
+    batch: "JECRC Design • 2020",
+    avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=300",
+    mutualCount: 8,
+    connectionStatus: "none",
+  },
+  {
+    id: "alm_6",
+    name: "Rohan Kapoor",
+    role: "Cybersecurity Director @ PwC",
+    batch: "JECRC CSE • 2016",
+    avatar: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&q=80&w=300",
+    mutualCount: 19,
+    connectionStatus: "none",
+  },
+  {
+    id: "st_102",
+    name: "Meera Nair",
+    role: "B.Tech IT • 4th Year (Placed @ Cisco)",
+    batch: "JECRC IT • 2025",
+    avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=300",
+    mutualCount: 26,
+    connectionStatus: "connected",
+  },
+];
+
+// Trending Hashtags in JECRC
+export const MOCK_TRENDING_TAGS = [
+  { tag: "#Placements2026", count: "340+ posts", category: "Career" },
+  { tag: "#AlumniMeetJaipur", count: "185 posts", category: "Events" },
+  { tag: "#GoogleInternships", count: "120 posts", category: "Opportunities" },
+  { tag: "#AIandML", count: "98 posts", category: "Tech" },
+  { tag: "#HackathonWinners", count: "64 posts", category: "Campus" },
+];
+
+// Notifications
+export const MOCK_NOTIFICATIONS = [
+  {
+    id: "notif_1",
+    type: "connection",
+    actor: "Priya Sharma",
+    avatar: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=300",
+    text: "accepted your mentorship request for Saturday.",
+    time: "10 mins ago",
+    unread: true,
+    link: "/my-connections",
+  },
+  {
+    id: "notif_2",
+    type: "like",
+    actor: "Arjun Verma",
+    avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=300",
+    text: "and 14 others liked your post 'NeuroPulse AI Performance Profiler'.",
+    time: "2 hours ago",
+    unread: true,
+    link: "/",
+  },
+  {
+    id: "notif_3",
+    type: "job",
+    actor: "Stripe Alumni Referral",
+    avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=300",
+    text: "New SDE Internship opening posted by Arjun Verma.",
+    time: "4 hours ago",
+    unread: false,
+    link: "/",
+  },
+  {
+    id: "notif_4",
+    type: "event",
+    actor: "JECRC Alumni Cell",
+    avatar: "https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&q=80&w=300",
+    text: "Registration open for 'Modern Fullstack Web Architecture' workshop.",
+    time: "1 day ago",
+    unread: false,
+    link: "/events",
+  },
+];

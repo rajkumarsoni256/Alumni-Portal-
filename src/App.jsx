@@ -6,8 +6,10 @@ import { AppProvider } from './context/AppContext';
 import { QuickRoleBar } from './components/common/QuickRoleBar';
 import { Navbar } from './components/common/Navbar';
 import { Footer } from './components/common/Footer';
+import { MobileBottomNav } from './components/common/MobileBottomNav';
 
 // Pages
+import { CommunityFeed } from './pages/CommunityFeed';
 import { LandingPage } from './pages/LandingPage';
 import { StudentDashboard } from './pages/StudentDashboard';
 import { ExploreAlumni } from './pages/ExploreAlumni';
@@ -34,12 +36,14 @@ export function App() {
     <AppProvider>
       <Router>
         <ScrollToTop />
-        <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900 font-sans antialiased selection:bg-indigo-500 selection:text-white">
+        <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900 font-sans antialiased selection:bg-red-600 selection:text-white pb-16 md:pb-0">
           <QuickRoleBar />
           <Navbar />
           <main className="flex-grow">
             <Routes>
-              <Route path="/" element={<LandingPage />} />
+              <Route path="/" element={<CommunityFeed />} />
+              <Route path="/feed" element={<CommunityFeed />} />
+              <Route path="/welcome" element={<LandingPage />} />
               <Route path="/student-dashboard" element={<StudentDashboard />} />
               <Route path="/explore" element={<ExploreAlumni />} />
               <Route path="/find-mentor" element={<FindMentor />} />
@@ -53,6 +57,7 @@ export function App() {
             </Routes>
           </main>
           <Footer />
+          <MobileBottomNav />
         </div>
       </Router>
     </AppProvider>
@@ -60,3 +65,4 @@ export function App() {
 }
 
 export default App;
+
