@@ -8,12 +8,21 @@ import {
   Calendar, 
   MessageSquare, 
   Bookmark, 
-  Sparkles
+  Sparkles,
+  Inbox,
+  LayoutDashboard,
+  ShieldCheck,
+  PlusCircle,
+  ArrowRight
 } from 'lucide-react';
+import { getRoleCapabilities } from '../../utils/roleCapabilities';
 
 export const FeedLeftSidebar = () => {
-  const { currentUser, feedFilter, setFeedFilter, activeRole } = useApp();
+  const { currentUser, feedFilter, setFeedFilter, activeRole, requests } = useApp();
   const location = useLocation();
+
+  const caps = getRoleCapabilities(activeRole);
+  const pendingRequestsCount = requests.filter((r) => r.status === 'Pending').length;
 
   const getProfileLink = () => {
     if (activeRole === 'student') return '/student-dashboard';
@@ -21,48 +30,129 @@ export const FeedLeftSidebar = () => {
     return '/admin';
   };
 
-  const navItems = [
-    { 
-      name: 'Community Feed', 
-      icon: Home, 
-      path: '/', 
-      isFilter: true, 
-      filterVal: 'all' 
-    },
-    { 
-      name: 'Explore Alumni', 
-      icon: Compass, 
-      path: '/explore' 
-    },
-    { 
-      name: 'Jobs & Internships', 
-      icon: Briefcase, 
-      badge: 'Hiring',
-      isFilter: true, 
-      filterVal: 'jobs' 
-    },
-    { 
-      name: 'Find a Mentor', 
-      icon: Sparkles, 
-      path: '/find-mentor' 
-    },
-    { 
-      name: 'Campus Events', 
-      icon: Calendar, 
-      path: '/events' 
-    },
-    { 
-      name: 'My Connections', 
-      icon: MessageSquare, 
-      path: '/my-connections' 
-    },
-    { 
-      name: 'Saved Posts', 
-      icon: Bookmark, 
-      isFilter: true, 
-      filterVal: 'saved' 
-    },
-  ];
+  const navItems = caps.isAlumni
+    ? [
+        { 
+          name: 'Community Feed', 
+          icon: Home, 
+          path: '/', 
+          isFilter: true, 
+          filterVal: 'all' 
+        },
+        { 
+          name: 'Alumni Directory', 
+          icon: Compass, 
+          path: '/explore' 
+        },
+        { 
+          name: 'Mentorship Requests', 
+          icon: Inbox, 
+          path: '/alumni-dashboard',
+          badge: pendingRequestsCount > 0 ? `${pendingRequestsCount} Pending` : null,
+          badgeColor: 'bg-red-50 text-red-700 border border-red-200'
+        },
+        { 
+          name: 'Post / Manage Jobs', 
+          icon: Briefcase, 
+          badge: 'Post Job',
+          badgeColor: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
+          path: '/jobs' 
+        },
+        { 
+          name: 'Campus Events', 
+          icon: Calendar, 
+          path: '/events' 
+        },
+        { 
+          name: 'Messages', 
+          icon: MessageSquare, 
+          path: '/messages' 
+        },
+        { 
+          name: 'Saved Posts', 
+          icon: Bookmark, 
+          isFilter: true, 
+          filterVal: 'saved' 
+        },
+      ]
+    : caps.isAdmin
+    ? [
+        { 
+          name: 'Admin Dashboard', 
+          icon: LayoutDashboard, 
+          path: '/admin' 
+        },
+        { 
+          name: 'Community Feed', 
+          icon: Home, 
+          path: '/', 
+          isFilter: true, 
+          filterVal: 'all' 
+        },
+        { 
+          name: 'Directory & Users', 
+          icon: Compass, 
+          path: '/explore' 
+        },
+        { 
+          name: 'Jobs Board', 
+          icon: Briefcase, 
+          path: '/jobs' 
+        },
+        { 
+          name: 'Campus Events', 
+          icon: Calendar, 
+          path: '/events' 
+        },
+        { 
+          name: 'Messages', 
+          icon: MessageSquare, 
+          path: '/messages' 
+        },
+      ]
+    : [
+        { 
+          name: 'Community Feed', 
+          icon: Home, 
+          path: '/', 
+          isFilter: true, 
+          filterVal: 'all' 
+        },
+        { 
+          name: 'Explore Alumni', 
+          icon: Compass, 
+          path: '/explore' 
+        },
+        { 
+          name: 'Find a Mentor', 
+          icon: Sparkles, 
+          path: '/find-mentor' 
+        },
+        { 
+          name: 'Jobs & Internships', 
+          icon: Briefcase, 
+          badge: 'Hiring',
+          badgeColor: 'bg-emerald-100 text-emerald-800',
+          isFilter: true, 
+          filterVal: 'jobs' 
+        },
+        { 
+          name: 'Campus Events', 
+          icon: Calendar, 
+          path: '/events' 
+        },
+        { 
+          name: 'Messages', 
+          icon: MessageSquare, 
+          path: '/messages' 
+        },
+        { 
+          name: 'Saved Posts', 
+          icon: Bookmark, 
+          isFilter: true, 
+          filterVal: 'saved' 
+        },
+      ];
 
   return (
     <aside className="space-y-3 sticky top-18">
@@ -174,6 +264,66 @@ export const FeedLeftSidebar = () => {
           );
         })}
       </nav>
+
+      {/* 3. Role-Aware Opportunities / Hub Card */}
+      {caps.isStudent ? (
+        <div className="bg-white rounded-xl border border-slate-200 p-3.5 shadow-2xs space-y-2.5">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold text-slate-900 flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+              <span>Opportunities for You</span>
+            </span>
+            <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded">
+              Active
+            </span>
+          </div>
+
+          <div className="space-y-1.5 text-xs text-slate-600">
+            <Link to="/jobs" className="flex items-center justify-between p-2 rounded-lg bg-slate-50 hover:bg-slate-100 transition-colors">
+              <span>3 Verified Internships</span>
+              <ArrowRight className="w-3 h-3 text-slate-400" />
+            </Link>
+            <Link to="/find-mentor" className="flex items-center justify-between p-2 rounded-lg bg-slate-50 hover:bg-slate-100 transition-colors">
+              <span>Find 1-on-1 Mentor</span>
+              <ArrowRight className="w-3 h-3 text-slate-400" />
+            </Link>
+          </div>
+        </div>
+      ) : caps.isAlumni ? (
+        <div className="bg-white rounded-xl border border-slate-200 p-3.5 shadow-2xs space-y-2.5">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold text-slate-900 flex items-center gap-1.5">
+              <ShieldCheck className="w-3.5 h-3.5 text-red-700" />
+              <span>Alumni Hub</span>
+            </span>
+            <span className="text-[10px] font-semibold text-red-700 bg-red-50 px-1.5 py-0.2 rounded">
+              Mentor
+            </span>
+          </div>
+
+          <div className="space-y-1.5 text-xs">
+            <Link
+              to="/alumni-dashboard"
+              className="flex items-center justify-between p-2 rounded-lg bg-red-50/60 hover:bg-red-50 text-red-900 border border-red-100 transition-colors"
+            >
+              <div>
+                <span className="font-semibold block">{pendingRequestsCount} Student Requests</span>
+                <span className="text-[10px] text-red-700">Awaiting your review</span>
+              </div>
+              <ArrowRight className="w-3.5 h-3.5 text-red-700" />
+            </Link>
+
+            <Link
+              to="/jobs"
+              className="flex items-center justify-between p-2 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-700 transition-colors"
+            >
+              <span>Post a Job / Referral</span>
+              <PlusCircle className="w-3.5 h-3.5 text-slate-500" />
+            </Link>
+          </div>
+        </div>
+      ) : null}
+
     </aside>
   );
 };

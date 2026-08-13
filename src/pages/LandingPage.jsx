@@ -3,26 +3,25 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { AlumniCard } from '../components/common/AlumniCard';
 import { 
-  Sparkles, 
-  Search, 
-  UserCheck, 
-  Calendar, 
-  MessageSquare, 
-  Briefcase, 
-  ArrowRight, 
-  CheckCircle, 
-  Shield, 
+  ShieldCheck, 
+  Users, 
   GraduationCap, 
-  Award,
-  Users,
-  Target,
-  TrendingUp,
-  Star
+  Target, 
+  ArrowRight, 
+  Search, 
+  CheckCircle2, 
+  Briefcase, 
+  Calendar, 
+  MessageSquare,
+  Sparkles,
+  Award
 } from 'lucide-react';
 
 export const LandingPage = () => {
   const navigate = useNavigate();
-  const { alumniList, events, setSelectedInterests } = useApp();
+  const { alumniList, setSelectedInterests } = useApp();
+
+  const featuredAlumni = alumniList.slice(0, 3);
 
   const handleDomainClick = (domain) => {
     setSelectedInterests([domain]);
@@ -30,473 +29,255 @@ export const LandingPage = () => {
   };
 
   return (
-    <div className="space-y-24 pb-20 overflow-hidden">
-      {/* 1. HERO SECTION */}
-      <section className="relative pt-10 pb-20 lg:pt-16 lg:pb-28 bg-gradient-to-b from-red-50/80 via-white to-slate-50">
-        {/* Glow backdrop blobs with keyframe pulse animation */}
-        <div className="hero-red-glow bg-red-600 w-[550px] h-[550px] -top-24 -left-24" />
-        <div className="hero-red-glow bg-rose-500 w-[450px] h-[450px] top-40 right-0" />
-
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+    <div className="min-h-screen bg-slate-100/75 py-6 sm:py-8 space-y-12">
+      <div className="max-w-6xl mx-auto px-3 sm:px-4 lg:px-6 space-y-12">
+        
+        {/* ============================================================ */}
+        {/* 1. HERO SECTION */}
+        {/* ============================================================ */}
+        <section className="bg-white rounded-xl border border-slate-200 p-6 sm:p-10 lg:p-12 shadow-2xs">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
             
-            {/* Left Hero Text */}
-            <div className="lg:col-span-7 space-y-6 text-center lg:text-left">
+            {/* Left Content (7 Cols) */}
+            <div className="lg:col-span-7 space-y-5 text-center lg:text-left">
               
-              {/* JU Alumni Crest Badge Banner */}
-              <div className="inline-flex items-center gap-3 bg-white/95 backdrop-blur-md px-4 py-2 rounded-2xl border-2 border-red-200 shadow-md animate-float">
+              {/* Badge */}
+              <div className="inline-flex items-center gap-2 bg-red-50 text-red-700 border border-red-200 px-3 py-1 rounded-full text-xs font-semibold">
                 <img
                   src="/ju-alumni-logo.jpg"
-                  alt="JECRC Alumni Association Logo"
-                  className="h-10 sm:h-12 w-auto object-contain rounded-md"
+                  alt="JECRC Alumni"
+                  className="h-4 w-4 object-contain rounded"
                 />
-                <div className="text-left">
-                  <span className="text-xs font-black text-red-900 block leading-tight">JU ALUMNI ASSOCIATION</span>
-                  <span className="text-[10px] font-extrabold text-red-600 tracking-wide uppercase">Let's Unite, Grow Together</span>
-                </div>
+                <span>JECRC Alumni Association • Official Community</span>
               </div>
 
-              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight text-slate-900 leading-[1.15]">
-                Connect with JU Alumni.{' '}
-                <span className="gradient-text-red">Build Your Future.</span>
+              {/* Heading */}
+              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-slate-900 tracking-tight leading-[1.15]">
+                Where the JECRC network <span className="text-red-700">grows together.</span>
               </h1>
 
-              <p className="text-lg sm:text-xl text-slate-600 font-normal leading-relaxed max-w-2xl mx-auto lg:mx-0">
-                Bridge the gap between campus and career. Connect with experienced JECRC graduates for 1-on-1 mentorship, career advice, resume reviews, project feedback, and placement prep.
+              {/* Subheading */}
+              <p className="text-xs sm:text-sm text-slate-600 leading-relaxed max-w-xl mx-auto lg:mx-0 font-normal">
+                Connect with thousands of JECRC students and accomplished alumni. Discover 1-on-1 career mentorship, off-campus placement referrals, and technical discussions.
               </p>
 
-              {/* CTAs */}
-              <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4 pt-2">
+              {/* Primary CTAs */}
+              <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-3 pt-2">
                 <Link
-                  to="/find-mentor"
-                  className="w-full sm:w-auto px-8 py-4 rounded-xl text-base font-extrabold text-white gradient-accent-red shadow-xl shadow-red-500/30 hover:shadow-red-500/45 hover:scale-[1.03] active:scale-[0.98] transition-all flex items-center justify-center gap-2 group"
+                  to="/register"
+                  className="w-full sm:w-auto px-6 py-2.5 rounded-md text-xs font-semibold text-white bg-red-700 hover:bg-red-800 transition-colors inline-flex items-center justify-center gap-2 shadow-2xs"
                 >
-                  <span>Find Your Mentor</span>
-                  <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                  <span>Join the Community</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
                 </Link>
 
                 <Link
-                  to="/explore"
-                  className="w-full sm:w-auto px-8 py-4 rounded-xl text-base font-extrabold text-slate-900 bg-white border-2 border-red-600/30 hover:border-red-600 hover:bg-red-50/60 shadow-sm transition-all flex items-center justify-center gap-2"
+                  to="/login"
+                  className="w-full sm:w-auto px-6 py-2.5 rounded-md text-xs font-semibold text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 transition-colors inline-flex items-center justify-center gap-2"
                 >
-                  <Search className="w-5 h-5 text-red-600" />
-                  <span>Explore Alumni Directory</span>
+                  <span>Sign In</span>
                 </Link>
               </div>
 
-              {/* Trust Badges */}
-              <div className="pt-6 flex flex-wrap items-center justify-center lg:justify-start gap-6 text-xs font-bold text-slate-700">
-                <div className="flex items-center gap-2">
-                  <CheckCircle className="w-4 h-4 text-red-600" />
-                  <span>100% Verified JU Graduates</span>
+              {/* Trust Metrics */}
+              <div className="pt-4 border-t border-slate-100 flex flex-wrap items-center justify-center lg:justify-start gap-5 text-xs text-slate-500">
+                <div className="flex items-center gap-1.5">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>100% Verified Graduates</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <CheckCircle className="w-4 h-4 text-red-600" />
+                <div className="flex items-center gap-1.5">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
                   <span>Free 1-on-1 Mentorship</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <CheckCircle className="w-4 h-4 text-red-600" />
-                  <span>Direct Campus Placement Prep</span>
+                <div className="flex items-center gap-1.5">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Tier-1 Tech Referrals</span>
                 </div>
               </div>
             </div>
 
-            {/* Right Hero Graphic Card */}
-            <div className="lg:col-span-5 relative">
-              <div className="relative mx-auto max-w-md lg:max-w-none">
-                
-                {/* Main Highlight Card */}
-                <div className="glass-card rounded-3xl p-6 shadow-2xl space-y-5 border-2 border-red-100/90 animate-float">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <img
-                        src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=200"
-                        alt="Priya Sharma"
-                        className="w-14 h-14 rounded-2xl object-cover border-2 border-red-600 shadow-md"
-                      />
-                      <div>
-                        <h4 className="font-extrabold text-slate-900 text-base">Priya Sharma</h4>
-                        <p className="text-xs font-bold text-red-600">Senior AI Engineer @ Google</p>
-                        <p className="text-[11px] text-slate-500 font-semibold">JECRC CS Class of 2018</p>
-                      </div>
-                    </div>
-                    <span className="bg-red-50 text-red-700 text-xs font-black px-3 py-1 rounded-full border border-red-200 shadow-2xs">
-                      98% Match
-                    </span>
-                  </div>
-
-                  <div className="bg-red-50/80 p-3.5 rounded-2xl border border-red-100 space-y-1">
-                    <span className="text-xs font-black text-red-900 flex items-center gap-1.5">
-                      <Sparkles className="w-4 h-4 text-red-600" />
-                      Mentorship Opportunity
-                    </span>
-                    <p className="text-xs text-slate-700 leading-snug">
-                      "Offering mock technical interviews & resume feedback for JECRC CSE students targeting Google, Microsoft & AI roles."
-                    </p>
-                  </div>
-
-                  <div className="pt-1 flex items-center justify-between border-t border-slate-100 text-xs text-slate-500">
-                    <span className="font-semibold">⚡ Responds within 24 hours</span>
-                    <Link
-                      to="/alumni/alm_1"
-                      className="font-extrabold text-red-600 hover:text-red-800 flex items-center gap-1"
-                    >
-                      <span>View Profile</span>
-                      <ArrowRight className="w-3.5 h-3.5" />
-                    </Link>
-                  </div>
-                </div>
-
-                {/* Floating Stat Badge */}
-                <div className="absolute -bottom-6 -left-6 bg-slate-900 text-white p-4 rounded-2xl shadow-xl flex items-center gap-3 border border-slate-800 hidden sm:flex">
-                  <div className="w-10 h-10 rounded-xl bg-red-600 flex items-center justify-center">
-                    <Star className="w-5 h-5 text-amber-300 fill-amber-300" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-black">4.9 / 5.0 Rating</p>
-                    <p className="text-[11px] text-slate-400">1,240+ JU Mentorship Sessions</p>
-                  </div>
-                </div>
-
+            {/* Right Card (5 Cols) */}
+            <div className="lg:col-span-5 bg-slate-900 text-white p-6 rounded-xl border border-slate-800 space-y-4">
+              <div className="space-y-1">
+                <span className="text-[10px] uppercase font-bold text-slate-400">Featured Network Spotlight</span>
+                <h3 className="text-sm font-bold text-white">Alumni at Leading Tech Firms</h3>
               </div>
-            </div>
 
-          </div>
-        </div>
-      </section>
-
-      {/* 2. PLATFORM STATISTICS */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="bg-gradient-to-br from-slate-900 via-red-950 to-slate-950 text-white rounded-3xl p-8 sm:p-12 shadow-2xl relative overflow-hidden border border-red-900/40">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-8 text-center divide-y lg:divide-y-0 lg:divide-x divide-red-900/40">
-            <div className="space-y-1">
-              <p className="text-4xl sm:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-red-400 to-rose-300">
-                1,890+
-              </p>
-              <p className="text-sm font-extrabold text-slate-200">Verified JU Alumni Mentors</p>
-              <p className="text-xs text-slate-400">Across 12+ Global Tech Hubs</p>
-            </div>
-
-            <div className="space-y-1 pt-6 lg:pt-0">
-              <p className="text-4xl sm:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-red-400 to-rose-300">
-                4,250+
-              </p>
-              <p className="text-sm font-extrabold text-slate-200">Active JECRC Students</p>
-              <p className="text-xs text-slate-400">Pursuing B.Tech, B.Des & MBA</p>
-            </div>
-
-            <div className="space-y-1 pt-6 lg:pt-0">
-              <p className="text-4xl sm:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-red-400 to-rose-300">
-                1,240+
-              </p>
-              <p className="text-sm font-extrabold text-slate-200">Mentorship Sessions</p>
-              <p className="text-xs text-slate-400">1-on-1 Sessions Conducted</p>
-            </div>
-
-            <div className="space-y-1 pt-6 lg:pt-0">
-              <p className="text-4xl sm:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-teal-300">
-                94%
-              </p>
-              <p className="text-sm font-extrabold text-slate-200">Placement Success Rate</p>
-              <p className="text-xs text-slate-400">Mentored Students Placed</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* 3. HOW ALUMBRIDGE WORKS */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
-        <div className="text-center space-y-3 max-w-2xl mx-auto">
-          <span className="text-xs font-black uppercase tracking-wider text-red-600 bg-red-50 px-3.5 py-1 rounded-full border border-red-200">
-            Simple 4-Step Journey
-          </span>
-          <h2 className="text-3xl sm:text-4xl font-black text-slate-900">
-            How AlumBridge Powers JU Students
-          </h2>
-          <p className="text-slate-600 text-sm sm:text-base">
-            From discovering your ideal alumni mentor to booking your first 1-on-1 placement guidance session.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-          
-          <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm relative space-y-4 hover:border-red-400 hover:shadow-md transition-all group">
-            <div className="w-12 h-12 rounded-2xl bg-red-50 text-red-600 font-black text-lg flex items-center justify-center group-hover:bg-red-600 group-hover:text-white transition-colors">
-              01
-            </div>
-            <h3 className="font-extrabold text-lg text-slate-900">Select Career Interests</h3>
-            <p className="text-sm text-slate-600 leading-relaxed">
-              Choose your domain, career goals, target companies, and areas where you need guidance.
-            </p>
-          </div>
-
-          <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm relative space-y-4 hover:border-red-400 hover:shadow-md transition-all group">
-            <div className="w-12 h-12 rounded-2xl bg-red-50 text-red-600 font-black text-lg flex items-center justify-center group-hover:bg-red-600 group-hover:text-white transition-colors">
-              02
-            </div>
-            <h3 className="font-extrabold text-lg text-slate-900">Smart Mentor Match</h3>
-            <p className="text-sm text-slate-600 leading-relaxed">
-              Our matching algorithm suggests alumni based on skills, company experience, and match score.
-            </p>
-          </div>
-
-          <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm relative space-y-4 hover:border-red-400 hover:shadow-md transition-all group">
-            <div className="w-12 h-12 rounded-2xl bg-red-50 text-red-600 font-black text-lg flex items-center justify-center group-hover:bg-red-600 group-hover:text-white transition-colors">
-              03
-            </div>
-            <h3 className="font-extrabold text-lg text-slate-900">Request Session</h3>
-            <p className="text-sm text-slate-600 leading-relaxed">
-              Submit your request specifying meeting objectives, resume review needs, or mock interview prep.
-            </p>
-          </div>
-
-          <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm relative space-y-4 hover:border-red-400 hover:shadow-md transition-all group">
-            <div className="w-12 h-12 rounded-2xl bg-red-50 text-red-600 font-black text-lg flex items-center justify-center group-hover:bg-red-600 group-hover:text-white transition-colors">
-              04
-            </div>
-            <h3 className="font-extrabold text-lg text-slate-900">Connect & Excel</h3>
-            <p className="text-sm text-slate-600 leading-relaxed">
-              Meet online or on campus, receive actionable feedback, and build a lifelong professional network.
-            </p>
-          </div>
-
-        </div>
-      </section>
-
-      {/* 4. CAREER DOMAINS */}
-      <section className="bg-red-50/50 py-16 border-y border-red-100">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10">
-          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-            <div>
-              <span className="text-xs font-black uppercase tracking-wider text-red-600">
-                Explore Specializations
-              </span>
-              <h2 className="text-3xl font-black text-slate-900 mt-1">
-                Explore Popular Career Domains
-              </h2>
-            </div>
-            <Link
-              to="/find-mentor"
-              className="text-sm font-extrabold text-red-600 hover:text-red-800 flex items-center gap-1"
-            >
-              <span>View All Mentors</span>
-              <ArrowRight className="w-4 h-4" />
-            </Link>
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-            {[
-              { name: "AI & Machine Learning", icon: Sparkles, count: "140+ Alumni" },
-              { name: "Web Development", icon: Target, count: "210+ Alumni" },
-              { name: "Data Science", icon: TrendingUp, count: "115+ Alumni" },
-              { name: "Cyber Security", icon: Shield, count: "80+ Alumni" },
-              { name: "Cloud Computing", icon: Users, count: "95+ Alumni" },
-              { name: "UI/UX Design", icon: Award, count: "75+ Alumni" },
-              { name: "Product Management", icon: Briefcase, count: "110+ Alumni" },
-              { name: "Finance & Venture", icon: GraduationCap, count: "90+ Alumni" },
-            ].map((domain, idx) => {
-              const Icon = domain.icon;
-              return (
-                <button
-                  key={idx}
-                  onClick={() => handleDomainClick(domain.name)}
-                  className="bg-white p-5 rounded-2xl border border-slate-200 hover:border-red-500 hover:shadow-md transition-all text-left group flex flex-col justify-between"
-                >
-                  <div className="w-10 h-10 rounded-xl bg-red-50 text-red-600 flex items-center justify-center group-hover:bg-red-600 group-hover:text-white transition-colors mb-3">
-                    <Icon className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h4 className="font-extrabold text-slate-900 text-sm group-hover:text-red-600 transition-colors">
-                      {domain.name}
-                    </h4>
-                    <p className="text-xs text-slate-500 font-semibold mt-0.5">{domain.count}</p>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      </section>
-
-      {/* 5. FEATURED ALUMNI */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10">
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-          <div>
-            <span className="text-xs font-black uppercase tracking-wider text-red-600">
-              JU Industry Leaders
-            </span>
-            <h2 className="text-3xl font-black text-slate-900 mt-1">
-              Featured Alumni Mentors
-            </h2>
-            <p className="text-slate-600 text-sm mt-1">
-              Connect with top JECRC graduates working at global technology firms.
-            </p>
-          </div>
-
-          <Link
-            to="/explore"
-            className="text-sm font-extrabold text-red-600 hover:text-red-800 flex items-center gap-1.5"
-          >
-            <span>Browse Full Directory</span>
-            <ArrowRight className="w-4 h-4" />
-          </Link>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {alumniList.slice(0, 3).map((alumni) => (
-            <AlumniCard key={alumni.id} alumni={alumni} showMatchReasons={true} />
-          ))}
-        </div>
-      </section>
-
-      {/* 6. UPCOMING EVENTS */}
-      <section className="bg-slate-950 text-white py-16 border-y border-red-950">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10">
-          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-            <div>
-              <span className="text-xs font-black uppercase tracking-wider text-red-400">
-                JECRC Campus & Virtual Sessions
-              </span>
-              <h2 className="text-3xl font-black text-white mt-1">
-                Upcoming Alumni Workshops & Talks
-              </h2>
-            </div>
-            <Link
-              to="/events"
-              className="text-sm font-extrabold text-red-400 hover:text-red-300 flex items-center gap-1"
-            >
-              <span>View All Events</span>
-              <ArrowRight className="w-4 h-4" />
-            </Link>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            {events.slice(0, 2).map((evt) => (
-              <div
-                key={evt.id}
-                className="bg-slate-900/90 rounded-3xl p-6 border border-slate-800 space-y-4 flex flex-col justify-between"
-              >
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="bg-red-950/80 text-red-300 px-3 py-1 rounded-full border border-red-800 font-black uppercase tracking-wider">
-                      {evt.category}
-                    </span>
-                    <span className="text-slate-400 font-semibold">{evt.date} • {evt.time}</span>
-                  </div>
-
-                  <h3 className="text-xl font-extrabold text-white">{evt.title}</h3>
-                  <p className="text-xs text-slate-300 leading-relaxed">{evt.description}</p>
-                </div>
-
-                <div className="pt-4 border-t border-slate-800 flex items-center justify-between gap-4">
-                  <div className="flex items-center gap-3">
+              <div className="space-y-2.5 divide-y divide-slate-800 text-xs">
+                {featuredAlumni.map((alum) => (
+                  <div key={alum.id} className="pt-2.5 first:pt-0 flex items-start gap-2.5">
                     <img
-                      src={evt.speakerAvatar}
-                      alt={evt.speaker}
-                      className="w-10 h-10 rounded-full object-cover border border-red-500/50"
+                      src={alum.avatar}
+                      alt={alum.name}
+                      className="w-9 h-9 rounded-full object-cover border border-slate-700 shrink-0"
                     />
-                    <div className="text-xs">
-                      <p className="font-extrabold text-white">{evt.speaker}</p>
-                      <p className="text-slate-400">{evt.location}</p>
+                    <div className="min-w-0 space-y-0.5">
+                      <span className="font-bold text-white block truncate">{alum.name}</span>
+                      <p className="text-[11px] text-slate-400 truncate">{alum.currentRole} @ {alum.company}</p>
+                      <span className="text-[10px] text-slate-500 block">JECRC Class of {alum.graduationYear}</span>
                     </div>
                   </div>
-
-                  <Link
-                    to="/events"
-                    className="px-4 py-2 rounded-xl text-xs font-extrabold text-white bg-red-600 hover:bg-red-500 transition-colors shadow-md"
-                  >
-                    Register
-                  </Link>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* 7. STUDENT TESTIMONIALS */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10">
-        <div className="text-center space-y-2 max-w-2xl mx-auto">
-          <span className="text-xs font-black uppercase tracking-wider text-red-600">
-            JECRC Placement Impact Stories
-          </span>
-          <h2 className="text-3xl font-black text-slate-900">
-            What JU Students Say About AlumBridge
-          </h2>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {[
-            {
-              quote: "Priya's mock technical interview was the exact reason I cracked the Google SSE intern offer! She pointed out my resume weaknesses and gave me system design tips.",
-              name: "Raj Kumar",
-              role: "JU B.Tech CSE '26",
-              company: "Placed @ Google (Intern)"
-            },
-            {
-              quote: "Arjun helped me review my React project portfolio. His architectural advice gave me immense confidence during my Stripe interview process.",
-              name: "Sneha Kapadia",
-              role: "JU B.Tech IT '25",
-              company: "Placed @ Stripe"
-            },
-            {
-              quote: "The 1-on-1 placement guidance with JU alumni gave me clarity on choosing between Product Management and Data Science. Truly priceless!",
-              name: "Vikrant Singh",
-              role: "JU MBA Class of '25",
-              company: "Placed @ Microsoft"
-            }
-          ].map((t, idx) => (
-            <div key={idx} className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4 flex flex-col justify-between hover:border-red-200 transition-colors">
-              <div className="space-y-3">
-                <div className="flex gap-1 text-amber-400">
-                  {[...Array(5)].map((_, i) => (
-                    <Star key={i} className="w-4 h-4 fill-amber-400" />
-                  ))}
-                </div>
-                <p className="text-sm text-slate-700 italic leading-relaxed">
-                  "{t.quote}"
-                </p>
+                ))}
               </div>
 
-              <div className="pt-4 border-t border-slate-100">
-                <h4 className="font-extrabold text-slate-900 text-sm">{t.name}</h4>
-                <p className="text-xs text-slate-500 font-semibold">{t.role} • <span className="font-extrabold text-emerald-600">{t.company}</span></p>
+              <div className="pt-2 border-t border-slate-800 flex items-center justify-between text-xs">
+                <span className="text-slate-400 text-[11px]">1,890+ Verified JU Alumni</span>
+                <Link to="/explore" className="text-red-400 font-semibold hover:underline">
+                  Browse Directory →
+                </Link>
               </div>
             </div>
-          ))}
-        </div>
-      </section>
 
-      {/* 8. CALL-TO-ACTION BANNER */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="gradient-red-card text-white rounded-3xl p-10 sm:p-14 text-center space-y-6 shadow-2xl relative overflow-hidden">
-          <div className="hero-red-glow bg-rose-500 w-[350px] h-[350px] top-0 left-1/2 -translate-x-1/2" />
-          
-          <div className="relative z-10 max-w-2xl mx-auto space-y-4">
-            <h2 className="text-3xl sm:text-4xl font-black text-white tracking-tight">
-              Ready to Accelerate Your Career at JECRC?
+          </div>
+        </section>
+
+        {/* ============================================================ */}
+        {/* 2. WHY JECRC COMMUNITY (3 PILLARS) */}
+        {/* ============================================================ */}
+        <section className="space-y-4">
+          <div className="text-center space-y-1 max-w-xl mx-auto">
+            <h2 className="text-lg font-bold text-slate-900">
+              Why JECRC Community?
             </h2>
-            <p className="text-slate-200 text-base font-normal">
-              Join thousands of JECRC University students connecting with top alumni mentors today.
+            <p className="text-xs text-slate-500">
+              Built exclusively for JECRC University students and alumni to accelerate careers and foster lifelong connections.
             </p>
+          </div>
 
-            <div className="pt-4 flex flex-col sm:flex-row items-center justify-center gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-2xs space-y-2">
+              <div className="w-8 h-8 rounded-lg bg-slate-100 text-slate-800 flex items-center justify-center font-bold">
+                <Users className="w-4 h-4 text-red-700" />
+              </div>
+              <h3 className="text-xs font-bold text-slate-900">1-on-1 Mentorship</h3>
+              <p className="text-xs text-slate-500 leading-relaxed font-normal">
+                Book direct 45-minute video sessions with senior software engineers, researchers, and product managers graduated from JECRC.
+              </p>
+            </div>
+
+            <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-2xs space-y-2">
+              <div className="w-8 h-8 rounded-lg bg-slate-100 text-slate-800 flex items-center justify-center font-bold">
+                <Target className="w-4 h-4 text-red-700" />
+              </div>
+              <h3 className="text-xs font-bold text-slate-900">Placement Preparation</h3>
+              <p className="text-xs text-slate-500 leading-relaxed font-normal">
+                Prepare for technical coding interviews, system design rounds, and resume screenings with mentors who walked the same campus halls.
+              </p>
+            </div>
+
+            <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-2xs space-y-2">
+              <div className="w-8 h-8 rounded-lg bg-slate-100 text-slate-800 flex items-center justify-center font-bold">
+                <ShieldCheck className="w-4 h-4 text-emerald-700" />
+              </div>
+              <h3 className="text-xs font-bold text-slate-900">Verified Alumni Network</h3>
+              <p className="text-xs text-slate-500 leading-relaxed font-normal">
+                Every alumni profile is officially verified by the Directorate of Alumni Relations at JECRC University.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        {/* ============================================================ */}
+        {/* 3. STUDENT & ALUMNI VALUE COMPARISON */}
+        {/* ============================================================ */}
+        <section className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* For Students */}
+          <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-2xs space-y-3">
+            <div className="flex items-center gap-2">
+              <GraduationCap className="w-4 h-4 text-red-700" />
+              <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">For Students</h3>
+            </div>
+            <h4 className="text-sm font-bold text-slate-900">Get Ahead in Your Placement Journey</h4>
+            <ul className="space-y-2 text-xs text-slate-600">
+              <li className="flex items-start gap-2">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
+                <span>1-on-1 mock interviews and resume reviews with industry veterans.</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
+                <span>Off-campus job and internship referrals posted directly by alumni.</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
+                <span>Explore student project collaborations and participate in campus hackathons.</span>
+              </li>
+            </ul>
+            <div className="pt-2">
               <Link
-                to="/find-mentor"
-                className="w-full sm:w-auto px-8 py-4 rounded-xl font-extrabold text-red-950 bg-white hover:bg-slate-100 transition-all shadow-lg scale-105"
+                to="/register"
+                className="text-xs font-semibold text-red-700 hover:underline inline-flex items-center gap-1"
               >
-                Find My Mentor Now
-              </Link>
-              <Link
-                to="/explore"
-                className="w-full sm:w-auto px-8 py-4 rounded-xl font-extrabold text-white border-2 border-white/40 hover:bg-white/10 transition-all"
-              >
-                Browse Alumni Directory
+                <span>Register as Student</span>
+                <ArrowRight className="w-3.5 h-3.5" />
               </Link>
             </div>
           </div>
-        </div>
-      </section>
+
+          {/* For Alumni */}
+          <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-2xs space-y-3">
+            <div className="flex items-center gap-2">
+              <Briefcase className="w-4 h-4 text-red-700" />
+              <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">For Alumni</h3>
+            </div>
+            <h4 className="text-sm font-bold text-slate-900">Give Back & Reconnect with Your Alma Mater</h4>
+            <ul className="space-y-2 text-xs text-slate-600">
+              <li className="flex items-start gap-2">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
+                <span>Mentor talented students and guide the next generation of engineers.</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
+                <span>Hire top JECRC talent and post company job referrals.</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
+                <span>Network with fellow alumni across global tech chapters and annual mixers.</span>
+              </li>
+            </ul>
+            <div className="pt-2">
+              <Link
+                to="/register"
+                className="text-xs font-semibold text-red-700 hover:underline inline-flex items-center gap-1"
+              >
+                <span>Join as Alumni Mentor</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+            </div>
+          </div>
+        </section>
+
+        {/* ============================================================ */}
+        {/* 4. FINAL CALL TO ACTION */}
+        {/* ============================================================ */}
+        <section className="bg-white rounded-xl border border-slate-200 p-8 text-center space-y-4 shadow-2xs">
+          <div className="space-y-1 max-w-md mx-auto">
+            <h2 className="text-xl font-bold text-slate-900">
+              Ready to connect with the JECRC network?
+            </h2>
+            <p className="text-xs text-slate-500 leading-relaxed font-normal">
+              Join students and alumni already growing their careers together on JECRC Community.
+            </p>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-1">
+            <Link
+              to="/register"
+              className="px-6 py-2.5 rounded-md text-xs font-semibold text-white bg-red-700 hover:bg-red-800 transition-colors inline-flex items-center gap-1.5 shadow-2xs"
+            >
+              <span>Create Your Account</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+
+            <Link
+              to="/login"
+              className="px-5 py-2.5 rounded-md text-xs font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 transition-colors"
+            >
+              Sign In
+            </Link>
+          </div>
+        </section>
+
+      </div>
     </div>
   );
 };

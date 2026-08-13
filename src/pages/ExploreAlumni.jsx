@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import { AlumniCard } from '../components/common/AlumniCard';
 import { CAREER_DOMAINS, INDUSTRIES } from '../data/mockData';
-import { Search, X, SlidersHorizontal, RotateCcw } from 'lucide-react';
+import { Search, X, RotateCcw } from 'lucide-react';
 
 export const ExploreAlumni = () => {
   const { alumniList } = useApp();

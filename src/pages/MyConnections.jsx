@@ -96,14 +96,13 @@ export const MyConnections = () => {
             >
               Mentorship Sessions
             </button>
-            <button
-              onClick={() => setMainView('messages')}
-              className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors cursor-pointer ${
-                mainView === 'messages' ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-600 hover:text-slate-900'
-              }`}
+            <Link
+              to="/messages"
+              className="px-3 py-1.5 rounded-md text-xs font-semibold transition-colors text-slate-600 hover:text-slate-900 inline-flex items-center gap-1.5"
             >
-              Direct Messages
-            </button>
+              <MessageSquare className="w-3.5 h-3.5" />
+              <span>Direct Messages</span>
+            </Link>
           </div>
         </div>
 
@@ -196,16 +195,13 @@ export const MyConnections = () => {
                         </a>
                       )}
 
-                      <button
-                        onClick={() => {
-                          setSelectedChatUser(req.alumniId);
-                          setMainView('messages');
-                        }}
+                      <Link
+                        to={`/messages?userId=${req.alumniId}`}
                         className="px-3 py-1.5 rounded-md text-xs font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 transition-colors inline-flex items-center gap-1.5 cursor-pointer"
                       >
                         <MessageSquare className="w-3.5 h-3.5 text-slate-400" />
                         <span>Chat</span>
-                      </button>
+                      </Link>
                     </div>
                   </div>
                 ))}

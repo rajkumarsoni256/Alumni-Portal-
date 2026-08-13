@@ -5,7 +5,7 @@ import { useApp } from '../../context/AppContext';
 
 export const AlumniCard = ({ alumni, showMatchReasons = false }) => {
   const navigate = useNavigate();
-  const { savedAlumniIds, toggleSaveAlumni } = useApp();
+  const { savedAlumniIds, toggleSaveAlumni, activeRole } = useApp();
   const isSaved = savedAlumniIds.includes(alumni.id);
 
   return (
@@ -123,7 +123,15 @@ export const AlumniCard = ({ alumni, showMatchReasons = false }) => {
           Profile
         </Link>
 
-        {alumni.isAvailableForMentorship ? (
+        {activeRole === 'alumni' ? (
+          <Link
+            to={`/messages?userId=${alumni.id}`}
+            className="w-full text-center py-1.5 rounded-md text-xs font-semibold text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 transition-colors inline-flex items-center justify-center gap-1"
+          >
+            <MessageSquare className="w-3 h-3 text-slate-500" />
+            <span>Message</span>
+          </Link>
+        ) : alumni.isAvailableForMentorship ? (
           <button
             onClick={() => navigate(`/request-mentorship/${alumni.id}`)}
             className="w-full text-center py-1.5 rounded-md text-xs font-semibold text-white bg-red-700 hover:bg-red-800 transition-colors cursor-pointer"

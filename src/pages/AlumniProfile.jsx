@@ -141,7 +141,7 @@ export const AlumniProfile = () => {
                     )}
 
                     <Link
-                      to="/my-connections"
+                      to={`/messages?userId=${alumni.id}`}
                       className="px-3.5 py-1.5 rounded-md text-xs font-semibold text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 transition-colors inline-flex items-center gap-1.5"
                     >
                       <MessageSquare className="w-3.5 h-3.5" />
