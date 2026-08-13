@@ -32,6 +32,7 @@ app.get('/actuator/health', (req, res) => {
 // API Routes
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/profiles', profileRoutes);
+app.use('/api/v1/users', profileRoutes);
 
 // Global Error Handler
 app.use(errorHandler);
