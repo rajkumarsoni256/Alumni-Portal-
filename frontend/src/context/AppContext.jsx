@@ -13,6 +13,7 @@ import {
 import { authService } from '../services/authService';
 import { postService } from '../services/postService';
 import { messageService } from '../services/messageService';
+import { profileService } from '../services/profileService';
 
 const AppContext = createContext();
 
@@ -104,10 +105,15 @@ export const AppProvider = ({ children }) => {
           const user = await authService.getCurrentUser();
           if (user) {
             const normalizedRole = (user.role || 'STUDENT').toLowerCase();
+            const isComplete = user.profileComplete !== false;
             setAuthUser(user);
             setActiveRole(normalizedRole);
             setIsAuthenticated(true);
-            setAuthStatus('AUTHENTICATED');
+            if (user.role?.toUpperCase() === 'ADMIN' || isComplete) {
+              setAuthStatus('AUTHENTICATED');
+            } else {
+              setAuthStatus('ONBOARDING');
+            }
           } else {
             authService.clearToken();
             setIsAuthenticated(false);
@@ -168,11 +174,16 @@ export const AppProvider = ({ children }) => {
       const response = await authService.login({ email, password });
       const user = response.user || response;
       const normalizedRole = (user.role || 'STUDENT').toLowerCase();
+      const isComplete = user.profileComplete !== false;
 
       setAuthUser(user);
       setActiveRole(normalizedRole);
       setIsAuthenticated(true);
-      setAuthStatus('AUTHENTICATED');
+      if (user.role?.toUpperCase() === 'ADMIN' || isComplete) {
+        setAuthStatus('AUTHENTICATED');
+      } else {
+        setAuthStatus('ONBOARDING');
+      }
       showNotification(`Welcome back, ${user.email}!`);
       return user;
     } catch (err) {
@@ -190,11 +201,16 @@ export const AppProvider = ({ children }) => {
       const response = await authService.loginWithGoogle(idToken);
       const user = response.user || response;
       const normalizedRole = (user.role || 'STUDENT').toLowerCase();
+      const isComplete = user.profileComplete !== false;
 
       setAuthUser(user);
       setActiveRole(normalizedRole);
       setIsAuthenticated(true);
-      setAuthStatus('AUTHENTICATED');
+      if (user.role?.toUpperCase() === 'ADMIN' || isComplete) {
+        setAuthStatus('AUTHENTICATED');
+      } else {
+        setAuthStatus('ONBOARDING');
+      }
       showNotification(`Signed in with Google as ${user.email}`);
       return user;
     } catch (err) {
@@ -289,17 +305,8 @@ export const AppProvider = ({ children }) => {
 
   const completeUserOnboarding = async (onboardingData) => {
     try {
-      if (pendingRegistration.role === 'student') {
-        setStudent((prev) => ({
-          ...prev,
-          name: onboardingData.name || prev.name,
-          degree: `${onboardingData.degree || 'B.Tech'} ${onboardingData.branch || 'CSE'}`,
-          graduationYear: onboardingData.graduationYear || '2026',
-          bio: onboardingData.bio || prev.bio,
-          avatar: onboardingData.avatar || prev.avatar,
-        }));
-      }
-
+      await profileService.completeOnboarding(onboardingData);
+      setAuthUser((prev) => (prev ? { ...prev, profileComplete: true } : prev));
       setIsAuthenticated(true);
       setAuthStatus('AUTHENTICATED');
       showNotification('Welcome to JECRC Community! Your profile is ready.');

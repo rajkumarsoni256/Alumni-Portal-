@@ -8,7 +8,7 @@ import { AppShell } from './AppShell';
  * Enforces authentication & completed onboarding before rendering the authenticated shell.
  */
 export const ProtectedRoute = ({ children, hideSidebar = false }) => {
-  const { isLoading, isAuthenticated, authStatus } = useApp();
+  const { isLoading, isAuthenticated, authStatus, authUser } = useApp();
   const location = useLocation();
 
   if (isLoading) {
@@ -28,8 +28,13 @@ export const ProtectedRoute = ({ children, hideSidebar = false }) => {
     return <Navigate to="/verify-email" replace />;
   }
 
-  if (authStatus === 'ONBOARDING' && !location.pathname.startsWith('/onboarding')) {
-    return <Navigate to="/onboarding" replace />;
+  const isProfileComplete = authUser?.profileComplete !== false;
+  const isAdmin = authUser?.role?.toUpperCase() === 'ADMIN';
+
+  if (!isAdmin && (!isProfileComplete || authStatus === 'ONBOARDING')) {
+    if (!location.pathname.startsWith('/onboarding')) {
+      return <Navigate to="/onboarding" replace />;
+    }
   }
 
   return (
