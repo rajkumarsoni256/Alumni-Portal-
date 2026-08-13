@@ -2,7 +2,6 @@ import React from 'react';
 import { Navbar } from '../../common/Navbar';
 import { AdminSidebar } from './AdminSidebar';
 import { MobileBottomNav } from '../../common/MobileBottomNav';
-import { QuickRoleBar } from '../../common/QuickRoleBar';
 
 /**
  * AdminLayout — Authenticated Admin Shell
@@ -13,9 +12,6 @@ export const AdminLayout = ({ children }) => {
   return (
     <div className="min-h-screen flex flex-col bg-slate-100/75 text-slate-900 font-sans antialiased selection:bg-red-700 selection:text-white pb-16 md:pb-0">
       
-      {/* Dev Prototype Role Switcher */}
-      <QuickRoleBar />
-
       {/* Global Top Navbar */}
       <Navbar />
 

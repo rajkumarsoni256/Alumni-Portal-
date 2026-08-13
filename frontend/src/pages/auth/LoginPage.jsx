@@ -30,8 +30,11 @@ export const LoginPage = () => {
     try {
       const user = await loginWithGoogle(idToken);
       const userRole = (user && user.role) ? user.role.toLowerCase() : 'student';
+      const isComplete = user && user.profileComplete !== false;
       if (userRole === 'admin') {
         navigate('/admin');
+      } else if (!isComplete) {
+        navigate('/onboarding');
       } else {
         navigate('/');
       }
@@ -104,8 +107,11 @@ export const LoginPage = () => {
     try {
       const user = await loginUser({ email, password });
       const userRole = (user && user.role) ? user.role.toLowerCase() : 'student';
+      const isComplete = user && user.profileComplete !== false;
       if (userRole === 'admin') {
         navigate('/admin');
+      } else if (!isComplete) {
+        navigate('/onboarding');
       } else {
         navigate('/');
       }

@@ -2,7 +2,6 @@ import React from 'react';
 import { Navbar } from '../common/Navbar';
 import { AppSidebar } from './AppSidebar';
 import { MobileBottomNav } from '../common/MobileBottomNav';
-import { QuickRoleBar } from '../common/QuickRoleBar';
 
 /**
  * AppShell — Master Authenticated Layout Wrapper
@@ -14,9 +13,6 @@ export const AppShell = ({ children, hideSidebar = false }) => {
   return (
     <div className="min-h-screen flex flex-col bg-slate-100/75 text-slate-900 font-sans antialiased selection:bg-red-600 selection:text-white pb-16 md:pb-0">
       
-      {/* Dev Prototype Role Switcher */}
-      <QuickRoleBar />
-
       {/* Global Top Navbar */}
       <Navbar />
 

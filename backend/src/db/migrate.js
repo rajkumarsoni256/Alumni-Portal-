@@ -1,4 +1,6 @@
 const db = require('../config/db');
+const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 
 const migrate = async () => {
   try {
@@ -97,6 +99,30 @@ const migrate = async () => {
     await db.query(`CREATE INDEX IF NOT EXISTS idx_user_profiles_branch ON user_profiles(branch);`);
     await db.query(`CREATE INDEX IF NOT EXISTS idx_user_profiles_grad_year ON user_profiles(graduation_year);`);
     await db.query(`CREATE INDEX IF NOT EXISTS idx_user_profiles_location ON user_profiles(location);`);
+
+    // Seed default ADMIN user if no ADMIN account exists
+    const adminEmail = (process.env.ADMIN_EMAIL || 'admin@jecrc.ac.in').trim().toLowerCase();
+    const adminPassword = process.env.ADMIN_PASSWORD || 'AdminPassword@123';
+
+    const adminCheck = await db.query(`SELECT id FROM users WHERE email = $1 OR role = 'ADMIN'`, [adminEmail]);
+    if (adminCheck.rows.length === 0) {
+      const passwordHash = await bcrypt.hash(adminPassword, 10);
+      const adminId = crypto.randomUUID();
+
+      await db.query(
+        `INSERT INTO users (id, email, password_hash, role, email_verified, account_status)
+         VALUES ($1, $2, $3, 'ADMIN', true, 'ACTIVE')`,
+        [adminId, adminEmail, passwordHash]
+      );
+
+      await db.query(
+        `INSERT INTO user_profiles (id, user_id, full_name, designation, company, is_profile_complete)
+         VALUES ($1, $2, 'Directorate of Alumni Relations', 'Dean of Alumni Relations', 'JECRC University', true)`,
+        [crypto.randomUUID(), adminId]
+      );
+
+      console.log(`[MIGRATION SEED] Created default Admin user: ${adminEmail}`);
+    }
 
     console.log('[MIGRATION] PostgreSQL database schema migration completed successfully.');
   } catch (err) {

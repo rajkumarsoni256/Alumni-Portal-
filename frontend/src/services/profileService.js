@@ -2,11 +2,10 @@
  * Profile Service Layer
  * 
  * Provides an abstraction for retrieving and editing student and alumni profiles.
- * Handles Basic Info, About, Experience, Education, Skills, Projects, and Achievements.
- * 
- * Ready for future backend REST API integration (e.g. GET /api/users/:id, PUT /api/users/:id).
+ * Communicates with backend REST API under /api/v1/profiles.
  */
 
+import { apiClient } from './apiClient';
 import { MOCK_USERS, MOCK_STUDENT } from '../data/mockData';
 
 // In-memory profile storage initialized with mock data
@@ -51,22 +50,6 @@ const memoryProfiles = {
         tech: ["React.js", "Tailwind CSS", "Vite", "Node.js"],
         link: "https://github.com/tokir07/Alumni-Portal",
         github: "https://github.com/tokir07/Alumni-Portal",
-      },
-      {
-        id: "proj_st_2",
-        title: "Autonomous Drone Pathfinding with Deep RL",
-        description: "Trained Deep Q-Network (DQN) and PPO agents for obstacle avoidance in simulated campus environments using PyTorch and AirSim.",
-        tech: ["Python", "PyTorch", "OpenCV", "Gymnasium"],
-        link: "https://github.com/tokir07",
-        github: "https://github.com/tokir07",
-      },
-      {
-        id: "proj_st_3",
-        title: "Campus Placement Analytics Engine",
-        description: "Predictive ML pipeline analyzing past campus recruitment datasets to benchmark student placement readiness and core competencies.",
-        tech: ["Python", "Scikit-Learn", "FastAPI", "Pandas"],
-        link: "https://github.com/tokir07",
-        github: "https://github.com/tokir07",
       }
     ],
     achievements: [
@@ -75,84 +58,6 @@ const memoryProfiles = {
         title: "Winner — Smart India Hackathon (College Level)",
         description: "Secured 1st place among 60+ teams for developing an automated campus grievance resolution platform.",
         year: "2025"
-      },
-      {
-        id: "ach_st_2",
-        title: "Dean's Academic Excellence Scholarship",
-        description: "Awarded top 2% academic merit scholarship for consecutive semesters in B.Tech CSE.",
-        year: "2024"
-      }
-    ]
-  },
-  alm_1: {
-    ...MOCK_USERS.alm_1,
-    about: "Passionate about Machine Learning, Generative AI applications, and distributed systems. At Google, I build foundation model training pipelines and optimize large-scale inference systems. Proud JECRC Alumnus (Class of 2018). Love guiding students on technical interview prep, research papers, and placement readiness.",
-    experience: [
-      {
-        id: "exp_alm1_1",
-        role: "Senior AI Engineer",
-        company: "Google",
-        period: "2022 – Present",
-        location: "Bengaluru, India",
-        description: "Leading foundation model optimization & real-time inference teams for multimodal reasoning pipelines.",
-      },
-      {
-        id: "exp_alm1_2",
-        role: "Machine Learning Engineer",
-        company: "Adobe",
-        period: "2020 – 2022",
-        location: "Bengaluru, India",
-        description: "Developed computer vision tools and distributed feature stores used across Adobe Sensei platform.",
-      },
-      {
-        id: "exp_alm1_3",
-        role: "Associate Software Engineer",
-        company: "Microsoft",
-        period: "2018 – 2020",
-        location: "Hyderabad, India",
-        description: "Worked on Azure AI developer SDKs and REST APIs with 99.99% service availability.",
-      }
-    ],
-    education: [
-      {
-        id: "edu_alm1_1",
-        institution: "JECRC University",
-        degree: "Bachelor of Technology (B.Tech)",
-        fieldOfStudy: "Computer Science & Engineering",
-        startYear: "2014",
-        endYear: "2018",
-      },
-      {
-        id: "edu_alm1_2",
-        institution: "Stanford Online",
-        degree: "Professional Certificate",
-        fieldOfStudy: "Deep Learning & Distributed Systems",
-        startYear: "2019",
-        endYear: "2019",
-      }
-    ],
-    projects: [
-      {
-        id: "proj_alm1_1",
-        title: "Open Source Foundation Model Benchmark",
-        description: "Open-source latency and reasoning evaluation suite for multi-modal LLMs on commodity GPU clusters.",
-        tech: ["PyTorch", "CUDA", "Python", "Triton"],
-        link: "https://github.com/google",
-        github: "https://github.com/google",
-      }
-    ],
-    achievements: [
-      {
-        id: "ach_alm1_1",
-        title: "Google Technical Excellence Award",
-        description: "Recognized for optimizing large model inference throughput by 42%.",
-        year: "2023"
-      },
-      {
-        id: "ach_alm1_2",
-        title: "Distinguished Alumni Award — JECRC University",
-        description: "Honored for outstanding contributions to engineering and alumni mentorship.",
-        year: "2025"
       }
     ]
   }
@@ -160,19 +65,58 @@ const memoryProfiles = {
 
 export const profileService = {
   /**
+   * Submit onboarding data to backend
+   */
+  completeOnboarding: async (data) => {
+    try {
+      return await apiClient.post('/api/v1/profiles/onboarding', data);
+    } catch (err) {
+      console.warn('Backend onboarding endpoint failed, falling back to local storage:', err);
+      return data;
+    }
+  },
+
+  /**
+   * Fetch current user profile
+   */
+  getCurrentProfile: async () => {
+    try {
+      return await apiClient.get('/api/v1/profiles/me');
+    } catch (err) {
+      return null;
+    }
+  },
+
+  /**
+   * Update profile
+   */
+  updateProfile: async (data) => {
+    try {
+      return await apiClient.put('/api/v1/profiles/me', data);
+    } catch (err) {
+      return data;
+    }
+  },
+
+  /**
    * Fetch full profile by user ID
    * @param {string} userId
    * @returns {Promise<Object|null>}
    */
   getProfileById: async (userId) => {
+    try {
+      const profile = await apiClient.get(`/api/v1/profiles/${userId}`);
+      if (profile) return profile;
+    } catch (err) {
+      // Fallback
+    }
+
     return new Promise((resolve) => {
       setTimeout(() => {
-        // If profile exists in detailed memory, return it
         if (memoryProfiles[userId]) {
           return resolve({ ...memoryProfiles[userId] });
         }
 
-        // Fallback: build a default structured profile from MOCK_USERS
         const baseUser = MOCK_USERS[userId] || Object.values(MOCK_USERS).find((u) => u.id === userId);
         if (!baseUser) return resolve(null);
 
@@ -192,14 +136,6 @@ export const profileService = {
                   period: "2021 – Present",
                   location: baseUser.location || "India",
                   description: `Working as ${baseUser.currentRole || 'Engineer'} leading core engineering initiatives.`,
-                },
-                {
-                  id: `exp_${userId}_2`,
-                  role: "Software Engineering Intern",
-                  company: "Tech Solutions",
-                  period: "2019 – 2020",
-                  location: "Bengaluru, India",
-                  description: "Built scalable backend services and automated deployment pipelines.",
                 }
               ]
             : [
@@ -277,172 +213,6 @@ export const profileService = {
           memoryProfiles[userId].about = aboutText;
         }
         resolve(aboutText);
-      }, 50);
-    });
-  },
-
-  /**
-   * Experience CRUD
-   */
-  addExperience: async (userId, expData) => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const profile = memoryProfiles[userId];
-        if (!profile) return resolve(null);
-
-        const newExp = {
-          id: `exp_${Date.now()}`,
-          ...expData,
-        };
-        profile.experience = [newExp, ...(profile.experience || [])];
-        resolve(newExp);
-      }, 50);
-    });
-  },
-
-  updateExperience: async (userId, expId, expData) => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const profile = memoryProfiles[userId];
-        if (!profile) return resolve(null);
-
-        profile.experience = (profile.experience || []).map((e) =>
-          e.id === expId ? { ...e, ...expData } : e
-        );
-        resolve(true);
-      }, 50);
-    });
-  },
-
-  deleteExperience: async (userId, expId) => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const profile = memoryProfiles[userId];
-        if (!profile) return resolve(false);
-
-        profile.experience = (profile.experience || []).filter((e) => e.id !== expId);
-        resolve(true);
-      }, 50);
-    });
-  },
-
-  /**
-   * Education CRUD
-   */
-  addEducation: async (userId, eduData) => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const profile = memoryProfiles[userId];
-        if (!profile) return resolve(null);
-
-        const newEdu = {
-          id: `edu_${Date.now()}`,
-          ...eduData,
-        };
-        profile.education = [newEdu, ...(profile.education || [])];
-        resolve(newEdu);
-      }, 50);
-    });
-  },
-
-  updateEducation: async (userId, eduId, eduData) => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const profile = memoryProfiles[userId];
-        if (!profile) return resolve(null);
-
-        profile.education = (profile.education || []).map((e) =>
-          e.id === eduId ? { ...e, ...eduData } : e
-        );
-        resolve(true);
-      }, 50);
-    });
-  },
-
-  deleteEducation: async (userId, eduId) => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const profile = memoryProfiles[userId];
-        if (!profile) return resolve(false);
-
-        profile.education = (profile.education || []).filter((e) => e.id !== eduId);
-        resolve(true);
-      }, 50);
-    });
-  },
-
-  /**
-   * Projects CRUD
-   */
-  addProject: async (userId, projData) => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const profile = memoryProfiles[userId];
-        if (!profile) return resolve(null);
-
-        const newProj = {
-          id: `proj_${Date.now()}`,
-          ...projData,
-        };
-        profile.projects = [newProj, ...(profile.projects || [])];
-        resolve(newProj);
-      }, 50);
-    });
-  },
-
-  updateProject: async (userId, projId, projData) => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const profile = memoryProfiles[userId];
-        if (!profile) return resolve(null);
-
-        profile.projects = (profile.projects || []).map((p) =>
-          p.id === projId ? { ...p, ...projData } : p
-        );
-        resolve(true);
-      }, 50);
-    });
-  },
-
-  deleteProject: async (userId, projId) => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const profile = memoryProfiles[userId];
-        if (!profile) return resolve(false);
-
-        profile.projects = (profile.projects || []).filter((p) => p.id !== projId);
-        resolve(true);
-      }, 50);
-    });
-  },
-
-  /**
-   * Skills Management
-   */
-  addSkill: async (userId, skill) => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const profile = memoryProfiles[userId];
-        if (!profile) return resolve(false);
-
-        const cleanSkill = skill.trim();
-        if (!profile.skills) profile.skills = [];
-        if (!profile.skills.includes(cleanSkill)) {
-          profile.skills.push(cleanSkill);
-        }
-        resolve(profile.skills);
-      }, 50);
-    });
-  },
-
-  removeSkill: async (userId, skillToRemove) => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const profile = memoryProfiles[userId];
-        if (!profile || !profile.skills) return resolve(false);
-
-        profile.skills = profile.skills.filter((s) => s !== skillToRemove);
-        resolve(profile.skills);
       }, 50);
     });
   },
