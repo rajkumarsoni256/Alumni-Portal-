@@ -8,45 +8,48 @@ import {
   Check, 
   ArrowRight, 
   ArrowLeft, 
-  Sparkles, 
   CheckCircle2, 
-  X,
-  Upload
+  AlertCircle 
 } from 'lucide-react';
 
 export const OnboardingPage = ({ defaultRole }) => {
   const navigate = useNavigate();
-  const { pendingRegistration, completeUserOnboarding } = useApp();
+  const { user: currentUser, pendingRegistration, completeUserOnboarding } = useApp();
 
-  const currentRole = defaultRole || pendingRegistration?.role || 'student';
-  const isStudent = currentRole === 'student';
+  const userRole = (currentUser?.role || pendingRegistration?.role || defaultRole || 'student').toLowerCase();
+  const isStudent = userRole === 'student';
 
-  const [step, setStep] = useState(1); // 1: Profile Info | 2: Skills & Preferences | 3: Complete
+  const [step, setStep] = useState(1); // 1: Profile & Academic/Work | 2: Skills & Links | 3: Complete
   const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
-  // Profile fields state
-  const [name, setName] = useState(pendingRegistration?.name || (isStudent ? 'Tokir Khan' : 'Priya Sharma'));
-  const [avatar, setAvatar] = useState(
+  // Personal
+  const [fullName, setFullName] = useState(currentUser?.fullName || pendingRegistration?.name || '');
+  const [phone, setPhone] = useState('');
+  const [avatarUrl, setAvatarUrl] = useState(
     isStudent 
       ? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=300'
       : 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=300'
   );
+  const [bio, setBio] = useState('');
+
+  // Academic
   const [degree, setDegree] = useState('B.Tech');
   const [branch, setBranch] = useState(isStudent ? 'Computer Science & Engineering (AI-ML)' : 'Computer Science & Engineering');
-  const [graduationYear, setGraduationYear] = useState(isStudent ? '2026' : '2018');
-  const [headline, setHeadline] = useState(
-    isStudent 
-      ? 'B.Tech CSE (AI-ML) | 3rd Year • Seeking SDE / AI Internships'
-      : 'Senior AI Engineer @ Google | LLMs & Distributed Systems'
-  );
-  
-  // Alumni specific
+  const [graduationYear, setGraduationYear] = useState(isStudent ? '2026' : '2020');
+  const [currentYear, setCurrentYear] = useState('3'); // 1, 2, 3, 4 for Students
+
+  // Professional (Alumni Required)
   const [company, setCompany] = useState(isStudent ? '' : 'Google');
-  const [roleTitle, setRoleTitle] = useState(isStudent ? '' : 'Senior AI Engineer');
+  const [designation, setDesignation] = useState(isStudent ? '' : 'Software Development Engineer');
   const [location, setLocation] = useState(isStudent ? 'Jaipur, Rajasthan' : 'Bengaluru, Karnataka');
   const [isAvailableForMentorship, setIsAvailableForMentorship] = useState(true);
 
-  // Step 2: Skills and Interests
+  // Social Links
+  const [linkedinUrl, setLinkedinUrl] = useState('');
+  const [githubUrl, setGithubUrl] = useState('');
+
+  // Skills & Topics
   const allSkills = [
     'Data Structures & Algorithms',
     'Python & PyTorch',
@@ -98,33 +101,103 @@ export const OnboardingPage = ({ defaultRole }) => {
     const file = e.target.files?.[0];
     if (file) {
       const url = URL.createObjectURL(file);
-      setAvatar(url);
+      setAvatarUrl(url);
     }
+  };
+
+  const validateStep1 = () => {
+    setErrorMessage('');
+    if (!fullName.trim()) {
+      setErrorMessage('Please enter your full name.');
+      return false;
+    }
+    if (!phone.trim()) {
+      setErrorMessage('Please enter your mobile phone number.');
+      return false;
+    }
+    if (!degree.trim()) {
+      setErrorMessage('Please select or specify your degree.');
+      return false;
+    }
+    if (!branch.trim()) {
+      setErrorMessage('Please enter your branch / specialization.');
+      return false;
+    }
+    if (!graduationYear) {
+      setErrorMessage('Please select your graduation year.');
+      return false;
+    }
+
+    if (!isStudent) {
+      if (!company.trim()) {
+        setErrorMessage('Current company name is required for Alumni onboarding.');
+        return false;
+      }
+      if (!designation.trim()) {
+        setErrorMessage('Current job role / designation is required for Alumni onboarding.');
+        return false;
+      }
+      if (!location.trim()) {
+        setErrorMessage('Current location is required for Alumni onboarding.');
+        return false;
+      }
+    }
+
+    return true;
+  };
+
+  const validateStep2 = () => {
+    setErrorMessage('');
+    if (!isStudent) {
+      if (!linkedinUrl.trim()) {
+        setErrorMessage('LinkedIn profile URL is required for Alumni onboarding.');
+        return false;
+      }
+      if (!linkedinUrl.toLowerCase().startsWith('http://') && !linkedinUrl.toLowerCase().startsWith('https://')) {
+        setErrorMessage('LinkedIn URL must start with http:// or https://');
+        return false;
+      }
+    }
+    return true;
   };
 
   const handleNextStep = () => {
     if (step === 1) {
-      setStep(2);
-    } else if (step === 2) {
-      setIsLoading(true);
-      setTimeout(async () => {
-        await completeUserOnboarding({
-          name,
-          avatar,
-          degree,
-          branch,
-          graduationYear,
-          headline,
-          company,
-          roleTitle,
-          location,
-          isAvailableForMentorship,
-          skills: selectedSkills,
-          interests: selectedInterests,
-        });
-        setIsLoading(false);
-        setStep(3);
-      }, 500);
+      if (validateStep1()) {
+        setStep(2);
+      }
+    }
+  };
+
+  const handleSubmitOnboarding = async () => {
+    if (!validateStep2()) return;
+
+    setIsLoading(true);
+    setErrorMessage('');
+    try {
+      await completeUserOnboarding({
+        fullName,
+        phone,
+        avatarUrl,
+        bio,
+        degree,
+        branch,
+        graduationYear,
+        currentYear: isStudent ? currentYear : null,
+        company: isStudent ? null : company,
+        designation: isStudent ? null : designation,
+        location,
+        isAvailableForMentorship,
+        linkedinUrl,
+        githubUrl,
+        skills: selectedSkills,
+        interests: selectedInterests,
+      });
+      setStep(3);
+    } catch (err) {
+      setErrorMessage(err.message || 'Failed to submit onboarding profile. Please check required fields.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -145,7 +218,7 @@ export const OnboardingPage = ({ defaultRole }) => {
               }`}>
                 {step > 1 ? <Check className="w-3.5 h-3.5" /> : '1'}
               </div>
-              <span>Profile</span>
+              <span>{isStudent ? 'Student Profile' : 'Alumni Profile'}</span>
             </div>
 
             <div className={`h-px w-12 sm:w-16 ${step >= 2 ? 'bg-slate-800' : 'bg-slate-200'}`} />
@@ -156,7 +229,7 @@ export const OnboardingPage = ({ defaultRole }) => {
               }`}>
                 {step > 2 ? <Check className="w-3.5 h-3.5" /> : '2'}
               </div>
-              <span>Skills & Topics</span>
+              <span>Skills & Links</span>
             </div>
 
             <div className={`h-px w-12 sm:w-16 ${step === 3 ? 'bg-slate-800' : 'bg-slate-200'}`} />
@@ -175,17 +248,39 @@ export const OnboardingPage = ({ defaultRole }) => {
         {/* Content Body */}
         <div className="p-6 sm:p-8 space-y-6">
           
+          {/* Error Banner */}
+          {errorMessage && (
+            <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+              <p className="leading-snug">{errorMessage}</p>
+            </div>
+          )}
+
           {/* ============================================================ */}
-          {/* STEP 1: Profile Information */}
+          {/* STEP 1: Personal & Academic/Work Information */}
           {/* ============================================================ */}
           {step === 1 && (
             <div className="space-y-5">
               <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  {isStudent ? (
+                    <span className="bg-red-50 text-red-700 text-[10px] font-bold px-2 py-0.5 rounded border border-red-200 uppercase tracking-wider">
+                      Student Onboarding
+                    </span>
+                  ) : (
+                    <span className="bg-slate-900 text-white text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider">
+                      Alumni Onboarding
+                    </span>
+                  )}
+                </div>
                 <h1 className="text-xl font-bold text-slate-900">
-                  {isStudent ? 'Tell us about your student journey' : 'Tell us about your career journey'}
+                  {isStudent ? 'Tell us about your academic details' : 'Tell us about your professional journey'}
                 </h1>
                 <p className="text-xs text-slate-500">
-                  This information will be displayed on your JECRC Community profile.
+                  {isStudent 
+                    ? 'Fill out your student information to access mentors and JECRC events.'
+                    : 'Required fields ensure the JECRC alumni directory stays verified and useful for students.'
+                  }
                 </p>
               </div>
 
@@ -193,7 +288,7 @@ export const OnboardingPage = ({ defaultRole }) => {
               <div className="flex items-center gap-4 pt-1">
                 <div className="relative group">
                   <img
-                    src={avatar}
+                    src={avatarUrl}
                     alt="Profile Avatar"
                     className="w-16 h-16 rounded-full object-cover border-2 border-slate-200 shadow-2xs"
                   />
@@ -228,25 +323,42 @@ export const OnboardingPage = ({ defaultRole }) => {
 
               {/* Form Grid */}
               <div className="space-y-3.5">
-                {/* Full Name */}
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-700 block">
-                    Full name
-                  </label>
-                  <input
-                    type="text"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-300 focus:border-slate-800 focus:bg-white rounded-md px-3 py-2 text-xs text-slate-900 focus:outline-none"
-                    required
-                  />
+                {/* Full Name & Phone */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-slate-700 block">
+                      Full name <span className="text-red-600">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={fullName}
+                      onChange={(e) => setFullName(e.target.value)}
+                      placeholder="e.g. Tokir Khan"
+                      className="w-full bg-slate-50 border border-slate-300 focus:border-slate-800 focus:bg-white rounded-md px-3 py-2 text-xs text-slate-900 focus:outline-none"
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-slate-700 block">
+                      Mobile Number <span className="text-red-600">*</span>
+                    </label>
+                    <input
+                      type="tel"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      placeholder="+91 98765 43210"
+                      className="w-full bg-slate-50 border border-slate-300 focus:border-slate-800 focus:bg-white rounded-md px-3 py-2 text-xs text-slate-900 focus:outline-none"
+                      required
+                    />
+                  </div>
                 </div>
 
                 {/* Degree & Branch */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <label className="text-xs font-semibold text-slate-700 block">
-                      Degree / Program
+                      Degree / Program <span className="text-red-600">*</span>
                     </label>
                     <select
                       value={degree}
@@ -264,39 +376,73 @@ export const OnboardingPage = ({ defaultRole }) => {
 
                   <div className="space-y-1">
                     <label className="text-xs font-semibold text-slate-700 block">
-                      Graduation Year
+                      Branch / Specialization <span className="text-red-600">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={branch}
+                      onChange={(e) => setBranch(e.target.value)}
+                      placeholder="e.g. Computer Science & Engineering"
+                      className="w-full bg-slate-50 border border-slate-300 focus:border-slate-800 focus:bg-white rounded-md px-3 py-2 text-xs text-slate-900 focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                {/* Graduation Year & Current Year */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-slate-700 block">
+                      {isStudent ? 'Expected Graduation Year' : 'Graduation / Passout Year'} <span className="text-red-600">*</span>
                     </label>
                     <select
                       value={graduationYear}
                       onChange={(e) => setGraduationYear(e.target.value)}
                       className="w-full bg-slate-50 border border-slate-300 focus:border-slate-800 focus:bg-white rounded-md px-3 py-2 text-xs text-slate-900 focus:outline-none"
                     >
-                      {[2028, 2027, 2026, 2025, 2024, 2023, 2022, 2021, 2020, 2019, 2018, 2017, 2016, 2015].map((yr) => (
+                      {[2028, 2027, 2026, 2025, 2024, 2023, 2022, 2021, 2020, 2019, 2018, 2017, 2016, 2015, 2014, 2013, 2012, 2010].map((yr) => (
                         <option key={yr} value={yr}>Class of {yr}</option>
                       ))}
                     </select>
                   </div>
-                </div>
 
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-700 block">
-                    Branch / Specialization
-                  </label>
-                  <input
-                    type="text"
-                    value={branch}
-                    onChange={(e) => setBranch(e.target.value)}
-                    placeholder="e.g. Computer Science & Engineering (AI-ML)"
-                    className="w-full bg-slate-50 border border-slate-300 focus:border-slate-800 focus:bg-white rounded-md px-3 py-2 text-xs text-slate-900 focus:outline-none"
-                  />
-                </div>
-
-                {/* Alumni fields: Company & Role */}
-                {!isStudent && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {isStudent ? (
                     <div className="space-y-1">
                       <label className="text-xs font-semibold text-slate-700 block">
-                        Current Company
+                        Current Academic Year <span className="text-red-600">*</span>
+                      </label>
+                      <select
+                        value={currentYear}
+                        onChange={(e) => setCurrentYear(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-300 focus:border-slate-800 focus:bg-white rounded-md px-3 py-2 text-xs text-slate-900 focus:outline-none"
+                      >
+                        <option value="1">1st Year</option>
+                        <option value="2">2nd Year</option>
+                        <option value="3">3rd Year</option>
+                        <option value="4">4th Year</option>
+                      </select>
+                    </div>
+                  ) : (
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-slate-700 block">
+                        Current Location <span className="text-red-600">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={location}
+                        onChange={(e) => setLocation(e.target.value)}
+                        placeholder="e.g. Bengaluru, Karnataka or New York, USA"
+                        className="w-full bg-slate-50 border border-slate-300 focus:border-slate-800 focus:bg-white rounded-md px-3 py-2 text-xs text-slate-900 focus:outline-none"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* Alumni Professional Section */}
+                {!isStudent && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1 border-t border-slate-100">
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-slate-700 block">
+                        Current Company <span className="text-red-600">*</span>
                       </label>
                       <input
                         type="text"
@@ -309,30 +455,30 @@ export const OnboardingPage = ({ defaultRole }) => {
 
                     <div className="space-y-1">
                       <label className="text-xs font-semibold text-slate-700 block">
-                        Job Title
+                        Job Title / Designation <span className="text-red-600">*</span>
                       </label>
                       <input
                         type="text"
-                        value={roleTitle}
-                        onChange={(e) => setRoleTitle(e.target.value)}
-                        placeholder="e.g. Senior AI Engineer"
+                        value={designation}
+                        onChange={(e) => setDesignation(e.target.value)}
+                        placeholder="e.g. Senior Software Engineer"
                         className="w-full bg-slate-50 border border-slate-300 focus:border-slate-800 focus:bg-white rounded-md px-3 py-2 text-xs text-slate-900 focus:outline-none"
                       />
                     </div>
                   </div>
                 )}
 
-                {/* Headline */}
+                {/* Bio / About */}
                 <div className="space-y-1">
                   <label className="text-xs font-semibold text-slate-700 block">
-                    Headline
+                    Short Bio (Optional)
                   </label>
-                  <input
-                    type="text"
-                    value={headline}
-                    onChange={(e) => setHeadline(e.target.value)}
-                    placeholder="e.g. B.Tech CSE (AI-ML) | 3rd Year • Seeking SDE Internships"
-                    className="w-full bg-slate-50 border border-slate-300 focus:border-slate-800 focus:bg-white rounded-md px-3 py-2 text-xs text-slate-900 focus:outline-none"
+                  <textarea
+                    rows={2}
+                    value={bio}
+                    onChange={(e) => setBio(e.target.value)}
+                    placeholder={isStudent ? 'Passionate about web development and AI...' : 'Building scalable distributed systems...'}
+                    className="w-full bg-slate-50 border border-slate-300 focus:border-slate-800 focus:bg-white rounded-md px-3 py-2 text-xs text-slate-900 focus:outline-none resize-none"
                   />
                 </div>
               </div>
@@ -344,7 +490,7 @@ export const OnboardingPage = ({ defaultRole }) => {
                   onClick={handleNextStep}
                   className="px-5 py-2.5 rounded-md text-xs font-semibold text-white bg-red-700 hover:bg-red-800 transition-colors cursor-pointer inline-flex items-center gap-1.5 shadow-2xs"
                 >
-                  <span>Continue to Skills</span>
+                  <span>Continue to Links & Skills</span>
                   <ArrowRight className="w-3.5 h-3.5" />
                 </button>
               </div>
@@ -352,23 +498,55 @@ export const OnboardingPage = ({ defaultRole }) => {
           )}
 
           {/* ============================================================ */}
-          {/* STEP 2: Skills & Interests */}
+          {/* STEP 2: Links & Skills */}
           {/* ============================================================ */}
           {step === 2 && (
             <div className="space-y-5">
               <div className="space-y-1">
                 <h2 className="text-xl font-bold text-slate-900">
-                  Skills & Areas of Interest
+                  Professional Links & Skills
                 </h2>
                 <p className="text-xs text-slate-500">
-                  Select your primary technical skills and career interests for community recommendations.
+                  {isStudent
+                    ? 'Connect your professional links and highlight skills to get noticed by alumni.'
+                    : 'LinkedIn URL is required for alumni verification and networking.'
+                  }
                 </p>
               </div>
 
+              {/* Professional Links */}
+              <div className="space-y-3">
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-slate-700 block">
+                    LinkedIn Profile URL {!isStudent && <span className="text-red-600">*</span>}
+                  </label>
+                  <input
+                    type="url"
+                    value={linkedinUrl}
+                    onChange={(e) => setLinkedinUrl(e.target.value)}
+                    placeholder="https://linkedin.com/in/yourprofile"
+                    className="w-full bg-slate-50 border border-slate-300 focus:border-slate-800 focus:bg-white rounded-md px-3 py-2 text-xs text-slate-900 focus:outline-none"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-slate-700 block">
+                    GitHub Profile URL (Optional)
+                  </label>
+                  <input
+                    type="url"
+                    value={githubUrl}
+                    onChange={(e) => setGithubUrl(e.target.value)}
+                    placeholder="https://github.com/yourusername"
+                    className="w-full bg-slate-50 border border-slate-300 focus:border-slate-800 focus:bg-white rounded-md px-3 py-2 text-xs text-slate-900 focus:outline-none"
+                  />
+                </div>
+              </div>
+
               {/* Skills Multi-select */}
-              <div className="space-y-2">
+              <div className="space-y-2 pt-2 border-t border-slate-100">
                 <label className="text-xs font-bold text-slate-800 block">
-                  Select Your Skills ({selectedSkills.length} selected)
+                  Select Your Primary Skills ({selectedSkills.length} selected)
                 </label>
                 <div className="flex flex-wrap gap-1.5">
                   {allSkills.map((skill) => {
@@ -391,32 +569,6 @@ export const OnboardingPage = ({ defaultRole }) => {
                 </div>
               </div>
 
-              {/* Interests Multi-select */}
-              <div className="space-y-2 pt-2 border-t border-slate-100">
-                <label className="text-xs font-bold text-slate-800 block">
-                  Career Topics & Domains
-                </label>
-                <div className="flex flex-wrap gap-1.5">
-                  {allInterests.map((interest) => {
-                    const isSelected = selectedInterests.includes(interest);
-                    return (
-                      <button
-                        key={interest}
-                        type="button"
-                        onClick={() => toggleInterest(interest)}
-                        className={`text-xs font-medium px-3 py-1.5 rounded-lg border transition-colors cursor-pointer ${
-                          isSelected
-                            ? 'bg-red-700 text-white border-red-700 font-semibold'
-                            : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                        }`}
-                      >
-                        {interest}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
               {/* Alumni Mentorship Toggle */}
               {!isStudent && (
                 <div className="pt-3 border-t border-slate-100 flex items-center justify-between p-3 bg-slate-50 border border-slate-200 rounded-lg">
@@ -425,7 +577,7 @@ export const OnboardingPage = ({ defaultRole }) => {
                       Available for 1-on-1 Mentorship
                     </span>
                     <p className="text-[11px] text-slate-500">
-                      Allow JECRC students to request 45-minute video sessions for career guidance.
+                      Allow JECRC students to request mentorship and career guidance sessions.
                     </p>
                   </div>
                   <input
@@ -450,8 +602,8 @@ export const OnboardingPage = ({ defaultRole }) => {
 
                 <button
                   type="button"
-                  disabled={isLoading || selectedSkills.length === 0}
-                  onClick={handleNextStep}
+                  disabled={isLoading}
+                  onClick={handleSubmitOnboarding}
                   className="px-5 py-2.5 rounded-md text-xs font-semibold text-white bg-red-700 hover:bg-red-800 disabled:opacity-50 transition-colors cursor-pointer inline-flex items-center gap-1.5 shadow-2xs"
                 >
                   {isLoading ? (
@@ -481,20 +633,25 @@ export const OnboardingPage = ({ defaultRole }) => {
                   Welcome to JECRC Community!
                 </h2>
                 <p className="text-xs text-slate-500 leading-relaxed">
-                  Your profile has been created. You are now connected to the JECRC University alumni and student network.
+                  Your profile has been verified and completed. You now have full access to the JECRC platform.
                 </p>
               </div>
 
               {/* Summary Card */}
               <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-lg text-left flex items-center gap-3">
                 <img
-                  src={avatar}
-                  alt={name}
+                  src={avatarUrl}
+                  alt={fullName}
                   className="w-12 h-12 rounded-full object-cover border border-slate-200 shrink-0"
                 />
                 <div className="min-w-0 space-y-0.5">
-                  <span className="text-xs font-bold text-slate-900 block truncate">{name}</span>
-                  <p className="text-[11px] text-slate-500 truncate">{headline}</p>
+                  <span className="text-xs font-bold text-slate-900 block truncate">{fullName}</span>
+                  <p className="text-[11px] text-slate-500 truncate">
+                    {isStudent 
+                      ? `${degree} ${branch} • Class of ${graduationYear}`
+                      : `${designation} @ ${company}`
+                    }
+                  </p>
                   <span className="text-[10px] font-semibold text-red-700 bg-red-50 px-1.5 py-0.2 rounded inline-block">
                     {isStudent ? 'JECRC Student' : 'JECRC Alumni'}
                   </span>
@@ -507,7 +664,7 @@ export const OnboardingPage = ({ defaultRole }) => {
                   onClick={handleFinish}
                   className="w-full py-2.5 rounded-md text-xs font-semibold text-white bg-red-700 hover:bg-red-800 transition-colors cursor-pointer shadow-2xs"
                 >
-                  Enter the Community Feed
+                  Enter Main Dashboard
                 </button>
               </div>
             </div>
