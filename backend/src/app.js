@@ -75,7 +75,7 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // Health Check Endpoints
-app.get(['/actuator/health', '/api/v1/health'], (req, res) => {
+app.get(['/actuator/health', '/api/v1/health', '/healthz'], (req, res) => {
   res.json({
     status: 'UP',
     service: 'jecrc-community-backend',
