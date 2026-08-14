@@ -10,6 +10,7 @@ import {
   Check, 
   AlertCircle 
 } from 'lucide-react';
+import { GoogleAuthButton } from '../../components/auth/GoogleAuthButton';
 
 export const RegisterPage = () => {
   const navigate = useNavigate();
@@ -47,52 +48,6 @@ export const RegisterPage = () => {
       setIsLoading(false);
     }
   };
-
-  useEffect(() => {
-    const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '792367093796-odhflll8ul8kgk83cci4aamgqgrvlk8p.apps.googleusercontent.com';
-    let isMounted = true;
-
-    const initGoogle = () => {
-      if (window.google?.accounts?.id && isMounted) {
-        try {
-          window.google.accounts.id.initialize({
-            client_id: googleClientId,
-            callback: async (response) => {
-              if (response && response.credential) {
-                await handleGoogleSuccess(response.credential);
-              }
-            },
-          });
-
-          const btnContainer = document.getElementById('googleRegisterBtnContainer');
-          if (btnContainer && btnContainer.children.length === 0) {
-            window.google.accounts.id.renderButton(btnContainer, {
-              theme: 'outline',
-              size: 'large',
-              width: 320,
-              text: 'signup_with',
-              shape: 'rectangular',
-            });
-          }
-        } catch (e) {
-          console.warn('Google Identity Services initialization warning:', e);
-        }
-      }
-    };
-
-    if (window.google?.accounts?.id) {
-      initGoogle();
-    } else {
-      const timer = setTimeout(initGoogle, 500);
-      return () => {
-        isMounted = false;
-        clearTimeout(timer);
-      };
-    }
-    return () => {
-      isMounted = false;
-    };
-  }, []);
 
   const validateForm = () => {
     const newErrors = {};
@@ -400,7 +355,12 @@ export const RegisterPage = () => {
 
             {/* Google Signup Button */}
             <div className="w-full flex flex-col items-center justify-center gap-2">
-              <div id="googleRegisterBtnContainer" className="w-full flex justify-center min-h-[40px]"></div>
+              <GoogleAuthButton
+                onSuccess={handleGoogleSuccess}
+                onError={(err) => setErrorMessage(err.message || 'Google signup failed.')}
+                text="signup_with"
+                disabled={isLoading}
+              />
             </div>
           </div>
 

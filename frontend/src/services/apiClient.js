@@ -99,11 +99,23 @@ export const request = async (endpoint, options = {}) => {
   if (!response.ok) {
     let defaultMessage = `HTTP error ${response.status}`;
     if (response.status === 401) {
-      defaultMessage = 'Session expired or unauthorized. Please log in again.';
-      // Clear dead JWT so future requests do not resend it, and notify app.
-      clearAuthToken();
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('auth:session-expired'));
+      const isAuthEndpoint =
+        endpoint.includes('/auth/login') ||
+        endpoint.includes('/auth/register') ||
+        endpoint.includes('/auth/google') ||
+        endpoint.includes('/auth/verify-email') ||
+        endpoint.includes('/auth/resend-verification');
+
+      defaultMessage = isAuthEndpoint
+        ? 'Invalid email or password.'
+        : 'Session expired or unauthorized. Please log in again.';
+
+      if (!isAuthEndpoint) {
+        // Clear dead JWT so future requests do not resend it, and notify app.
+        clearAuthToken();
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('auth:session-expired'));
+        }
       }
     } else if (response.status === 403) {
       defaultMessage = 'Access denied. Administrative privileges are required.';
