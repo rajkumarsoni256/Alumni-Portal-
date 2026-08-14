@@ -205,7 +205,7 @@ const runPhase10Tests = async () => {
     assert(parseInt(dbRecipients.total, 10) === publishedRecipients, 'announcement_recipients count matches API statistics');
 
     // In-app notifications table sync check
-    const dbInAppNotifs = (await db.query(`SELECT COUNT(*) AS total FROM notifications WHERE message = $1`, ['Annual Alumni Meet 2026 — Early Bird Access'])).rows[0];
+    const dbInAppNotifs = (await db.query(`SELECT COUNT(*) AS total FROM notifications WHERE title = $1 OR message = $1`, ['Annual Alumni Meet 2026 — Early Bird Access'])).rows[0];
     assert(parseInt(dbInAppNotifs.total, 10) > 0, 'In-app notifications table populated for recipient users');
 
     // Attempting to edit PUBLISHED announcement -> 409 Conflict

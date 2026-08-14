@@ -95,9 +95,26 @@ const migrate = async () => {
       console.warn('[MIGRATION] avatar_url alter warning:', e.message);
     }
     try {
-      await db.query(`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS banner_url TEXT;`);
+      await db.query(`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS university_roll_number VARCHAR(64);`);
     } catch (e) {
-      console.warn('[MIGRATION] banner_url add warning:', e.message);
+      console.warn('[MIGRATION] university_roll_number add warning:', e.message);
+    }
+    try {
+      await db.query(`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS joining_year INTEGER;`);
+    } catch (e) {
+      console.warn('[MIGRATION] joining_year add warning:', e.message);
+    }
+    try {
+      await db.query(`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS course VARCHAR(100);`);
+    } catch (e) {
+      console.warn('[MIGRATION] course add warning:', e.message);
+    }
+    try {
+      await db.query(
+        `CREATE UNIQUE INDEX IF NOT EXISTS idx_user_profiles_roll_number ON user_profiles(university_roll_number) WHERE university_roll_number IS NOT NULL;`
+      );
+    } catch (e) {
+      console.warn('[MIGRATION] idx_user_profiles_roll_number index warning:', e.message);
     }
 
     // 6. audit_logs table (Admin Audit Logs)
@@ -625,6 +642,7 @@ const migrate = async () => {
 
     // Indices
     await db.query(`CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);`).catch(() => {});
+    await db.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_user_profiles_roll_number_unique ON user_profiles(LOWER(university_roll_number)) WHERE university_roll_number IS NOT NULL AND TRIM(university_roll_number) != '';`).catch(() => {});
     await db.query(`CREATE INDEX IF NOT EXISTS idx_user_profiles_company ON user_profiles(company);`).catch(() => {});
     await db.query(`CREATE INDEX IF NOT EXISTS idx_user_profiles_branch ON user_profiles(branch);`).catch(() => {});
     await db.query(`CREATE INDEX IF NOT EXISTS idx_user_profiles_grad_year ON user_profiles(graduation_year);`).catch(() => {});

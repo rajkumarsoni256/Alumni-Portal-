@@ -189,16 +189,22 @@ const buildUserQueryFilters = (options = {}) => {
     whereClauses.push(`p.company ILIKE $${queryParams.length}`);
   }
 
-  // 9. Profile Status Filter
+  // 9. Profile / Account Status Filter
   const activeStatus = profileStatus || status || '';
   if (activeStatus && activeStatus !== 'all') {
-    const normStatus = activeStatus.toLowerCase().trim();
-    if (normStatus === 'complete') {
-      whereClauses.push(`p.is_profile_complete = true AND (NOW() - COALESCE(p.updated_at, u.updated_at)) <= INTERVAL '365 days'`);
-    } else if (normStatus === 'incomplete') {
-      whereClauses.push(`(p.is_profile_complete IS NOT TRUE) AND (NOW() - COALESCE(p.updated_at, u.updated_at)) <= INTERVAL '365 days'`);
-    } else if (normStatus === 'needs update' || normStatus === 'needs_update') {
-      whereClauses.push(`(NOW() - COALESCE(p.updated_at, u.updated_at)) > INTERVAL '365 days'`);
+    const upperStatus = activeStatus.toUpperCase().trim();
+    if (['ACTIVE', 'PENDING_APPROVAL', 'REJECTED', 'DISABLED'].includes(upperStatus)) {
+      queryParams.push(upperStatus);
+      whereClauses.push(`u.account_status = $${queryParams.length}`);
+    } else {
+      const normStatus = activeStatus.toLowerCase().trim();
+      if (normStatus === 'complete') {
+        whereClauses.push(`p.is_profile_complete = true AND (NOW() - COALESCE(p.updated_at, u.updated_at)) <= INTERVAL '365 days'`);
+      } else if (normStatus === 'incomplete') {
+        whereClauses.push(`(p.is_profile_complete IS NOT TRUE) AND (NOW() - COALESCE(p.updated_at, u.updated_at)) <= INTERVAL '365 days'`);
+      } else if (normStatus === 'needs update' || normStatus === 'needs_update') {
+        whereClauses.push(`(NOW() - COALESCE(p.updated_at, u.updated_at)) > INTERVAL '365 days'`);
+      }
     }
   }
 
@@ -372,8 +378,63 @@ const getUserById = async (userId) => {
   return formatAdminUserDetails(result.rows[0]);
 };
 
+/**
+ * Enable or Disable user account (updates users.account_status)
+ */
+const updateUserStatus = async (userId, accountStatus) => {
+  const normStatus = String(accountStatus).toUpperCase().trim();
+  if (!['ACTIVE', 'DISABLED'].includes(normStatus)) {
+    const error = new Error('Invalid account status. Allowed values: ACTIVE, DISABLED');
+    error.statusCode = 400;
+    error.errorCode = 'VALIDATION_ERROR';
+    throw error;
+  }
+
+  const query = `
+    UPDATE users
+    SET account_status = $2, updated_at = CURRENT_TIMESTAMP
+    WHERE id = $1
+    RETURNING id, email, role, account_status;
+  `;
+  const res = await db.query(query, [userId, normStatus]);
+  if (res.rows.length === 0) {
+    const error = new Error(`User not found with ID: ${userId}`);
+    error.statusCode = 404;
+    error.errorCode = 'USER_NOT_FOUND';
+    throw error;
+  }
+  return res.rows[0];
+};
+
+const getUserStats = async () => {
+  const query = `
+    SELECT
+      COUNT(*) AS total_users,
+      COUNT(*) FILTER (WHERE role = 'STUDENT') AS students,
+      COUNT(*) FILTER (WHERE role = 'ALUMNI') AS alumni,
+      COUNT(*) FILTER (WHERE role = 'ADMIN') AS administrators,
+      COUNT(*) FILTER (WHERE account_status = 'PENDING_APPROVAL') AS pending_approvals,
+      COUNT(*) FILTER (WHERE account_status = 'ACTIVE') AS active_users,
+      COUNT(*) FILTER (WHERE account_status = 'DISABLED') AS disabled_users
+    FROM users;
+  `;
+  const result = await db.query(query);
+  const row = result.rows[0] || {};
+  return {
+    totalUsers: parseInt(row.total_users || 0, 10),
+    students: parseInt(row.students || 0, 10),
+    alumni: parseInt(row.alumni || 0, 10),
+    administrators: parseInt(row.administrators || 0, 10),
+    pendingApprovals: parseInt(row.pending_approvals || 0, 10),
+    activeUsers: parseInt(row.active_users || 0, 10),
+    disabledUsers: parseInt(row.disabled_users || 0, 10),
+  };
+};
+
 module.exports = {
   getUsers,
   getUserById,
+  updateUserStatus,
+  getUserStats,
   buildUserQueryFilters,
 };

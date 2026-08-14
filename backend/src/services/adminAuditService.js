@@ -3,6 +3,7 @@ const db = require('../config/db');
 const AUDIT_ACTIONS = {
   USER_VIEWED: 'USER_VIEWED',
   USER_EXPORTED: 'USER_EXPORTED',
+  USER_STATUS_UPDATED: 'USER_STATUS_UPDATED',
   VERIFICATION_APPROVED: 'VERIFICATION_APPROVED',
   VERIFICATION_REJECTED: 'VERIFICATION_REJECTED',
   DATA_QUALITY_VIEWED: 'DATA_QUALITY_VIEWED',
@@ -11,6 +12,9 @@ const AUDIT_ACTIONS = {
   NOTIFICATION_UPDATED: 'NOTIFICATION_UPDATED',
   NOTIFICATION_PUBLISHED: 'NOTIFICATION_PUBLISHED',
   NOTIFICATION_CANCELLED: 'NOTIFICATION_CANCELLED',
+  POST_MODERATED: 'POST_MODERATED',
+  COMMENT_MODERATED: 'COMMENT_MODERATED',
+  JOB_MODERATED: 'JOB_MODERATED',
 };
 
 /**
@@ -129,7 +133,7 @@ const getAuditLogs = async (options = {}) => {
 
   if (targetUserId) {
     queryParams.push(targetUserId.trim());
-    whereClauses.push(`(a.target_id = $${queryParams.length} OR (a.details->>'targetUserId') = $${queryParams.length})`);
+    whereClauses.push(`(a.target_id::text = $${queryParams.length} OR (a.details->>'targetUserId') = $${queryParams.length})`);
   }
 
   if (targetEntity) {

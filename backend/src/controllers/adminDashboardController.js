@@ -14,6 +14,34 @@ const getDashboardStats = async (req, res, next) => {
   }
 };
 
+const getEmailHealthStats = async (req, res, next) => {
+  try {
+    const provider = (process.env.EMAIL_PROVIDER || 'console').toLowerCase().trim();
+    const host = process.env.SMTP_HOST || 'smtp.gmail.com';
+    const port = parseInt(process.env.SMTP_PORT || '587', 10);
+    const from = process.env.EMAIL_FROM || 'no-reply@jecrc.ac.in';
+    const mode = process.env.EMAIL_MODE || 'development';
+
+    const isConfigured = Boolean(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASSWORD);
+
+    return successResponse(
+      res,
+      {
+        provider,
+        configured: isConfigured,
+        host,
+        port,
+        from,
+        mode,
+      },
+      'Email system health status retrieved successfully'
+    );
+  } catch (err) {
+    next(err);
+  }
+};
+
 module.exports = {
   getDashboardStats,
+  getEmailHealthStats,
 };

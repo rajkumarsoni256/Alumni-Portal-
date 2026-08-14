@@ -87,8 +87,9 @@ const createJob = async (user, jobData) => {
     throw err;
   }
 
-  if ((user.role || '').toUpperCase() !== 'ALUMNI') {
-    const err = new Error('Only Alumni members are authorized to post job referrals and opportunities');
+  const roleUpper = (user.role || '').toUpperCase();
+  if (roleUpper !== 'ALUMNI' && roleUpper !== 'ADMIN') {
+    const err = new Error('Only Alumni members and Administrators are authorized to post job opportunities');
     err.statusCode = 403;
     err.errorCode = 'FORBIDDEN';
     throw err;
@@ -311,8 +312,8 @@ const deleteJob = async (user, jobId) => {
   }
 
   const job = jobRes.rows[0];
-  if (job.posted_by !== user.id) {
-    const err = new Error('Only the alumnus who posted this job opportunity can delete it');
+  if (job.posted_by !== user.id && (user.role || '').toUpperCase() !== 'ADMIN') {
+    const err = new Error('Only the job poster or admin can delete this job opportunity');
     err.statusCode = 403;
     err.errorCode = 'FORBIDDEN';
     throw err;
