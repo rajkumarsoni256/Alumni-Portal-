@@ -54,17 +54,55 @@ export const AdminUsersPage = () => {
   const [pageSize, setPageSize] = useState(20);
   const [selectedUserIds, setSelectedUserIds] = useState([]);
 
-  // Fetch Data
-  const dataResult = useMemo(() => {
-    return adminUserService.getAdminUsers({
-      searchQuery,
-      filters,
-      sortField,
-      sortOrder,
-      page,
-      pageSize,
-    });
-  }, [searchQuery, filters, sortField, sortOrder, page, pageSize]);
+  // Data State
+  const [dataResult, setDataResult] = useState({
+    users: [],
+    totalCount: 0,
+    page: 1,
+    pageSize: 20,
+    totalPages: 1,
+  });
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [errorStatus, setErrorStatus] = useState(null);
+
+  // Debounce search query
+  const [debouncedQuery, setDebouncedQuery] = useState(searchQuery);
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedQuery(searchQuery);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // Fetch Users from real API
+  const fetchUsers = async () => {
+    setIsLoading(true);
+    setError(null);
+    setErrorStatus(null);
+    try {
+      const res = await adminUserService.getAdminUsers({
+        searchQuery: debouncedQuery,
+        filters,
+        sortField,
+        sortOrder,
+        page,
+        pageSize,
+      });
+      setDataResult(res || { users: [], totalCount: 0, page: 1, pageSize: 20, totalPages: 1 });
+    } catch (err) {
+      console.error('Failed to load admin users:', err);
+      setError(err.message || 'Failed to fetch users from database. Please check your backend connection.');
+      setErrorStatus(err.status || null);
+      setDataResult({ users: [], totalCount: 0, page: 1, pageSize: 20, totalPages: 1 });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchUsers();
+  }, [debouncedQuery, filters, sortField, sortOrder, page, pageSize]);
 
   // Handle URL query sync
   useEffect(() => {
@@ -157,10 +195,11 @@ export const AdminUsersPage = () => {
   };
 
   const selectedUsersList = useMemo(() => {
-    return adminUserService.getAdminUsers({ pageSize: 1000 }).users.filter((u) =>
-      selectedUserIds.includes(u.id)
-    );
-  }, [selectedUserIds]);
+    return selectedUserIds.map((id) => {
+      const found = dataResult.users.find((u) => u.id === id);
+      return found || { id };
+    });
+  }, [dataResult.users, selectedUserIds]);
 
   return (
     <AdminLayout>
@@ -528,7 +567,47 @@ export const AdminUsersPage = () => {
               </thead>
 
               <tbody className="divide-y divide-slate-100">
-                {dataResult.users.length === 0 ? (
+                {error ? (
+                  <tr>
+                    <td colSpan={8} className="py-12 text-center text-red-600 space-y-2 bg-red-50/40">
+                      <AlertCircle className="w-8 h-8 mx-auto text-red-500" />
+                      <p className="font-bold text-slate-800">
+                        {errorStatus === 401 ? 'Session Expired' : 'Failed to Load Users'}
+                      </p>
+                      <p className="text-xs text-slate-500 max-w-md mx-auto">
+                        {errorStatus === 401
+                          ? 'Your administrator session has expired. Please log in again.'
+                          : error}
+                      </p>
+                      {errorStatus === 401 ? (
+                        <button
+                          type="button"
+                          onClick={() => navigate('/login')}
+                          className="mt-2 px-3 py-1.5 rounded-lg bg-red-700 hover:bg-red-800 text-white text-xs font-semibold cursor-pointer"
+                        >
+                          Log In Again
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={fetchUsers}
+                          className="mt-2 px-3 py-1.5 rounded-lg bg-red-700 hover:bg-red-800 text-white text-xs font-semibold cursor-pointer"
+                        >
+                          Retry Loading
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ) : isLoading ? (
+                  <tr>
+                    <td colSpan={8} className="py-16 text-center text-slate-400">
+                      <div className="flex flex-col items-center justify-center space-y-2">
+                        <div className="w-6 h-6 border-2 border-red-700 border-t-transparent rounded-full animate-spin"></div>
+                        <p className="text-xs font-semibold text-slate-500">Loading records from PostgreSQL...</p>
+                      </div>
+                    </td>
+                  </tr>
+                ) : dataResult.users.length === 0 ? (
                   <tr>
                     <td colSpan={8} className="py-12 text-center text-slate-400 space-y-2">
                       <Search className="w-8 h-8 mx-auto text-slate-300" />

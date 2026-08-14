@@ -17,6 +17,7 @@ const eventRoutes = require('./routes/eventRoutes');
 const mentorshipRoutes = require('./routes/mentorshipRoutes');
 const hashtagRoutes = require('./routes/hashtagRoutes');
 const settingsRoutes = require('./routes/settingsRoutes');
+const adminRoutes = require('./routes/adminRoutes');
 const errorHandler = require('./middleware/errorHandler');
 
 const app = express();
@@ -56,6 +57,7 @@ app.use('/api/v1/events', eventRoutes);
 app.use('/api/v1/mentorship', mentorshipRoutes);
 app.use('/api/v1/hashtags', hashtagRoutes);
 app.use('/api/v1', settingsRoutes);
+app.use('/api/v1/admin', adminRoutes);
 
 // Global Error Handler
 app.use(errorHandler);
@@ -73,6 +75,8 @@ const startServer = async () => {
   }
 };
 
-startServer();
+if (require.main === module) {
+  startServer();
+}
 
 module.exports = app;
