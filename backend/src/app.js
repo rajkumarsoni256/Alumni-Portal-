@@ -28,8 +28,9 @@ app.use(cors({
   origin: true,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
 }));
+app.options('*', cors());
 
 // Body parsers with 50MB payload limit for profile photos and banner uploads
 app.use(express.json({ limit: '50mb' }));

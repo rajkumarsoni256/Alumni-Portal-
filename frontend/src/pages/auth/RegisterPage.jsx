@@ -50,9 +50,10 @@ export const RegisterPage = () => {
 
   useEffect(() => {
     const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '792367093796-odhflll8ul8kgk83cci4aamgqgrvlk8p.apps.googleusercontent.com';
-    
+    let isMounted = true;
+
     const initGoogle = () => {
-      if (window.google?.accounts?.id) {
+      if (window.google?.accounts?.id && isMounted) {
         try {
           window.google.accounts.id.initialize({
             client_id: googleClientId,
@@ -68,7 +69,7 @@ export const RegisterPage = () => {
             window.google.accounts.id.renderButton(btnContainer, {
               theme: 'outline',
               size: 'large',
-              width: '100%',
+              width: 320,
               text: 'signup_with',
               shape: 'rectangular',
             });
@@ -79,9 +80,18 @@ export const RegisterPage = () => {
       }
     };
 
-    initGoogle();
-    const timer = setTimeout(initGoogle, 400);
-    return () => clearTimeout(timer);
+    if (window.google?.accounts?.id) {
+      initGoogle();
+    } else {
+      const timer = setTimeout(initGoogle, 500);
+      return () => {
+        isMounted = false;
+        clearTimeout(timer);
+      };
+    }
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const validateForm = () => {
