@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { PageContainer } from '../components/layout/PageContainer';
 import { 
   Briefcase, 
@@ -11,145 +11,161 @@ import {
   X, 
   Users, 
   Check, 
-  MessageSquare 
+  MessageSquare,
+  Bookmark,
+  Trash2,
+  Loader2
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { getRoleCapabilities } from '../utils/roleCapabilities';
+import { jobService } from '../services/jobService';
 import { Link } from 'react-router-dom';
 
 export const JobsPage = () => {
   const { activeRole, currentUser, showNotification } = useApp();
   const caps = getRoleCapabilities(activeRole);
 
+  const [jobs, setJobs] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [hasError, setHasError] = useState(false);
+  const [totalJobs, setTotalJobs] = useState(0);
+
   const [activeTab, setActiveTab] = useState('all'); // 'all' | 'my_posts'
   const [filterType, setFilterType] = useState('All'); // 'All' | 'Internship' | 'Full-time' | 'Remote'
   const [searchQuery, setSearchQuery] = useState('');
   const [isPostModalOpen, setIsPostModalOpen] = useState(false);
-
-  // Initial jobs dataset
-  const [jobs, setJobs] = useState([
-    {
-      id: 'job_1',
-      title: 'Software Development Engineer Intern',
-      company: 'Google',
-      location: 'Bengaluru, India (Hybrid)',
-      type: 'Internship',
-      postedById: 'alm_1',
-      postedBy: 'Priya Sharma (Class of 2018)',
-      tags: ['Data Structures', 'C++', 'Java', 'Algorithms'],
-      stipend: '₹85,000 / month',
-      applicantsCount: 28,
-      isMyPosting: true,
-    },
-    {
-      id: 'job_2',
-      title: 'Graduate Software Engineer (Full-Time)',
-      company: 'Amazon Web Services',
-      location: 'Hyderabad, India',
-      type: 'Full-time',
-      postedById: 'alm_13',
-      postedBy: 'Rahul Sharma (Class of 2020)',
-      tags: ['Cloud', 'Java', 'Spring Boot', 'AWS'],
-      stipend: '₹18 - ₹24 LPA',
-      applicantsCount: 42,
-      isMyPosting: false,
-    },
-    {
-      id: 'job_3',
-      title: 'Frontend Engineer (React / TypeScript)',
-      company: 'Stripe',
-      location: 'Bengaluru, India (Remote)',
-      type: 'Full-time',
-      postedById: 'alm_2',
-      postedBy: 'Arjun Verma (Class of 2017)',
-      tags: ['React', 'TypeScript', 'Tailwind CSS'],
-      stipend: '₹22 - ₹30 LPA',
-      applicantsCount: 19,
-      isMyPosting: false,
-    },
-    {
-      id: 'job_4',
-      title: 'AI / Computer Vision Research Intern',
-      company: 'Adobe Sensei',
-      location: 'Noida, India (Hybrid)',
-      type: 'Internship',
-      postedById: 'alm_1',
-      postedBy: 'Priya Sharma (Class of 2018)',
-      tags: ['PyTorch', 'Computer Vision', 'Python'],
-      stipend: '₹75,000 / month',
-      applicantsCount: 16,
-      isMyPosting: true,
-    },
-  ]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Form state for posting a job
   const [newJob, setNewJob] = useState({
     title: '',
-    company: currentUser?.company || 'Google',
+    company: currentUser?.company || '',
     location: 'Bengaluru, India',
-    type: 'Internship',
-    stipend: '₹50,000 / month',
-    tags: 'React, Node.js, DSA',
+    type: 'Full-time',
+    stipend: '₹18 - ₹24 LPA',
+    description: 'We are looking for talented JECRC graduates to join our team.',
+    tags: 'Java, Spring Boot, AWS',
   });
 
-  const handlePostJob = (e) => {
-    e.preventDefault();
-    if (!newJob.title.trim()) return;
+  const fetchJobs = async () => {
+    setIsLoading(true);
+    setHasError(false);
+    try {
+      const result = await jobService.getJobs({
+        page: 1,
+        limit: 30,
+        search: searchQuery,
+        type: filterType,
+        myPosts: activeTab === 'my_posts',
+      });
 
-    const created = {
-      id: `job_${Date.now()}`,
-      title: newJob.title.trim(),
-      company: newJob.company.trim(),
-      location: newJob.location.trim(),
-      type: newJob.type,
-      postedById: currentUser?.id || 'alm_1',
-      postedBy: `${currentUser?.name || 'Alumni'} (${currentUser?.batch || 'Class of 2018'})`,
-      tags: newJob.tags.split(',').map((t) => t.trim()).filter(Boolean),
-      stipend: newJob.stipend.trim(),
-      applicantsCount: 0,
-      isMyPosting: true,
-    };
-
-    setJobs([created, ...jobs]);
-    setIsPostModalOpen(false);
-    setNewJob({
-      title: '',
-      company: currentUser?.company || 'Google',
-      location: 'Bengaluru, India',
-      type: 'Internship',
-      stipend: '₹50,000 / month',
-      tags: 'React, Node.js, DSA',
-    });
-    showNotification('Job opportunity posted successfully to JECRC community!');
+      setJobs(result.jobs || []);
+      setTotalJobs(result.total || (result.jobs || []).length);
+    } catch (err) {
+      console.warn('Failed to load jobs:', err);
+      setHasError(true);
+      setJobs([]);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const isJobMyPosting = (job) => job.postedById === currentUser?.id;
+  useEffect(() => {
+    fetchJobs();
+  }, [activeTab, filterType, searchQuery]);
 
-  const filteredJobs = jobs.filter((job) => {
-    const isMyPosting = isJobMyPosting(job);
-    if (activeTab === 'my_posts' && !isMyPosting) return false;
-    if (filterType !== 'All' && job.type !== filterType && !job.location.includes(filterType)) return false;
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      return (
-        job.title.toLowerCase().includes(q) ||
-        job.company.toLowerCase().includes(q) ||
-        job.tags.some((t) => t.toLowerCase().includes(q))
-      );
+  const handlePostJob = async (e) => {
+    e.preventDefault();
+    if (!newJob.title.trim() || !newJob.company.trim()) return;
+
+    setIsSubmitting(true);
+    try {
+      const createdJob = await jobService.createJob({
+        title: newJob.title.trim(),
+        company: newJob.company.trim(),
+        location: newJob.location.trim(),
+        type: newJob.type,
+        salary: newJob.stipend.trim(),
+        stipend: newJob.stipend.trim(),
+        description: newJob.description.trim(),
+        skills: newJob.tags.split(',').map((t) => t.trim()).filter(Boolean),
+      });
+
+      if (createdJob) {
+        setJobs((prev) => [createdJob, ...prev]);
+        setTotalJobs((prev) => prev + 1);
+        setIsPostModalOpen(false);
+        setNewJob({
+          title: '',
+          company: currentUser?.company || '',
+          location: 'Bengaluru, India',
+          type: 'Full-time',
+          stipend: '₹18 - ₹24 LPA',
+          description: 'We are looking for talented JECRC graduates to join our team.',
+          tags: 'Java, Spring Boot, AWS',
+        });
+        showNotification('Job opportunity posted successfully to JECRC community!');
+      }
+    } catch (err) {
+      showNotification(err.message || 'Failed to post job opportunity', 'error');
+    } finally {
+      setIsSubmitting(false);
     }
-    return true;
-  });
+  };
+
+  const handleBookmarkToggle = async (jobId) => {
+    try {
+      const res = await jobService.toggleBookmark(jobId);
+      const isSaved = res.isBookmarked !== undefined ? res.isBookmarked : res.isSaved;
+
+      setJobs((prev) =>
+        prev.map((j) => (j.id === jobId ? { ...j, isBookmarked: isSaved, isSaved: isSaved } : j))
+      );
+      showNotification(isSaved ? 'Job bookmarked' : 'Bookmark removed', 'info');
+    } catch (err) {
+      showNotification(err.message || 'Failed to bookmark job', 'error');
+    }
+  };
+
+  const handleApplyJob = async (job) => {
+    try {
+      const res = await jobService.applyForJob(job.id, {
+        coverNote: 'Requesting referral via JECRC Alumni Community Portal',
+      });
+
+      setJobs((prev) =>
+        prev.map((j) => {
+          if (j.id === job.id) {
+            return {
+              ...j,
+              hasApplied: true,
+              applicationStatus: 'APPLIED',
+              applicantsCount: res.applicantsCount !== undefined ? res.applicantsCount : j.applicantsCount + 1,
+            };
+          }
+          return j;
+        })
+      );
+      showNotification(`Referral application submitted to ${job.company}!`, 'success');
+    } catch (err) {
+      showNotification(err.message || 'Failed to apply for job', 'error');
+    }
+  };
+
+  const handleDeleteJob = async (jobId) => {
+    if (!window.confirm('Are you sure you want to delete this job opportunity?')) return;
+    try {
+      await jobService.deleteJob(jobId);
+      setJobs((prev) => prev.filter((j) => j.id !== jobId));
+      setTotalJobs((prev) => Math.max(0, prev - 1));
+      showNotification('Job posting deleted successfully', 'info');
+    } catch (err) {
+      showNotification(err.message || 'Failed to delete job posting', 'error');
+    }
+  };
 
   return (
-    <PageContainer
-      title="Jobs & Internships"
-      description={
-        caps.isAlumni
-          ? "Post and manage job opportunities, campus referrals, and internships for JECRC students."
-          : "Opportunities and verified referrals posted directly by JECRC alumni for students and freshers."
-      }
-      badge="Module 06"
-    >
+    <PageContainer>
       <div className="space-y-4">
         
         {/* Header Banner with Role Actions */}
@@ -206,7 +222,7 @@ export const JobsPage = () => {
                     activeTab === 'all' ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
-                  All Openings ({jobs.length})
+                  All Openings
                 </button>
                 <button
                   type="button"
@@ -215,7 +231,7 @@ export const JobsPage = () => {
                     activeTab === 'my_posts' ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
-                  Your Postings ({jobs.filter((j) => j.isMyPosting).length})
+                  Your Postings
                 </button>
               </div>
             )}
@@ -243,15 +259,35 @@ export const JobsPage = () => {
 
         {/* Job Cards */}
         <div className="space-y-3">
-          {filteredJobs.length === 0 ? (
+          {isLoading ? (
+            <div className="bg-white rounded-xl border border-slate-200 p-12 text-center space-y-3">
+              <Loader2 className="w-8 h-8 text-red-700 animate-spin mx-auto" />
+              <p className="text-xs font-semibold text-slate-600">Loading verified job openings from database...</p>
+            </div>
+          ) : hasError ? (
+            <div className="bg-white rounded-xl border border-rose-200 p-10 text-center space-y-3">
+              <Briefcase className="w-8 h-8 mx-auto text-rose-500" />
+              <h4 className="text-xs font-bold text-slate-900">Failed to load jobs</h4>
+              <p className="text-xs text-slate-500">Please check your network connection and try again.</p>
+              <button
+                type="button"
+                onClick={fetchJobs}
+                className="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 cursor-pointer"
+              >
+                Retry
+              </button>
+            </div>
+          ) : jobs.length === 0 ? (
             <div className="bg-white rounded-xl border border-slate-200 p-10 text-center space-y-2">
               <Briefcase className="w-8 h-8 mx-auto text-slate-400" />
               <h4 className="text-xs font-bold text-slate-900">No job openings found</h4>
               <p className="text-xs text-slate-500">Try adjusting your filters or search query.</p>
             </div>
           ) : (
-            filteredJobs.map((job) => {
-              const isMyPosting = isJobMyPosting(job);
+            jobs.map((job) => {
+              const isMyPosting = job.isMyPosting;
+              const hasApplied = job.hasApplied || job.applicationStatus !== null;
+
               return (
                 <div
                   key={job.id}
@@ -259,7 +295,7 @@ export const JobsPage = () => {
                 >
                   <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
                     <div className="space-y-1">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <h4 className="text-sm font-bold text-slate-900">{job.title}</h4>
                         <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
                           Verified Referral
@@ -267,6 +303,12 @@ export const JobsPage = () => {
                         {isMyPosting && (
                           <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-red-50 text-red-700 border border-red-200">
                             Your Posting
+                          </span>
+                        )}
+                        {hasApplied && (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 flex items-center gap-1">
+                            <Check className="w-3 h-3 text-blue-600" />
+                            Applied
                           </span>
                         )}
                       </div>
@@ -285,15 +327,47 @@ export const JobsPage = () => {
                       </div>
                     </div>
 
-                    <div className="text-left sm:text-right shrink-0">
-                      <span className="text-xs font-bold text-slate-900 block">{job.stipend}</span>
-                      <span className="text-[10px] text-slate-400 block">Posted by {job.postedBy}</span>
+                    <div className="text-left sm:text-right shrink-0 flex sm:flex-col items-center sm:items-end justify-between gap-2">
+                      <div>
+                        <span className="text-xs font-bold text-slate-900 block">{job.salary || job.stipend}</span>
+                        <span className="text-[10px] text-slate-400 block">Posted by {job.postedBy}</span>
+                      </div>
+
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => handleBookmarkToggle(job.id)}
+                          className={`p-1.5 rounded-lg border text-slate-400 hover:text-slate-700 transition-colors cursor-pointer ${
+                            job.isBookmarked ? 'bg-slate-900 text-white border-slate-900' : 'bg-slate-50 border-slate-200'
+                          }`}
+                          title={job.isBookmarked ? 'Remove Bookmark' : 'Bookmark Job'}
+                        >
+                          <Bookmark className="w-4 h-4" fill={job.isBookmarked ? 'currentColor' : 'none'} />
+                        </button>
+
+                        {isMyPosting && (
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteJob(job.id)}
+                            className="p-1.5 rounded-lg border border-rose-200 bg-rose-50 text-rose-600 hover:bg-rose-100 transition-colors cursor-pointer"
+                            title="Delete Job Posting"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
 
+                  {job.description && (
+                    <p className="text-xs text-slate-600 line-clamp-2 leading-relaxed">
+                      {job.description}
+                    </p>
+                  )}
+
                   <div className="pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
                     <div className="flex flex-wrap gap-1.5">
-                      {job.tags.map((tag) => (
+                      {(job.skills || job.tags || []).map((tag) => (
                         <span key={tag} className="text-[10px] font-medium px-2 py-0.5 rounded bg-slate-100 text-slate-600">
                           {tag}
                         </span>
@@ -302,47 +376,61 @@ export const JobsPage = () => {
 
                     <div className="flex items-center gap-2">
                       {isMyPosting ? (
-                      <div className="flex items-center gap-2 text-xs">
-                        <span className="text-slate-500 font-medium flex items-center gap-1">
-                          <Users className="w-3.5 h-3.5 text-slate-400" />
-                          <span>{job.applicantsCount} applicants</span>
-                        </span>
-                        <span className="text-slate-400">•</span>
-                        <span className="font-semibold text-emerald-600">Active</span>
-                      </div>
-                    ) : (
-                      <>
-                        <Link
-                          to={`/messages?userId=${job.postedById}`}
-                          className="px-3 py-1.5 rounded-md text-xs font-semibold text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 transition-colors inline-flex items-center gap-1"
-                        >
-                          <MessageSquare className="w-3.5 h-3.5 text-slate-400" />
-                          <span>Ask Question</span>
-                        </Link>
+                        <div className="flex items-center gap-2 text-xs">
+                          <span className="text-slate-500 font-medium flex items-center gap-1">
+                            <Users className="w-3.5 h-3.5 text-slate-400" />
+                            <span>{job.applicantsCount} applicants</span>
+                          </span>
+                          <span className="text-slate-400">•</span>
+                          <span className="font-semibold text-emerald-600">Active</span>
+                          <span className="text-slate-400">•</span>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteJob(job.id)}
+                            className="text-xs font-semibold text-rose-600 hover:underline cursor-pointer flex items-center gap-1"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                            <span>Delete</span>
+                          </button>
+                        </div>
+                      ) : (
+                        <>
+                          {job.postedById && (
+                            <Link
+                              to={`/messages?userId=${job.postedById}`}
+                              className="px-3 py-1.5 rounded-md text-xs font-semibold text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 transition-colors inline-flex items-center gap-1"
+                            >
+                              <MessageSquare className="w-3.5 h-3.5 text-slate-400" />
+                              <span>Ask Question</span>
+                            </Link>
+                          )}
 
-                        <button
-                          type="button"
-                          onClick={() => {
-                            showNotification(`Referral request submitted to ${job.postedBy}!`);
-                          }}
-                          className="px-3.5 py-1.5 rounded-md text-xs font-semibold text-white bg-red-700 hover:bg-red-800 transition-colors inline-flex items-center gap-1 shadow-2xs cursor-pointer"
-                        >
-                          <span>Request Referral</span>
-                          <ExternalLink className="w-3 h-3" />
-                        </button>
-                      </>
-                    )}
+                          <button
+                            type="button"
+                            disabled={hasApplied}
+                            onClick={() => handleApplyJob(job)}
+                            className={`px-3.5 py-1.5 rounded-md text-xs font-semibold transition-colors inline-flex items-center gap-1 shadow-2xs ${
+                              hasApplied
+                                ? 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed'
+                                : 'text-white bg-red-700 hover:bg-red-800 cursor-pointer'
+                            }`}
+                          >
+                            <span>{hasApplied ? 'Applied' : 'Request Referral'}</span>
+                            {!hasApplied && <ExternalLink className="w-3 h-3" />}
+                          </button>
+                        </>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            );
-          })
-        )}
-      </div>
+              );
+            })
+          )}
+        </div>
 
       </div>
 
-      {/* Post a Job Modal (Alumni & Admin) */}
+      {/* Post a Job Modal (Alumni only) */}
       {isPostModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs">
           <div className="bg-white rounded-2xl border border-slate-200 shadow-xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
@@ -406,6 +494,7 @@ export const JobsPage = () => {
                   >
                     <option value="Internship">Internship</option>
                     <option value="Full-time">Full-time</option>
+                    <option value="Contract">Contract</option>
                     <option value="Remote">Remote</option>
                   </select>
                 </div>
@@ -422,7 +511,18 @@ export const JobsPage = () => {
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-800">Tags (comma separated)</label>
+                <label className="text-xs font-bold text-slate-800">Description</label>
+                <textarea
+                  rows={3}
+                  required
+                  value={newJob.description}
+                  onChange={(e) => setNewJob({ ...newJob, description: e.target.value })}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs focus:bg-white focus:outline-none resize-none"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-800">Skills / Tags (comma separated)</label>
                 <input
                   type="text"
                   placeholder="Java, Spring Boot, AWS, Python"
@@ -442,9 +542,10 @@ export const JobsPage = () => {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 rounded-lg text-xs font-semibold text-white bg-red-700 hover:bg-red-800 transition-colors shadow-2xs cursor-pointer"
+                  disabled={isSubmitting}
+                  className="px-4 py-2 rounded-lg text-xs font-semibold text-white bg-red-700 hover:bg-red-800 transition-colors shadow-2xs cursor-pointer disabled:opacity-50"
                 >
-                  Post Opportunity
+                  {isSubmitting ? 'Posting...' : 'Post Opportunity'}
                 </button>
               </div>
             </form>

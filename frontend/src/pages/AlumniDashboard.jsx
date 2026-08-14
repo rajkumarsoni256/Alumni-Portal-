@@ -10,22 +10,25 @@ import {
 import { Link } from 'react-router-dom';
 
 export const AlumniDashboard = () => {
-  const { requests, updateRequestStatus, alumniList, showNotification } = useApp();
+  const { requests, updateRequestStatus, currentUser, showNotification } = useApp();
 
-  const currentAlumni = alumniList.find((a) => a.id === 'alm_1') || alumniList[0];
+  const pendingRequests = requests.filter((r) => (r.status || '').toUpperCase() === 'PENDING');
+  const upcomingSessions = requests.filter((r) => (r.status || '').toUpperCase() === 'ACCEPTED');
 
-  const alumniRequests = requests.filter((r) => r.alumniId === currentAlumni.id);
-  const pendingRequests = alumniRequests.filter((r) => r.status === 'Pending');
-  const upcomingSessions = alumniRequests.filter((r) => r.status === 'Accepted');
-
-  const handleAccept = (reqId) => {
-    updateRequestStatus(reqId, 'Accepted', 'Upcoming Saturday 3:00 PM');
-    showNotification('Mentorship request accepted and meeting scheduled');
+  const handleAccept = async (reqId) => {
+    try {
+      await updateRequestStatus(reqId, 'ACCEPTED');
+    } catch (err) {
+      // Handled in context
+    }
   };
 
-  const handleDecline = (reqId) => {
-    updateRequestStatus(reqId, 'Declined');
-    showNotification('Mentorship request declined', 'info');
+  const handleDecline = async (reqId) => {
+    try {
+      await updateRequestStatus(reqId, 'DECLINED');
+    } catch (err) {
+      // Handled in context
+    }
   };
 
   return (
@@ -42,12 +45,12 @@ export const AlumniDashboard = () => {
               </span>
             </div>
             <p className="text-xs text-slate-500">
-              Managing mentorship sessions and student requests for <strong className="text-slate-800">{currentAlumni.name}</strong> ({currentAlumni.currentRole} @ {currentAlumni.company}).
+              Managing mentorship sessions and student requests for <strong className="text-slate-800">{currentUser.name}</strong> ({currentUser.designation || 'Alumni Mentor'} @ {currentUser.company || 'JECRC'}).
             </p>
           </div>
 
           <Link
-            to={`/alumni/${currentAlumni.id}`}
+            to={`/alumni/${currentUser.id}`}
             className="px-3.5 py-1.5 rounded-md text-xs font-semibold text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 transition-colors inline-flex items-center gap-1.5 self-start sm:self-auto"
           >
             <span>View Public Profile</span>
@@ -65,7 +68,7 @@ export const AlumniDashboard = () => {
 
           <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-2xs space-y-1">
             <span className="text-[10px] font-bold uppercase text-slate-400">Students Guided</span>
-            <p className="text-xl font-bold text-slate-900">14</p>
+            <p className="text-xl font-bold text-slate-900">{upcomingSessions.length}</p>
             <span className="text-[11px] text-emerald-600 font-medium block">Campus mentees</span>
           </div>
 
@@ -81,7 +84,7 @@ export const AlumniDashboard = () => {
               <p className="text-xl font-bold text-slate-900">4.9</p>
               <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-500" />
             </div>
-            <span className="text-[11px] text-slate-400 font-medium block">32 student reviews</span>
+            <span className="text-[11px] text-slate-400 font-medium block">Verified reviews</span>
           </div>
         </div>
 
@@ -97,12 +100,12 @@ export const AlumniDashboard = () => {
                 <div key={req.id} className="pt-3 first:pt-0 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div className="space-y-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold text-slate-900">{req.studentName}</span>
-                      <span className="text-[11px] text-slate-400">({req.studentDegree || 'B.Tech CSE, 3rd Year'})</span>
+                      <span className="text-xs font-bold text-slate-900">{req.student?.name}</span>
+                      <span className="text-[11px] text-slate-400">({req.student?.branch || 'B.Tech CSE'}, Class of {req.student?.graduationYear || 2026})</span>
                     </div>
                     <p className="text-xs font-medium text-slate-700">Topic: {req.topic}</p>
                     <p className="text-xs text-slate-500 max-w-xl">"{req.message}"</p>
-                    <span className="text-[10px] text-slate-400 block">Requested: {req.requestedAt}</span>
+                    <span className="text-[10px] text-slate-400 block">Requested: {new Date(req.createdAt).toLocaleDateString()}</span>
                   </div>
 
                   <div className="flex items-center gap-2 shrink-0">
@@ -111,7 +114,7 @@ export const AlumniDashboard = () => {
                       className="px-3 py-1.5 rounded-md text-xs font-semibold text-white bg-emerald-700 hover:bg-emerald-800 transition-colors inline-flex items-center gap-1 cursor-pointer"
                     >
                       <Check className="w-3.5 h-3.5" />
-                      <span>Accept & Schedule</span>
+                      <span>Accept Request</span>
                     </button>
                     <button
                       onClick={() => handleDecline(req.id)}
@@ -141,26 +144,22 @@ export const AlumniDashboard = () => {
                 <div key={session.id} className="pt-3 first:pt-0 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold text-slate-900">{session.studentName}</span>
+                      <span className="text-xs font-bold text-slate-900">{session.student?.name}</span>
                       <span className="text-[10px] font-semibold text-emerald-800 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
-                        Confirmed
+                        Accepted & Confirmed
                       </span>
                     </div>
                     <p className="text-xs text-slate-700 font-medium">{session.topic}</p>
-                    <p className="text-[11px] text-slate-500">{session.scheduledTime}</p>
+                    <p className="text-[11px] text-slate-500">Confirmed on {new Date(session.respondedAt || session.updatedAt).toLocaleDateString()}</p>
                   </div>
 
-                  {session.meetingLink && (
-                    <a
-                      href={session.meetingLink}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="px-3.5 py-1.5 rounded-md text-xs font-semibold text-white bg-red-700 hover:bg-red-800 transition-colors inline-flex items-center gap-1.5 self-start sm:self-auto"
-                    >
-                      <Video className="w-3.5 h-3.5" />
-                      <span>Launch Google Meet</span>
-                    </a>
-                  )}
+                  <Link
+                    to={`/messages?userId=${session.student?.id}`}
+                    className="px-3.5 py-1.5 rounded-md text-xs font-semibold text-white bg-red-700 hover:bg-red-800 transition-colors inline-flex items-center gap-1.5 self-start sm:self-auto"
+                  >
+                    <Video className="w-3.5 h-3.5" />
+                    <span>Message Mentee</span>
+                  </Link>
                 </div>
               ))}
             </div>

@@ -1,5 +1,6 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
+import { postService } from '../services/postService';
 import { FeedSidebar } from '../components/feed/FeedSidebar';
 import { CreatePostComposer } from '../components/feed/CreatePostComposer';
 import { PostCard } from '../components/feed/PostCard';
@@ -9,16 +10,19 @@ import { Search, X } from 'lucide-react';
 export const CommunityFeed = () => {
   const { 
     posts, 
-    usersMap, 
+    setPosts, 
     feedFilter, 
     setFeedFilter, 
     searchQuery, 
     setSearchQuery 
   } = useApp();
 
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
   const [isComposerModalOpen, setIsComposerModalOpen] = useState(false);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+  const [totalPosts, setTotalPosts] = useState(0);
 
   // Category filter tabs
   const filterTabs = [
@@ -29,49 +33,46 @@ export const CommunityFeed = () => {
     { id: 'saved', label: 'Saved' },
   ];
 
-  const handleFilterChange = (filterId) => {
-    setIsLoading(true);
-    setFeedFilter(filterId);
-    setTimeout(() => {
+  const fetchFeedPosts = async (targetPage = 1, isInitial = false) => {
+    if (isInitial) setIsLoading(true);
+    setHasError(false);
+
+    try {
+      const result = await postService.getPosts({
+        page: targetPage,
+        limit: 15,
+        filter: feedFilter,
+        searchQuery: searchQuery,
+      });
+
+      if (targetPage === 1) {
+        setPosts(result.posts || []);
+      } else {
+        setPosts((prev) => [...prev, ...(result.posts || [])]);
+      }
+
+      setTotalPosts(result.total || result.totalCount || 0);
+      setHasMore(result.hasMore || false);
+      setPage(targetPage);
+    } catch (err) {
+      console.warn('Failed to load feed posts:', err);
+      setHasError(true);
+    } finally {
       setIsLoading(false);
-    }, 120);
+    }
+  };
+
+  useEffect(() => {
+    fetchFeedPosts(1, true);
+  }, [feedFilter, searchQuery]);
+
+  const handleFilterChange = (filterId) => {
+    setFeedFilter(filterId);
   };
 
   const handleRetry = () => {
-    setHasError(false);
-    setIsLoading(true);
-    setTimeout(() => {
-      setIsLoading(false);
-    }, 200);
+    fetchFeedPosts(1, true);
   };
-
-  const filteredPosts = useMemo(() => {
-    return posts.filter((post) => {
-      const author = usersMap[post.authorId] || {};
-
-      // 1. Category Tab Filter
-      if (feedFilter === 'alumni' && post.category !== 'alumni' && !author.isAlumni) return false;
-      if (feedFilter === 'student' && post.category !== 'student' && author.isAlumni) return false;
-      if (feedFilter === 'jobs' && post.type !== 'JOB') return false;
-      if (feedFilter === 'saved' && !post.savedByCurrentUser) return false;
-
-      // 2. Search query / Tag filter
-      if (searchQuery && searchQuery.trim()) {
-        const q = searchQuery.toLowerCase().trim();
-        const matchesContent = post.content && post.content.toLowerCase().includes(q);
-        const matchesAuthor = author.name && author.name.toLowerCase().includes(q);
-        const matchesTags = post.tags && post.tags.some((t) => t.toLowerCase().includes(q));
-        const matchesJob = post.jobData && (
-          (post.jobData.title && post.jobData.title.toLowerCase().includes(q)) || 
-          (post.jobData.company && post.jobData.company.toLowerCase().includes(q))
-        );
-
-        return matchesContent || matchesAuthor || matchesTags || matchesJob;
-      }
-
-      return true;
-    });
-  }, [posts, usersMap, feedFilter, searchQuery]);
 
   return (
     <div className="flex flex-col lg:flex-row items-start gap-6">
@@ -138,7 +139,7 @@ export const CommunityFeed = () => {
           <FeedErrorState onRetry={handleRetry} />
         ) : isLoading ? (
           <FeedSkeletons count={3} />
-        ) : filteredPosts.length === 0 ? (
+        ) : posts.length === 0 ? (
           <FeedEmptyState
             filterName={feedFilter}
             onResetFilter={() => {
@@ -149,21 +150,36 @@ export const CommunityFeed = () => {
           />
         ) : (
           <div className="space-y-3">
-            {filteredPosts.map((post) => (
+            {posts.map((post) => (
               <PostCard key={post.id} post={post} />
             ))}
 
+            {/* Load More Button */}
+            {hasMore && (
+              <div className="pt-2 text-center">
+                <button
+                  type="button"
+                  onClick={() => fetchFeedPosts(page + 1, false)}
+                  className="px-5 py-2 rounded-lg text-xs font-semibold text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 transition-colors shadow-2xs cursor-pointer"
+                >
+                  Load More Updates
+                </button>
+              </div>
+            )}
+
             {/* Feed Catch-up Notice */}
-            <div className="py-4 text-center">
-              <span className="text-xs text-slate-400 font-medium">
-                You're all caught up with community updates
-              </span>
-            </div>
+            {!hasMore && posts.length > 0 && (
+              <div className="py-4 text-center">
+                <span className="text-xs text-slate-400 font-medium">
+                  You're all caught up with community updates ({totalPosts} posts)
+                </span>
+              </div>
+            )}
           </div>
         )}
       </div>
 
-      {/* Right Sidebar Widgets Column (Desktop LG/XL, 280px width, sticky on scroll) */}
+      {/* Right Sidebar Widgets Column */}
       <div className="hidden lg:block w-64 xl:w-72 2xl:w-80 shrink-0 sticky top-20">
         <FeedSidebar />
       </div>

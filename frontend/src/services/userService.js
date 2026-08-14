@@ -1,186 +1,114 @@
 /**
  * User and Network Service Layer
  * 
- * Provides an abstraction for discovering JECRC students and alumni,
- * filtering/searching directories, managing connections, and handling requests.
- * 
- * Ready for future backend API integration (e.g. GET /api/users?page=1&limit=20).
+ * Provides abstraction for discovering JECRC students and alumni,
+ * filtering/searching directories, managing connections, and retrieving public profiles.
+ * Communicates with backend REST API under /api/v1/users and /api/v1/connections.
  */
 
-import { MOCK_USERS, MOCK_CONNECTION_REQUESTS } from '../data/mockData';
-
-// In-memory mutable collections for client mock simulation
-let memoryUsers = { ...MOCK_USERS };
-let memoryRequests = [...MOCK_CONNECTION_REQUESTS];
+import { apiClient } from './apiClient';
+import { connectionService } from './connectionService';
 
 export const userService = {
   /**
-   * Fetch paginated and filtered users
+   * Fetch paginated and filtered users from backend REST API
    * @param {Object} params
-   * @param {number} [params.page=1]
-   * @param {number} [params.limit=24]
-   * @param {string} [params.type='all'] - 'all' | 'alumni' | 'student'
-   * @param {string} [params.branch='all']
-   * @param {string|number} [params.batch='all']
-   * @param {string} [params.location='all']
-   * @param {string} [params.query='']
-   * @returns {Promise<{ users: Array, totalCount: number, page: number, totalPages: number, hasMore: boolean }>}
    */
   getUsers: async ({
     page = 1,
-    limit = 24,
+    limit = 18,
     type = 'all',
     branch = 'all',
     batch = 'all',
     location = 'all',
     query = '',
   } = {}) => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const allList = Object.values(memoryUsers);
+    try {
+      const queryParams = new URLSearchParams();
+      queryParams.set('page', page);
+      queryParams.set('limit', limit);
 
-        const filtered = allList.filter((user) => {
-          // Exclude self if needed, or include all members
-          
-          // 1. Role Type Filter
-          if (type === 'alumni' && !user.isAlumni) return false;
-          if (type === 'student' && user.isAlumni) return false;
+      if (type && type !== 'all') queryParams.set('role', type);
+      if (branch && branch !== 'all') queryParams.set('branch', branch);
+      if (batch && batch !== 'all') queryParams.set('graduationYear', batch);
+      if (query && query.trim() !== '') queryParams.set('query', query.trim());
 
-          // 2. Branch Filter
-          if (branch !== 'all' && user.branch !== branch) {
-            // Check substring or normalization
-            if (!user.branch?.toLowerCase().includes(branch.toLowerCase())) return false;
-          }
+      const data = await apiClient.get(`/api/v1/users?${queryParams.toString()}`);
 
-          // 3. Batch Filter
-          if (batch !== 'all') {
-            const batchNum = Number(batch);
-            if (Number(user.batch) !== batchNum && !String(user.batch).includes(String(batch))) {
-              return false;
-            }
-          }
+      if (!data) {
+        return { users: [], totalCount: 0, page: 1, totalPages: 1, hasMore: false };
+      }
 
-          // 4. Location Filter
-          if (location !== 'all') {
-            if (!user.location?.toLowerCase().includes(location.toLowerCase())) {
-              return false;
-            }
-          }
+      const rawUsers = data.users || [];
+      const total = data.total !== undefined ? data.total : (data.totalCount || rawUsers.length);
+      const currentPage = data.page || page;
+      const totalPages = data.pages || Math.ceil(total / limit) || 1;
+      const hasMore = data.hasMore !== undefined ? data.hasMore : (currentPage < totalPages);
 
-          // 5. Search Query Filter (Case-insensitive across Name, Company, Role/Headline, Skills, Branch, Location)
-          if (query && query.trim()) {
-            const q = query.toLowerCase().trim();
-            const matchesName = user.name?.toLowerCase().includes(q);
-            const matchesHeadline = user.headline?.toLowerCase().includes(q);
-            const matchesRole = user.role?.toLowerCase().includes(q) || user.currentRole?.toLowerCase().includes(q);
-            const matchesCompany = user.company?.toLowerCase().includes(q);
-            const matchesBranch = user.branch?.toLowerCase().includes(q);
-            const matchesLocation = user.location?.toLowerCase().includes(q);
-            const matchesSkills = user.skills?.some((s) => s.toLowerCase().includes(q));
-
-            if (!matchesName && !matchesHeadline && !matchesRole && !matchesCompany && !matchesBranch && !matchesLocation && !matchesSkills) {
-              return false;
-            }
-          }
-
-          return true;
-        });
-
-        const totalCount = filtered.length;
-        const totalPages = Math.ceil(totalCount / limit) || 1;
-        const startIndex = (page - 1) * limit;
-        const pagedUsers = filtered.slice(0, startIndex + limit); // cumulative for "Load More" or slice for page
-
-        resolve({
-          users: pagedUsers,
-          totalCount,
-          page,
-          totalPages,
-          hasMore: startIndex + limit < totalCount,
-        });
-      }, 60);
-    });
+      return {
+        users: rawUsers,
+        totalCount: total,
+        page: currentPage,
+        totalPages,
+        hasMore,
+      };
+    } catch (err) {
+      console.warn('Failed to fetch users from backend:', err);
+      return { users: [], totalCount: 0, page: 1, totalPages: 1, hasMore: false };
+    }
   },
 
   /**
-   * Get single user by ID
+   * Get single public user by ID from backend REST API
    * @param {string} userId
-   * @returns {Promise<Object|null>}
    */
   getUserById: async (userId) => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve(memoryUsers[userId] || null);
-      }, 40);
-    });
+    try {
+      const response = await apiClient.get(`/api/v1/users/${userId}`);
+      if (!response) return null;
+      return response.user || response;
+    } catch (err) {
+      console.warn(`Failed to fetch public profile for user ${userId}:`, err);
+      return null;
+    }
   },
 
   /**
-   * Fetch incoming connection requests
-   * @returns {Promise<Array>}
+   * Fetch incoming connection requests from real backend
    */
   getConnectionRequests: async () => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve([...memoryRequests]);
-      }, 50);
-    });
+    return connectionService.getIncomingRequests();
   },
 
   /**
    * Accept incoming connection request
-   * @param {string} requestId
-   * @param {string} fromUserId
-   * @returns {Promise<boolean>}
    */
-  acceptConnectionRequest: async (requestId, fromUserId) => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        memoryRequests = memoryRequests.filter((r) => r.id !== requestId);
-        if (memoryUsers[fromUserId]) {
-          memoryUsers[fromUserId] = {
-            ...memoryUsers[fromUserId],
-            connectionStatus: 'connected',
-            connectionsCount: (memoryUsers[fromUserId].connectionsCount || 0) + 1,
-          };
-        }
-        resolve(true);
-      }, 50);
-    });
+  acceptConnectionRequest: async (requestId) => {
+    await connectionService.acceptRequest(requestId);
+    return true;
   },
 
   /**
-   * Ignore incoming connection request
-   * @param {string} requestId
-   * @returns {Promise<boolean>}
+   * Ignore / Decline incoming connection request
    */
   ignoreConnectionRequest: async (requestId) => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        memoryRequests = memoryRequests.filter((r) => r.id !== requestId);
-        resolve(true);
-      }, 50);
-    });
+    await connectionService.declineRequest(requestId);
+    return true;
   },
 
   /**
-   * Toggle connection request state (none <-> pending)
-   * @param {string} userId
-   * @returns {Promise<string>} 'pending' | 'none'
+   * Toggle connection request state based on current status
    */
-  toggleConnect: async (userId) => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const user = memoryUsers[userId];
-        if (!user) return resolve('none');
-
-        const nextStatus = user.connectionStatus === 'pending' ? 'none' : 'pending';
-        memoryUsers[userId] = {
-          ...user,
-          connectionStatus: nextStatus,
-        };
-        resolve(nextStatus);
-      }, 50);
-    });
+  toggleConnect: async (targetUserId, currentStatus) => {
+    if (currentStatus === 'connected') {
+      await connectionService.removeConnection(targetUserId);
+      return 'none';
+    } else if (currentStatus === 'pending' || currentStatus === 'pending_outgoing') {
+      await connectionService.cancelRequest(targetUserId);
+      return 'none';
+    } else {
+      await connectionService.sendRequest(targetUserId);
+      return 'pending';
+    }
   },
 };

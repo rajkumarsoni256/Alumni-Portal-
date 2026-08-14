@@ -1,6 +1,7 @@
 import { 
   Home, 
   Users, 
+  UserCheck,
   Briefcase, 
   Calendar, 
   GraduationCap, 
@@ -66,7 +67,8 @@ export const getNavLinksForRole = (
   if (caps.isStudent) {
     return [
       { name: 'Home', path: '/', icon: Home, matchExact: true },
-      { name: 'Network', path: '/network', icon: Users },
+      { name: 'Discover People', path: '/network', icon: Users },
+      { name: 'My Connections', path: '/my-connections', icon: UserCheck },
       { name: 'Explore Alumni', path: '/explore', icon: Compass },
       { name: 'Find Mentor', path: '/find-mentor', icon: GraduationCap },
       { name: 'Jobs & Internships', path: '/jobs', icon: Briefcase },
@@ -90,7 +92,8 @@ export const getNavLinksForRole = (
   if (caps.isAlumni) {
     return [
       { name: 'Home', path: '/', icon: Home, matchExact: true },
-      { name: 'Network', path: '/network', icon: Users },
+      { name: 'Discover People', path: '/network', icon: Users },
+      { name: 'My Connections', path: '/my-connections', icon: UserCheck },
       { name: 'Alumni Directory', path: '/explore', icon: Compass },
       { 
         name: 'Mentorship Requests', 
@@ -120,7 +123,8 @@ export const getNavLinksForRole = (
   return [
     { name: 'Administration', path: '/admin', icon: LayoutDashboard },
     { name: 'Community Feed', path: '/', icon: Home, matchExact: true },
-    { name: 'Network & Users', path: '/network', icon: Users },
+    { name: 'Discover People', path: '/network', icon: Users },
+    { name: 'My Connections', path: '/my-connections', icon: UserCheck },
     { name: 'Alumni Directory', path: '/explore', icon: Compass },
     { name: 'Jobs Board', path: '/jobs', icon: Briefcase },
     { name: 'Campus Events', path: '/events', icon: Calendar },

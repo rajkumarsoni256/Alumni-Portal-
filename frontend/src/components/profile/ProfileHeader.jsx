@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { 
   MapPin, 
@@ -14,12 +14,17 @@ import { useApp } from '../../context/AppContext';
 export const ProfileHeader = ({ profile, isOwnProfile, onEditClick }) => {
   const navigate = useNavigate();
   const { toggleConnectUser, showNotification, activeRole } = useApp();
+  const [localStatus, setLocalStatus] = useState(profile?.connectionStatus || 'none');
+
+  useEffect(() => {
+    setLocalStatus(profile?.connectionStatus || 'none');
+  }, [profile?.connectionStatus]);
 
   if (!profile) return null;
 
   const isAlumni = Boolean(profile.isAlumni || profile.role?.toLowerCase() === 'alumni');
-  const isConnected = profile.connectionStatus === 'connected';
-  const isPending = profile.connectionStatus === 'pending';
+  const isConnected = localStatus === 'connected' || localStatus === 'CONNECTED';
+  const isPending = localStatus === 'pending' || localStatus === 'pending_outgoing' || localStatus === 'PENDING_OUTGOING';
 
   const handleShare = () => {
     navigator.clipboard.writeText(window.location.href);
@@ -28,6 +33,15 @@ export const ProfileHeader = ({ profile, isOwnProfile, onEditClick }) => {
 
   const handleMessageClick = () => {
     navigate(`/messages?userId=${profile.id}`);
+  };
+
+  const handleConnectClick = async () => {
+    if (isConnected || isPending) return;
+    setLocalStatus('pending_outgoing');
+    const res = await toggleConnectUser(profile.id);
+    if (!res) {
+      setLocalStatus(profile?.connectionStatus || 'none');
+    }
   };
 
   return (
@@ -81,7 +95,7 @@ export const ProfileHeader = ({ profile, isOwnProfile, onEditClick }) => {
               <>
                 <button
                   type="button"
-                  onClick={() => toggleConnectUser(profile.id)}
+                  onClick={handleConnectClick}
                   className={`px-4 py-2 rounded-lg text-xs font-semibold transition-colors inline-flex items-center gap-1.5 shadow-2xs cursor-pointer ${
                     isConnected
                       ? 'bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200'
@@ -98,7 +112,7 @@ export const ProfileHeader = ({ profile, isOwnProfile, onEditClick }) => {
                   ) : isPending ? (
                     <>
                       <Clock className="w-3.5 h-3.5" />
-                      <span>Pending</span>
+                      <span>Request Sent</span>
                     </>
                   ) : (
                     <span>Connect</span>

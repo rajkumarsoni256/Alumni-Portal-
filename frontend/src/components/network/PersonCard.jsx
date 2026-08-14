@@ -1,22 +1,32 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { MapPin, Clock, Check } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 
 export const PersonCard = ({ person }) => {
   const { toggleConnectUser } = useApp();
+  const [localStatus, setLocalStatus] = useState(person?.connectionStatus || 'none');
+
+  useEffect(() => {
+    setLocalStatus(person?.connectionStatus || 'none');
+  }, [person?.connectionStatus]);
 
   if (!person) return null;
 
-  const isConnected = person.connectionStatus === 'connected';
-  const isPending = person.connectionStatus === 'pending';
+  const isConnected = localStatus === 'connected' || localStatus === 'CONNECTED';
+  const isPending = localStatus === 'pending' || localStatus === 'pending_outgoing' || localStatus === 'PENDING_OUTGOING';
   const isAlumni = Boolean(person.isAlumni || person.role?.toLowerCase() === 'alumni');
 
-  const profilePath = isAlumni
-    ? `/alumni/${person.id}`
-    : person.id === 'st_101'
-    ? '/student-dashboard'
-    : `/alumni/${person.id}`;
+  const profilePath = `/alumni/${person.id}`;
+
+  const handleConnectClick = async () => {
+    if (isConnected || isPending) return;
+    setLocalStatus('pending_outgoing');
+    const res = await toggleConnectUser(person.id);
+    if (!res) {
+      setLocalStatus(person?.connectionStatus || 'none');
+    }
+  };
 
   return (
     <div className="bg-white rounded-xl border border-slate-200/90 p-4 shadow-2xs hover:border-slate-300 transition-all flex flex-col justify-between space-y-3.5 group">
@@ -73,18 +83,12 @@ export const PersonCard = ({ person }) => {
           </div>
         </div>
 
-        {/* Location & Mutual Connections */}
+        {/* Location */}
         <div className="flex items-center justify-between text-[11px] text-slate-500 pt-0.5">
           <div className="flex items-center gap-1 min-w-0">
             <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
             <span className="truncate">{person.location || 'Jaipur, India'}</span>
           </div>
-
-          {person.mutualCount > 0 && (
-            <span className="text-[10px] text-slate-400 font-medium shrink-0">
-              {person.mutualCount} mutual
-            </span>
-          )}
         </div>
 
         {/* Skills Tag Row */}
@@ -118,12 +122,12 @@ export const PersonCard = ({ person }) => {
 
         <button
           type="button"
-          onClick={() => toggleConnectUser(person.id)}
+          onClick={handleConnectClick}
           className={`text-center py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer flex items-center justify-center gap-1 shadow-2xs ${
             isConnected
               ? 'bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200'
               : isPending
-              ? 'bg-amber-50 text-amber-800 border border-amber-200'
+              ? 'bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100'
               : 'bg-red-700 text-white hover:bg-red-800'
           }`}
         >
@@ -135,7 +139,7 @@ export const PersonCard = ({ person }) => {
           ) : isPending ? (
             <>
               <Clock className="w-3.5 h-3.5" />
-              <span>Pending</span>
+              <span>Request Sent</span>
             </>
           ) : (
             <span>Connect</span>

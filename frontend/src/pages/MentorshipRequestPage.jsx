@@ -14,12 +14,13 @@ export const MentorshipRequestPage = () => {
   const navigate = useNavigate();
   const { alumniList, submitMentorshipRequest } = useApp();
 
-  const alumni = alumniList.find((a) => a.id === id) || alumniList[0];
+  const alumni = alumniList.find((a) => a.id === id || a.userId === id) || alumniList[0];
 
   const [selectedTopics, setSelectedTopics] = useState(['Resume Review', 'Mock Interview']);
   const [reason, setReason] = useState('Preparing for software engineering campus placements. Seeking guidance on system design and portfolio project presentation.');
   const [goals, setGoals] = useState('Targeting SDE internship roles at top product firms in 2026.');
   const [preferredSlot, setPreferredSlot] = useState('Upcoming Saturday 3:00 PM - 3:45 PM');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
 
   const availableTopics = [
@@ -41,21 +42,21 @@ export const MentorshipRequestPage = () => {
     }
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    submitMentorshipRequest({
-      alumniId: alumni.id,
-      alumniName: alumni.name,
-      alumniRole: `${alumni.currentRole} @ ${alumni.company}`,
-      alumniAvatar: alumni.avatar,
-      category: selectedTopics.join(' & '),
-      helpTopics: selectedTopics,
-      reason,
-      goals,
-      scheduledTime: preferredSlot,
-      meetingType: 'Google Meet',
-    });
-    setIsSubmitted(true);
+    setIsSubmitting(true);
+    try {
+      await submitMentorshipRequest({
+        mentorId: alumni.id || alumni.userId,
+        topic: selectedTopics.join(', '),
+        message: `${reason}\nImmediate Goal: ${goals}\nPreferred Slot: ${preferredSlot}`,
+      });
+      setIsSubmitted(true);
+    } catch (err) {
+      // Handled in context
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -80,13 +81,13 @@ export const MentorshipRequestPage = () => {
 
               <div className="flex items-start gap-3">
                 <img
-                  src={alumni.avatar}
+                  src={alumni.avatar || alumni.avatarUrl}
                   alt={alumni.name}
                   className="w-12 h-12 rounded-full object-cover border border-slate-200 shrink-0"
                 />
                 <div className="min-w-0 space-y-0.5">
-                  <h3 className="text-xs font-bold text-slate-900 truncate">{alumni.name}</h3>
-                  <p className="text-[11px] text-slate-600 font-medium truncate">{alumni.currentRole}</p>
+                  <h3 className="text-xs font-bold text-slate-900 truncate">{alumni.name || alumni.fullName}</h3>
+                  <p className="text-[11px] text-slate-600 font-medium truncate">{alumni.currentRole || alumni.designation}</p>
                   <p className="text-[11px] text-slate-500 font-bold">{alumni.company}</p>
                 </div>
               </div>
@@ -94,7 +95,7 @@ export const MentorshipRequestPage = () => {
               <div className="pt-2 border-t border-slate-100 space-y-1.5 text-xs text-slate-600">
                 <div className="flex items-center gap-1.5">
                   <GraduationCap className="w-3.5 h-3.5 text-slate-400" />
-                  <span>JECRC Class of {alumni.graduationYear}</span>
+                  <span>JECRC Class of {alumni.graduationYear || 'Alumnus'}</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <Video className="w-3.5 h-3.5 text-slate-400" />
@@ -198,10 +199,11 @@ export const MentorshipRequestPage = () => {
 
                   <button
                     type="submit"
-                    className="px-5 py-2 rounded-md text-xs font-semibold text-white bg-red-700 hover:bg-red-800 transition-colors cursor-pointer inline-flex items-center gap-1.5"
+                    disabled={isSubmitting}
+                    className="px-5 py-2 rounded-md text-xs font-semibold text-white bg-red-700 hover:bg-red-800 transition-colors cursor-pointer inline-flex items-center gap-1.5 disabled:opacity-50"
                   >
                     <Send className="w-3.5 h-3.5" />
-                    <span>Submit Request</span>
+                    <span>{isSubmitting ? 'Sending...' : 'Submit Request'}</span>
                   </button>
                 </div>
               </form>
@@ -218,7 +220,7 @@ export const MentorshipRequestPage = () => {
             <div className="space-y-1">
               <h3 className="text-sm font-bold text-slate-900">Mentorship Request Sent</h3>
               <p className="text-xs text-slate-500">
-                Your request has been delivered to <strong>{alumni.name}</strong>. You will be notified once they confirm the slot.
+                Your request has been delivered to <strong>{alumni.name || alumni.fullName}</strong>. You will be notified once they confirm the slot.
               </p>
             </div>
 

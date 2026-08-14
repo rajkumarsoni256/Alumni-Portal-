@@ -1,12 +1,16 @@
-import React, { useState, useMemo } from 'react';
-import { useApp } from '../context/AppContext';
+import React, { useState, useEffect, useMemo } from 'react';
+import { userService } from '../services/userService';
 import { AlumniCard } from '../components/common/AlumniCard';
 import { CAREER_DOMAINS, INDUSTRIES } from '../data/mockData';
 import { Search, X, RotateCcw } from 'lucide-react';
+import { useApp } from '../context/AppContext';
 
 export const ExploreAlumni = () => {
-  const { alumniList } = useApp();
+  const { currentUser } = useApp();
+  const currentUserId = currentUser?.id;
 
+  const [alumniList, setAlumniList] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDomain, setSelectedDomain] = useState('All');
   const [selectedIndustry, setSelectedIndustry] = useState('All');
@@ -14,13 +18,35 @@ export const ExploreAlumni = () => {
   const [selectedLocation, setSelectedLocation] = useState('All');
   const [onlyAvailableMentors, setOnlyAvailableMentors] = useState(false);
 
+  const loadAlumni = async () => {
+    setIsLoading(true);
+    try {
+      const result = await userService.getUsers({
+        type: 'alumni',
+        limit: 50,
+        query: searchQuery,
+      });
+      const filtered = (result.users || []).filter((u) => u.id !== currentUserId && u.userId !== currentUserId);
+      setAlumniList(filtered);
+    } catch (err) {
+      console.warn('Failed to load alumni directory:', err);
+      setAlumniList([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadAlumni();
+  }, [searchQuery]);
+
   const companyOptions = useMemo(() => {
-    const set = new Set(alumniList.map((a) => a.company));
+    const set = new Set(alumniList.map((a) => a.company).filter(Boolean));
     return ['All', ...Array.from(set)];
   }, [alumniList]);
 
   const locationOptions = useMemo(() => {
-    const set = new Set(alumniList.map((a) => a.location.split(',')[0].trim()));
+    const set = new Set(alumniList.map((a) => a.location ? a.location.split(',')[0].trim() : '').filter(Boolean));
     return ['All', ...Array.from(set)];
   }, [alumniList]);
 
@@ -29,16 +55,16 @@ export const ExploreAlumni = () => {
       const query = searchQuery.toLowerCase().trim();
       const matchesQuery =
         !query ||
-        a.name.toLowerCase().includes(query) ||
-        a.company.toLowerCase().includes(query) ||
-        a.currentRole.toLowerCase().includes(query) ||
-        a.skills.some((s) => s.toLowerCase().includes(query));
+        a.name?.toLowerCase().includes(query) ||
+        a.company?.toLowerCase().includes(query) ||
+        (a.currentRole || a.designation || '').toLowerCase().includes(query) ||
+        a.skills?.some((s) => s.toLowerCase().includes(query));
 
       const matchesDomain = selectedDomain === 'All' || a.domain === selectedDomain;
       const matchesIndustry = selectedIndustry === 'All' || a.industry === selectedIndustry;
       const matchesCompany = selectedCompany === 'All' || a.company === selectedCompany;
       const matchesLocation =
-        selectedLocation === 'All' || a.location.toLowerCase().includes(selectedLocation.toLowerCase());
+        selectedLocation === 'All' || (a.location && a.location.toLowerCase().includes(selectedLocation.toLowerCase()));
       const matchesAvailability = !onlyAvailableMentors || a.isAvailableForMentorship;
 
       return (
@@ -86,7 +112,7 @@ export const ExploreAlumni = () => {
           <div className="space-y-0.5">
             <h1 className="text-lg font-bold text-slate-900">Alumni Directory</h1>
             <p className="text-xs text-slate-500">
-              Discover and connect with {alumniList.length}+ verified JECRC University graduates.
+              Discover and connect with verified JECRC University graduates.
             </p>
           </div>
 
@@ -199,7 +225,11 @@ export const ExploreAlumni = () => {
         </div>
 
         {/* Directory Grid */}
-        {filteredAlumni.length > 0 ? (
+        {isLoading ? (
+          <div className="py-12 text-center text-xs text-slate-500">
+            Loading JECRC alumni directory...
+          </div>
+        ) : filteredAlumni.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredAlumni.map((alumni) => (
               <AlumniCard key={alumni.id} alumni={alumni} />
@@ -207,7 +237,7 @@ export const ExploreAlumni = () => {
           </div>
         ) : (
           <div className="bg-white rounded-xl border border-slate-200 p-10 text-center space-y-3">
-            <h3 className="text-sm font-bold text-slate-900">No alumni matched your filters</h3>
+            <h3 className="text-sm font-bold text-slate-900">No alumni matched your search</h3>
             <p className="text-xs text-slate-500 max-w-sm mx-auto">
               Try adjusting your search criteria or resetting filters to view all graduates.
             </p>

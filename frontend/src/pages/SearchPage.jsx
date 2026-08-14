@@ -1,28 +1,59 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { PageContainer } from '../components/layout/PageContainer';
 import { useApp } from '../context/AppContext';
-import { Search, Users, FileText, Calendar, ArrowRight } from 'lucide-react';
+import { userService } from '../services/userService';
+import { Search, Loader2 } from 'lucide-react';
 import { AlumniCard } from '../components/common/AlumniCard';
 
 export const SearchPage = () => {
-  const { searchQuery, setSearchQuery, alumniList, posts } = useApp();
+  const { searchQuery, setSearchQuery, showNotification } = useApp();
   const [activeFilter, setActiveFilter] = useState('all');
+  const [matchingAlumni, setMatchingAlumni] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const queryLower = (searchQuery || '').toLowerCase().trim();
+  useEffect(() => {
+    const fetchSearchResults = async () => {
+      setIsLoading(true);
+      try {
+        const res = await userService.getUsers({
+          query: searchQuery.trim(),
+          limit: 30,
+        });
+        const mappedUsers = (res.users || []).map((u) => ({
+          id: u.userId || u.id,
+          userId: u.userId || u.id,
+          name: u.fullName || (u.email ? u.email.split('@')[0] : 'Community Member'),
+          email: u.email,
+          currentRole: u.designation || (u.role === 'ALUMNI' ? 'Alumni' : 'Student'),
+          company: u.company || (u.role === 'ALUMNI' ? 'Industry Professional' : 'JECRC University'),
+          graduationYear: u.graduationYear || 2026,
+          degree: u.degree || 'B.Tech',
+          branch: u.branch || 'CSE',
+          location: u.location || 'Jaipur, India',
+          avatar: u.avatarUrl || 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=300',
+          skills: u.skills ? u.skills.split(',').map((s) => s.trim()) : [],
+        }));
+        setMatchingAlumni(mappedUsers);
+      } catch (err) {
+        showNotification('Failed to perform search', 'error');
+        setMatchingAlumni([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
 
-  const matchingAlumni = alumniList.filter((a) =>
-    !queryLower ||
-    a.name.toLowerCase().includes(queryLower) ||
-    a.company.toLowerCase().includes(queryLower) ||
-    a.currentRole.toLowerCase().includes(queryLower) ||
-    a.skills.some((s) => s.toLowerCase().includes(queryLower))
-  );
+    const timer = setTimeout(() => {
+      fetchSearchResults();
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   return (
     <PageContainer
       title="Search JECRC Community"
       description="Find alumni, student peers, campus posts, and opportunities across the university network."
-      badge="Module 11 Preview"
+      badge="Global Search"
     >
       <div className="space-y-6">
         
@@ -65,16 +96,27 @@ export const SearchPage = () => {
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-              {queryLower ? `Results for "${searchQuery}"` : 'Recommended Connections'}
+              {searchQuery.trim() ? `Results for "${searchQuery}"` : 'Recommended Connections'}
             </h3>
             <span className="text-[11px] text-slate-400">{matchingAlumni.length} found</span>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {matchingAlumni.map((alum) => (
-              <AlumniCard key={alum.id} alumni={alum} />
-            ))}
-          </div>
+          {isLoading ? (
+            <div className="bg-white rounded-xl border border-slate-200 p-12 text-center shadow-2xs space-y-3">
+              <Loader2 className="w-7 h-7 text-red-600 animate-spin mx-auto" />
+              <p className="text-xs font-semibold text-slate-600">Searching JECRC community members...</p>
+            </div>
+          ) : matchingAlumni.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {matchingAlumni.map((alum) => (
+                <AlumniCard key={alum.id} alumni={alum} />
+              ))}
+            </div>
+          ) : (
+            <div className="bg-white rounded-xl border border-slate-200 p-10 text-center space-y-2">
+              <p className="text-xs text-slate-500 font-medium">No members found matching your search criteria.</p>
+            </div>
+          )}
         </div>
 
       </div>

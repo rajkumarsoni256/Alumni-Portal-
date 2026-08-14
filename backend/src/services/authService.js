@@ -129,7 +129,7 @@ const login = async ({ email, password }) => {
 
   const userResult = await db.query(
     `SELECT u.id, u.email, u.password_hash, u.role, u.email_verified, u.account_status,
-            p.full_name, p.is_profile_complete
+            p.full_name, p.avatar_url, p.is_profile_complete
      FROM users u
      LEFT JOIN user_profiles p ON u.id = p.user_id
      WHERE u.email = $1`,
@@ -175,6 +175,7 @@ const login = async ({ email, password }) => {
       email: user.email,
       role: user.role,
       fullName: user.full_name || null,
+      avatarUrl: user.avatar_url || null,
       profileComplete: !!user.is_profile_complete,
     },
     token,
@@ -351,7 +352,7 @@ const resetPassword = async ({ token, newPassword }) => {
 
 const getCurrentUser = async (user) => {
   const result = await db.query(
-    `SELECT u.id, u.email, u.role, p.full_name, p.is_profile_complete
+    `SELECT u.id, u.email, u.role, p.full_name, p.avatar_url, p.is_profile_complete
      FROM users u
      LEFT JOIN user_profiles p ON u.id = p.user_id
      WHERE u.id = $1`,
@@ -371,6 +372,7 @@ const getCurrentUser = async (user) => {
     email: row.email,
     role: row.role,
     fullName: row.full_name || null,
+    avatarUrl: row.avatar_url || null,
     profileComplete: !!row.is_profile_complete,
   };
 };

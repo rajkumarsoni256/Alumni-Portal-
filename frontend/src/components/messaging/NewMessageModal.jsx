@@ -1,22 +1,35 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, X, ShieldCheck, User } from 'lucide-react';
+import { Search, X, ShieldCheck, User, Loader2 } from 'lucide-react';
+import { connectionService } from '../../services/connectionService';
 
 export const NewMessageModal = ({
   isOpen,
   onClose,
   onSelectUser,
-  usersMap = {},
-  currentUserId = 'st_101',
+  currentUserId,
 }) => {
   const [search, setSearch] = useState('');
+  const [connections, setConnections] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
   const searchInputRef = useRef(null);
 
   useEffect(() => {
     if (isOpen) {
       setSearch('');
-      setTimeout(() => {
-        searchInputRef.current?.focus();
-      }, 50);
+      setIsLoading(true);
+      connectionService.getMyConnections()
+        .then((res) => {
+          setConnections(res || []);
+        })
+        .catch(() => {
+          setConnections([]);
+        })
+        .finally(() => {
+          setIsLoading(false);
+          setTimeout(() => {
+            searchInputRef.current?.focus();
+          }, 50);
+        });
     }
   }, [isOpen]);
 
@@ -32,14 +45,11 @@ export const NewMessageModal = ({
 
   if (!isOpen) return null;
 
-  // Convert usersMap to filterable list excluding current user
-  const allUsers = Object.values(usersMap).filter((u) => u.id !== currentUserId);
-
-  const filteredUsers = allUsers.filter((u) => {
+  const filteredUsers = connections.filter((u) => {
     if (!search.trim()) return true;
     const q = search.toLowerCase();
-    const name = (u.name || '').toLowerCase();
-    const headline = (u.headline || u.currentRole || '').toLowerCase();
+    const name = (u.fullName || u.name || '').toLowerCase();
+    const headline = (u.headline || u.designation || u.branch || '').toLowerCase();
     const company = (u.company || '').toLowerCase();
     return name.includes(q) || headline.includes(q) || company.includes(q);
   });
@@ -63,7 +73,7 @@ export const NewMessageModal = ({
               New message
             </h3>
             <p className="text-[11px] text-slate-500">
-              Select a member from the JECRC community to start a chat
+              Select an accepted connection from the JECRC community to start a chat
             </p>
           </div>
 
@@ -84,7 +94,7 @@ export const NewMessageModal = ({
             <input
               ref={searchInputRef}
               type="text"
-              placeholder="Search people by name, company, role..."
+              placeholder="Search connected peers by name, company, branch..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full bg-white text-slate-900 placeholder-slate-400 text-xs rounded-xl pl-8 pr-3 py-2 border border-slate-200 focus:border-slate-300 focus:outline-none transition-colors"
@@ -94,24 +104,31 @@ export const NewMessageModal = ({
 
         {/* User List */}
         <div className="flex-1 overflow-y-auto divide-y divide-slate-100 p-1 max-h-80 scrollbar-thin scrollbar-thumb-slate-200">
-          {filteredUsers.length === 0 ? (
+          {isLoading ? (
+            <div className="py-12 text-center space-y-2">
+              <Loader2 className="w-6 h-6 text-red-700 animate-spin mx-auto" />
+              <p className="text-xs text-slate-500 font-medium">Loading your connections...</p>
+            </div>
+          ) : filteredUsers.length === 0 ? (
             <div className="py-8 text-center text-slate-400 space-y-1">
               <User className="w-6 h-6 mx-auto stroke-[1.5]" />
-              <p className="text-xs font-semibold text-slate-600">No people found</p>
-              <p className="text-[11px] text-slate-400">Try searching for a different name</p>
+              <p className="text-xs font-semibold text-slate-600">No active connections found</p>
+              <p className="text-[11px] text-slate-400">Connect with alumni or students first to exchange private messages</p>
             </div>
           ) : (
             filteredUsers.map((user) => {
-              const isAlumni = Boolean(user.isAlumni || user.role?.toLowerCase() === 'alumni');
-              const subtitle = user.headline || (isAlumni ? `Alumni @ ${user.company || 'JECRC'}` : 'JECRC Student');
-              const batch = user.batchDisplay || (user.batch ? `JECRC ${user.branch || 'CSE'} • ${user.batch}` : 'JECRC Member');
+              const userId = user.id || user.userId;
+              const isAlumni = (user.role || '').toUpperCase() === 'ALUMNI';
+              const name = user.fullName || user.name || user.email;
+              const subtitle = user.designation ? `${user.designation} @ ${user.company || 'Company'}` : (user.branch || 'JECRC Member');
+              const batch = user.graduationYear ? `Class of ${user.graduationYear}` : (isAlumni ? 'Alumni' : 'Student');
 
               return (
                 <button
-                  key={user.id}
+                  key={userId}
                   type="button"
                   onClick={() => {
-                    onSelectUser(user.id);
+                    onSelectUser(userId);
                     onClose();
                   }}
                   className="w-full text-left p-3 rounded-xl hover:bg-slate-50 flex items-center gap-3 transition-colors cursor-pointer group"
@@ -119,8 +136,8 @@ export const NewMessageModal = ({
                   {/* Avatar */}
                   <div className="relative shrink-0">
                     <img
-                      src={user.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=300'}
-                      alt={user.name}
+                      src={user.avatarUrl || user.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=300'}
+                      alt={name}
                       className="w-10 h-10 rounded-full object-cover border border-slate-200 group-hover:ring-2 group-hover:ring-red-600/20 transition-all"
                     />
                     {isAlumni && (
@@ -135,7 +152,7 @@ export const NewMessageModal = ({
                   <div className="min-w-0 flex-1 space-y-0.5">
                     <div className="flex items-center gap-1.5">
                       <span className="text-xs font-bold text-slate-900 group-hover:text-red-700 transition-colors truncate block">
-                        {user.name}
+                        {name}
                       </span>
                       {isAlumni && (
                         <ShieldCheck className="w-3.5 h-3.5 text-red-700 shrink-0" />

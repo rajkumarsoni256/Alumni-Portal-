@@ -16,6 +16,17 @@ const parseList = (str) => {
 };
 
 const formatProfileResponse = (row) => {
+  if (!row) {
+    return {
+      profile: null,
+      profileCompleted: false,
+      isProfileComplete: false,
+    };
+  }
+
+  const isComplete = !!row.is_profile_complete;
+  const currentAcademicYear = row.current_year ? parseInt(row.current_year, 10) : null;
+
   return {
     id: row.id,
     userId: row.user_id,
@@ -28,7 +39,8 @@ const formatProfileResponse = (row) => {
     degree: row.degree || null,
     branch: row.branch || null,
     graduationYear: row.graduation_year || null,
-    currentYear: row.current_year || null,
+    currentYear: currentAcademicYear,
+    currentAcademicYear: currentAcademicYear,
     company: row.company || null,
     designation: row.designation || null,
     location: row.location || null,
@@ -38,7 +50,27 @@ const formatProfileResponse = (row) => {
     websiteUrl: row.website_url || null,
     skills: parseList(row.skills),
     interests: parseList(row.interests),
-    profileComplete: !!row.is_profile_complete,
+    profileCompleted: isComplete,
+    isProfileComplete: isComplete,
+    profile: {
+      userId: row.user_id,
+      fullName: row.full_name,
+      phone: row.phone || null,
+      degree: row.degree || null,
+      branch: row.branch || null,
+      graduationYear: row.graduation_year || null,
+      currentAcademicYear: currentAcademicYear,
+      company: row.company || null,
+      designation: row.designation || null,
+      location: row.location || null,
+      linkedinUrl: row.linkedin_url || null,
+      githubUrl: row.github_url || null,
+      bio: row.bio || null,
+      skills: parseList(row.skills),
+      interests: parseList(row.interests),
+      avatarUrl: row.avatar_url || null,
+      profileCompleted: isComplete,
+    }
   };
 };
 
@@ -69,6 +101,12 @@ const validateRoleOnboarding = (role, data) => {
   }
 
   if (role === 'ALUMNI') {
+    if (!data.graduationYear) {
+      const error = new Error('Graduation year / Passout batch is required for Alumni onboarding');
+      error.statusCode = 400;
+      error.errorCode = 'BAD_REQUEST';
+      throw error;
+    }
     if (isBlank(data.company)) {
       const error = new Error('Current company is required for Alumni onboarding');
       error.statusCode = 400;
@@ -100,15 +138,16 @@ const validateRoleOnboarding = (role, data) => {
       error.errorCode = 'BAD_REQUEST';
       throw error;
     }
-    if (!data.graduationYear) {
-      const error = new Error('Graduation year / Passout batch is required for Alumni onboarding');
+  } else if (role === 'STUDENT') {
+    const academicYear = data.currentAcademicYear || data.currentYear;
+    if (!academicYear) {
+      const error = new Error('Current academic year is required for Student onboarding');
       error.statusCode = 400;
       error.errorCode = 'BAD_REQUEST';
       throw error;
     }
-  } else if (role === 'STUDENT') {
-    if (!data.graduationYear && !data.currentYear) {
-      const error = new Error('Expected graduation year or current academic year is required for Student onboarding');
+    if (!data.graduationYear) {
+      const error = new Error('Expected graduation year is required for Student onboarding');
       error.statusCode = 400;
       error.errorCode = 'BAD_REQUEST';
       throw error;
@@ -120,10 +159,11 @@ const calculateCompleteness = (role, data) => {
   if (isBlank(data.fullName) || isBlank(data.phone) || isBlank(data.degree) || isBlank(data.branch)) {
     return false;
   }
+  const academicYear = data.currentAcademicYear || data.currentYear;
   if (role === 'ALUMNI') {
     return isNotBlank(data.company) && isNotBlank(data.designation) && isNotBlank(data.location) && isNotBlank(data.linkedinUrl) && !!data.graduationYear;
   } else if (role === 'STUDENT') {
-    return !!data.graduationYear || !!data.currentYear;
+    return !!data.graduationYear && !!academicYear;
   }
   return true;
 };
@@ -135,6 +175,7 @@ const completeOnboarding = async (user, data) => {
   const interestsStr = formatSkillsInterests(data.interests);
   const isComplete = calculateCompleteness(user.role, data);
   const profileId = crypto.randomUUID();
+  const currentAcademicYear = data.currentAcademicYear || data.currentYear;
 
   const queryText = `
     INSERT INTO user_profiles (
@@ -177,7 +218,7 @@ const completeOnboarding = async (user, data) => {
     data.degree ? data.degree.trim() : null,
     data.branch ? data.branch.trim() : null,
     data.graduationYear ? parseInt(data.graduationYear, 10) : null,
-    data.currentYear ? parseInt(data.currentYear, 10) : null,
+    currentAcademicYear ? parseInt(currentAcademicYear, 10) : null,
     data.company ? data.company.trim() : null,
     data.designation ? data.designation.trim() : null,
     data.location ? data.location.trim() : null,
@@ -206,21 +247,27 @@ const getCurrentProfile = async (user) => {
   );
 
   if (result.rows.length === 0) {
-    const error = new Error(`Profile not found for user: '${user.id}'`);
-    error.statusCode = 404;
-    error.errorCode = 'RESOURCE_NOT_FOUND';
-    throw error;
+    return {
+      userId: user.id,
+      email: user.email,
+      role: user.role,
+      fullName: user.fullName || '',
+      profileCompleted: false,
+      isProfileComplete: false,
+      profile: null,
+    };
   }
 
   return formatProfileResponse(result.rows[0]);
 };
 
 const updateProfile = async (user, data) => {
-  const skillsStr = data.skills !== undefined ? formatSkillsInterests(data.skills) : null;
-  const interestsStr = data.interests !== undefined ? formatSkillsInterests(data.interests) : null;
-
   const currentProfileResult = await db.query('SELECT * FROM user_profiles WHERE user_id = $1', [user.id]);
   let current = currentProfileResult.rows[0] || {};
+
+  const currentAcademicYear = data.currentAcademicYear !== undefined 
+    ? data.currentAcademicYear 
+    : (data.currentYear !== undefined ? data.currentYear : current.current_year);
 
   const mergedData = {
     fullName: data.fullName !== undefined ? data.fullName : current.full_name,
@@ -228,15 +275,23 @@ const updateProfile = async (user, data) => {
     degree: data.degree !== undefined ? data.degree : current.degree,
     branch: data.branch !== undefined ? data.branch : current.branch,
     graduationYear: data.graduationYear !== undefined ? data.graduationYear : current.graduation_year,
-    currentYear: data.currentYear !== undefined ? data.currentYear : current.current_year,
+    currentAcademicYear: currentAcademicYear,
+    currentYear: currentAcademicYear,
     company: data.company !== undefined ? data.company : current.company,
     designation: data.designation !== undefined ? data.designation : current.designation,
     location: data.location !== undefined ? data.location : current.location,
     linkedinUrl: data.linkedinUrl !== undefined ? data.linkedinUrl : current.linkedin_url,
   };
 
+  if (data.isOnboarding || !current.is_profile_complete) {
+    validateRoleOnboarding(user.role, mergedData);
+  }
+
   const isComplete = calculateCompleteness(user.role, mergedData);
   const profileId = current.id || crypto.randomUUID();
+
+  const skillsStr = data.skills !== undefined ? formatSkillsInterests(data.skills) : current.skills;
+  const interestsStr = data.interests !== undefined ? formatSkillsInterests(data.interests) : current.interests;
 
   const queryText = `
     INSERT INTO user_profiles (
@@ -247,23 +302,23 @@ const updateProfile = async (user, data) => {
     )
     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, NOW())
     ON CONFLICT (user_id) DO UPDATE SET
-      full_name = COALESCE(EXCLUDED.full_name, user_profiles.full_name),
-      phone = COALESCE(EXCLUDED.phone, user_profiles.phone),
-      avatar_url = COALESCE(EXCLUDED.avatar_url, user_profiles.avatar_url),
-      bio = COALESCE(EXCLUDED.bio, user_profiles.bio),
-      degree = COALESCE(EXCLUDED.degree, user_profiles.degree),
-      branch = COALESCE(EXCLUDED.branch, user_profiles.branch),
-      graduation_year = COALESCE(EXCLUDED.graduation_year, user_profiles.graduation_year),
-      current_year = COALESCE(EXCLUDED.current_year, user_profiles.current_year),
-      company = COALESCE(EXCLUDED.company, user_profiles.company),
-      designation = COALESCE(EXCLUDED.designation, user_profiles.designation),
-      location = COALESCE(EXCLUDED.location, user_profiles.location),
-      is_available_for_mentorship = COALESCE(EXCLUDED.is_available_for_mentorship, user_profiles.is_available_for_mentorship),
-      linkedin_url = COALESCE(EXCLUDED.linkedin_url, user_profiles.linkedin_url),
-      github_url = COALESCE(EXCLUDED.github_url, user_profiles.github_url),
-      website_url = COALESCE(EXCLUDED.website_url, user_profiles.website_url),
-      skills = COALESCE(EXCLUDED.skills, user_profiles.skills),
-      interests = COALESCE(EXCLUDED.interests, user_profiles.interests),
+      full_name = EXCLUDED.full_name,
+      phone = EXCLUDED.phone,
+      avatar_url = EXCLUDED.avatar_url,
+      bio = EXCLUDED.bio,
+      degree = EXCLUDED.degree,
+      branch = EXCLUDED.branch,
+      graduation_year = EXCLUDED.graduation_year,
+      current_year = EXCLUDED.current_year,
+      company = EXCLUDED.company,
+      designation = EXCLUDED.designation,
+      location = EXCLUDED.location,
+      is_available_for_mentorship = EXCLUDED.is_available_for_mentorship,
+      linkedin_url = EXCLUDED.linkedin_url,
+      github_url = EXCLUDED.github_url,
+      website_url = EXCLUDED.website_url,
+      skills = EXCLUDED.skills,
+      interests = EXCLUDED.interests,
       is_profile_complete = EXCLUDED.is_profile_complete,
       updated_at = NOW()
     RETURNING *;
@@ -272,21 +327,21 @@ const updateProfile = async (user, data) => {
   const values = [
     profileId,
     user.id,
-    data.fullName ? data.fullName.trim() : current.full_name || user.email,
-    data.phone ? data.phone.trim() : null,
-    data.avatarUrl ? data.avatarUrl.trim() : null,
-    data.bio ? data.bio.trim() : null,
-    data.degree ? data.degree.trim() : null,
-    data.branch ? data.branch.trim() : null,
-    data.graduationYear ? parseInt(data.graduationYear, 10) : null,
-    data.currentYear ? parseInt(data.currentYear, 10) : null,
-    data.company ? data.company.trim() : null,
-    data.designation ? data.designation.trim() : null,
-    data.location ? data.location.trim() : null,
-    data.isAvailableForMentorship !== undefined ? data.isAvailableForMentorship : true,
-    data.linkedinUrl ? data.linkedinUrl.trim() : null,
-    data.githubUrl ? data.githubUrl.trim() : null,
-    data.websiteUrl ? data.websiteUrl.trim() : null,
+    mergedData.fullName ? mergedData.fullName.trim() : user.email,
+    mergedData.phone ? mergedData.phone.trim() : null,
+    data.avatarUrl !== undefined ? (data.avatarUrl ? data.avatarUrl.trim() : null) : current.avatar_url,
+    data.bio !== undefined ? (data.bio ? data.bio.trim() : null) : current.bio,
+    mergedData.degree ? mergedData.degree.trim() : null,
+    mergedData.branch ? mergedData.branch.trim() : null,
+    mergedData.graduationYear ? parseInt(mergedData.graduationYear, 10) : null,
+    currentAcademicYear ? parseInt(currentAcademicYear, 10) : null,
+    mergedData.company ? mergedData.company.trim() : null,
+    mergedData.designation ? mergedData.designation.trim() : null,
+    mergedData.location ? mergedData.location.trim() : null,
+    data.isAvailableForMentorship !== undefined ? data.isAvailableForMentorship : (current.is_available_for_mentorship !== false),
+    mergedData.linkedinUrl ? mergedData.linkedinUrl.trim() : null,
+    data.githubUrl !== undefined ? (data.githubUrl ? data.githubUrl.trim() : null) : current.github_url,
+    data.websiteUrl !== undefined ? (data.websiteUrl ? data.websiteUrl.trim() : null) : current.website_url,
     skillsStr,
     interestsStr,
     isComplete,

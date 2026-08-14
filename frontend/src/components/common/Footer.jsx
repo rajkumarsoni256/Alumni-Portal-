@@ -13,12 +13,12 @@ export const Footer = () => {
             <Link to="/" className="flex items-center gap-2.5">
               <img
                 src="/ju-alumni-logo.jpg"
-                alt="JECRC Alumni Logo"
-                className="h-9 w-9 object-contain rounded-md"
+                alt="JU Connect Logo"
+                className="h-9 w-9 object-cover rounded-lg border border-slate-200"
               />
               <div>
                 <span className="text-base font-bold text-slate-900 tracking-tight">
-                  JECRC <span className="text-red-700">Community</span>
+                  JU <span className="text-red-700">Connect</span>
                 </span>
                 <span className="text-[11px] text-slate-500 block font-medium">
                   Alumni Association
