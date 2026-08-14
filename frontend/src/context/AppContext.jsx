@@ -134,6 +134,26 @@ export const AppProvider = ({ children }) => {
     initializeAuthSession();
   }, []);
 
+  // Global session-expiry listener.
+  // apiClient dispatches 'auth:session-expired' whenever a 401 is received.
+  // We clear auth state here so that AdminRoute's isAuthenticated guard
+  // triggers and redirects the user to /login without a hard page reload.
+  useEffect(() => {
+    const handleSessionExpired = () => {
+      authService.clearToken();
+      setIsAuthenticated(false);
+      setIsLoading(false);
+      setAuthUser(null);
+      setActiveRole('student');
+      setAuthStatus('UNAUTHENTICATED');
+    };
+
+    window.addEventListener('auth:session-expired', handleSessionExpired);
+    return () => {
+      window.removeEventListener('auth:session-expired', handleSessionExpired);
+    };
+  }, []);
+
   // Resolve current logged-in user profile according to activeRole and authUser
   const currentUser = activeRole === 'alumni'
     ? {

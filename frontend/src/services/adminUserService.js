@@ -1,239 +1,295 @@
-import { MOCK_ADMIN_USERS, MOCK_ADMIN_SUMMARY, MOCK_RECENT_ADMIN_UPDATES } from '../data/adminUsers';
+import { apiClient } from './apiClient';
 
 /**
  * Admin User Service
- * Encapsulates backend abstraction for filtering, searching, sorting, pagination,
- * data quality metrics, and CSV generation for 34,000+ potential database records.
+ * Encapsulates backend API communication for filtering, searching, sorting, pagination,
+ * data quality metrics, verification workflows, and CSV generation against PostgreSQL.
  */
 
 export const adminUserService = {
   /**
-   * Fetch paginated & filtered admin users list
+   * Fetch paginated & filtered admin users list from backend API
    */
-  getAdminUsers: ({
+  getAdminUsers: async ({
     searchQuery = '',
     filters = {},
     sortField = 'lastUpdated',
     sortOrder = 'desc',
     page = 1,
-    pageSize = 50
+    pageSize = 20
   } = {}) => {
-    let result = [...MOCK_ADMIN_USERS];
+    const params = {
+      q: searchQuery && searchQuery.trim() ? searchQuery.trim() : undefined,
+      role: filters.role && filters.role !== 'all' ? filters.role : undefined,
+      branch: filters.branch && filters.branch !== 'all' ? filters.branch : undefined,
+      batch: filters.batch && filters.batch !== 'all' ? filters.batch : undefined,
+      batchFrom: filters.batchFrom || undefined,
+      batchTo: filters.batchTo || undefined,
+      city: filters.city && filters.city !== 'all' ? filters.city : undefined,
+      company: filters.company && filters.company.trim() ? filters.company.trim() : undefined,
+      status: filters.profileStatus && filters.profileStatus !== 'all' ? filters.profileStatus : undefined,
+      missing: filters.missingFields && filters.missingFields.length > 0 ? filters.missingFields.join(',') : undefined,
+      lastUpdated: filters.lastUpdated && filters.lastUpdated !== 'all' ? filters.lastUpdated : undefined,
+      sortBy: sortField || 'lastUpdated',
+      sortOrder: sortOrder || 'desc',
+      page: page || 1,
+      pageSize: pageSize || 20
+    };
 
-    // 1. Multi-field Search Filter
-    if (searchQuery && searchQuery.trim()) {
-      const q = searchQuery.toLowerCase().trim();
-      result = result.filter((u) => {
-        const matchesName = u.name && u.name.toLowerCase().includes(q);
-        const matchesEmail = u.email && u.email.toLowerCase().includes(q);
-        const matchesPhone = u.phone && u.phone.toLowerCase().includes(q);
-        const matchesCompany = u.company && u.company.toLowerCase().includes(q);
-        const matchesDesignation = u.designation && u.designation.toLowerCase().includes(q);
-        const matchesBranch = u.branch && u.branch.toLowerCase().includes(q);
-        const matchesCity = u.city && u.city.toLowerCase().includes(q);
+    return await apiClient.get('/api/v1/admin/users', { params });
+  },
 
-        return (
-          matchesName ||
-          matchesEmail ||
-          matchesPhone ||
-          matchesCompany ||
-          matchesDesignation ||
-          matchesBranch ||
-          matchesCity
-        );
-      });
+  /**
+   * Fetch single user details by ID from backend API
+   */
+  getAdminUserById: async (id) => {
+    if (!id) return null;
+    return await apiClient.get(`/api/v1/admin/users/${id}`);
+  },
+
+  /**
+   * Fetch Data Management quality cards from backend API
+   */
+  getDataQualityStats: async () => {
+    return await apiClient.get('/api/v1/admin/data-quality/stats');
+  },
+
+  /**
+   * Fetch complete Dashboard Analytics & Reporting from backend API
+   */
+  getDashboardAnalytics: async () => {
+    return await apiClient.get('/api/v1/admin/dashboard/stats');
+  },
+
+  /**
+   * Fetch Overview Metrics for Dashboard from backend APIs
+   */
+  getAdminDashboardStats: async () => {
+    try {
+      const [dashData, activityList] = await Promise.all([
+        apiClient.get('/api/v1/admin/dashboard/stats'),
+        apiClient.get('/api/v1/admin/activity', { params: { limit: 5 } }).catch(() => ([])),
+      ]);
+
+      const overview = dashData.overview || {};
+      const qualityStats = dashData.profileQuality || {};
+
+      const totalUsers = overview.totalUsers || 0;
+      const alumni = overview.alumni || 0;
+      const students = overview.students || 0;
+      const needsUpdate = qualityStats.needsUpdate || 0;
+      const complete = qualityStats.complete || 0;
+      const missingContact = qualityStats.missingContact || 0;
+      const missingCompany = qualityStats.missingCompany || 0;
+
+      const completePct = totalUsers > 0 ? Math.round((complete / totalUsers) * 100) : 0;
+      const missingContactPct = totalUsers > 0 ? Math.round((missingContact / totalUsers) * 100) : 0;
+      const missingProfPct = totalUsers > 0 ? Math.round((missingCompany / totalUsers) * 100) : 0;
+      const needsUpdatePct = totalUsers > 0 ? Math.round((needsUpdate / totalUsers) * 100) : 0;
+
+      const recentUpdates = Array.isArray(activityList) && activityList.length > 0
+        ? activityList.map((item) => ({
+            id: item.id,
+            userId: item.actorId,
+            userName: item.actorName,
+            userRole: item.action?.startsWith('VERIFICATION') ? 'Admin Action' : 'Activity',
+            avatar: item.avatar,
+            action: item.description,
+            time: item.time,
+          }))
+        : [];
+
+      return {
+        metrics: {
+          totalUsers,
+          alumni,
+          students,
+          needsUpdate,
+        },
+        verification: dashData.verification || { pending: 0, approved: 0, rejected: 0, total: 0 },
+        growth: dashData.growth || { newUsersThisWeek: 0, newUsersThisMonth: 0, newUsersLastMonth: 0, monthlyTimeSeries: [] },
+        distribution: dashData.distribution || { branches: [], batches: [] },
+        recentUpdates,
+        dataQualitySnapshot: [
+          { label: 'Complete', percentage: completePct, count: complete, color: 'bg-emerald-500' },
+          { label: 'Missing Contact', percentage: missingContactPct, count: missingContact, color: 'bg-amber-500' },
+          { label: 'Missing Professional', percentage: missingProfPct, count: missingCompany, color: 'bg-blue-500' },
+          { label: 'Needs Update', percentage: needsUpdatePct, count: needsUpdate, color: 'bg-red-500' }
+        ]
+      };
+    } catch (err) {
+      console.error('Error fetching admin dashboard stats:', err);
+      throw err;
     }
+  },
 
-    // 2. Structured Category Filters
-    if (filters.role && filters.role !== 'all') {
-      result = result.filter((u) => u.role.toLowerCase() === filters.role.toLowerCase());
-    }
+  /**
+   * Fetch paginated & filtered audit logs from backend API
+   */
+  getAuditLogs: async (options = {}) => {
+    return await apiClient.get('/api/v1/admin/audit-logs', { params: options });
+  },
 
-    if (filters.branch && filters.branch !== 'all') {
-      result = result.filter((u) => u.branch.toLowerCase() === filters.branch.toLowerCase());
-    }
+  /**
+   * Fetch recent activity stream derived from audit_logs
+   */
+  getRecentActivity: async ({ limit = 10 } = {}) => {
+    return await apiClient.get('/api/v1/admin/activity', { params: { limit } });
+  },
 
-    if (filters.batch && filters.batch !== 'all') {
-      result = result.filter((u) => u.batch === parseInt(filters.batch, 10));
-    }
-
-    if (filters.batchFrom) {
-      result = result.filter((u) => u.batch >= parseInt(filters.batchFrom, 10));
-    }
-
-    if (filters.batchTo) {
-      result = result.filter((u) => u.batch <= parseInt(filters.batchTo, 10));
-    }
-
-    if (filters.city && filters.city !== 'all') {
-      result = result.filter((u) => u.city.toLowerCase().includes(filters.city.toLowerCase()));
-    }
-
-    if (filters.company && filters.company.trim()) {
-      const comp = filters.company.toLowerCase().trim();
-      result = result.filter((u) => u.company && u.company.toLowerCase().includes(comp));
-    }
-
-    if (filters.profileStatus && filters.profileStatus !== 'all') {
-      result = result.filter((u) => u.profileStatus.toLowerCase() === filters.profileStatus.toLowerCase());
-    }
-
-    if (filters.missingFields && filters.missingFields.length > 0) {
-      result = result.filter((u) => {
-        return filters.missingFields.some((mf) => u.missingFields.includes(mf));
-      });
-    }
-
-    if (filters.lastUpdated && filters.lastUpdated !== 'all') {
-      result = result.filter((u) => {
-        const days = u.lastUpdatedDaysAgo;
-        if (filters.lastUpdated === '30days') return days <= 30;
-        if (filters.lastUpdated === '3months') return days <= 90;
-        if (filters.lastUpdated === '6months') return days <= 180;
-        if (filters.lastUpdated === '1year') return days <= 365;
-        if (filters.lastUpdated === 'more1year') return days > 365;
-        return true;
-      });
-    }
-
-    // 3. Sorting
-    result.sort((a, b) => {
-      let valA = a[sortField];
-      let valB = b[sortField];
-
-      if (sortField === 'lastUpdated') {
-        valA = a.lastUpdatedDaysAgo;
-        valB = b.lastUpdatedDaysAgo;
-        // Reversed for date (smaller days ago = more recent)
-        return sortOrder === 'desc' ? valA - valB : valB - valA;
-      }
-
-      if (typeof valA === 'string') {
-        return sortOrder === 'asc'
-          ? valA.localeCompare(valB)
-          : valB.localeCompare(valA);
-      }
-
-      return sortOrder === 'asc' ? valA - valB : valB - valA;
-    });
-
-    // 4. Pagination
-    const totalCount = result.length;
-    const startIndex = (page - 1) * pageSize;
-    const paginatedUsers = result.slice(startIndex, startIndex + pageSize);
-    const totalPages = Math.ceil(totalCount / pageSize) || 1;
-
-    return {
-      users: paginatedUsers,
-      totalCount,
+  /**
+   * Fetch Alumni Verification queue requests from backend API
+   */
+  getVerifications: async ({ status, q, page = 1, pageSize = 20 } = {}) => {
+    const params = {
+      status: status && status !== 'all' ? status : undefined,
+      q: q && q.trim() ? q.trim() : undefined,
       page,
-      pageSize,
-      totalPages,
+      pageSize
     };
+    return await apiClient.get('/api/v1/admin/verifications', { params });
   },
 
   /**
-   * Fetch single user details by ID
+   * Approve or Reject an Alumni Verification request via backend API
    */
-  getAdminUserById: (id) => {
-    return MOCK_ADMIN_USERS.find((u) => u.id === id) || null;
+  updateVerificationStatus: async (id, { status, rejectionReason } = {}) => {
+    return await apiClient.patch(`/api/v1/admin/verifications/${id}`, {
+      status,
+      rejectionReason
+    });
   },
 
   /**
-   * Fetch Overview Metrics for Dashboard
+   * Server-side secure CSV Export API Integration
    */
-  getAdminDashboardStats: () => {
-    return {
-      metrics: {
-        totalUsers: MOCK_ADMIN_SUMMARY.totalUsersCount,
-        alumni: MOCK_ADMIN_SUMMARY.alumniCount,
-        students: MOCK_ADMIN_SUMMARY.studentsCount,
-        needsUpdate: MOCK_ADMIN_SUMMARY.needsUpdateCount,
+  exportUsersCSV: async ({ userIds, filters, selectedFields } = {}) => {
+    const activeColumns = selectedFields 
+      ? Object.keys(selectedFields).filter((k) => selectedFields[k])
+      : undefined;
+
+    const token = localStorage.getItem('jecrc_community_jwt');
+    const baseUrl = import.meta.env?.VITE_API_BASE_URL || 'http://localhost:8080';
+    
+    const response = await fetch(`${baseUrl}/api/v1/admin/users/export`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
       },
-      recentUpdates: MOCK_RECENT_ADMIN_UPDATES,
-      dataQualitySnapshot: [
-        { label: 'Complete', percentage: 72, count: MOCK_ADMIN_SUMMARY.completeCount, color: 'bg-emerald-500' },
-        { label: 'Missing Contact', percentage: 12, count: MOCK_ADMIN_SUMMARY.missingContactCount, color: 'bg-amber-500' },
-        { label: 'Missing Professional', percentage: 10, count: MOCK_ADMIN_SUMMARY.missingCompanyCount, color: 'bg-blue-500' },
-        { label: 'Needs Update', percentage: 6, count: MOCK_ADMIN_SUMMARY.needsUpdateCount, color: 'bg-red-500' }
-      ]
-    };
-  },
-
-  /**
-   * Fetch Data Management quality cards
-   */
-  getDataQualityStats: () => {
-    return {
-      complete: MOCK_ADMIN_SUMMARY.completeCount,
-      incomplete: MOCK_ADMIN_SUMMARY.incompleteCount,
-      needsUpdate: MOCK_ADMIN_SUMMARY.needsUpdateCount,
-      missingContact: MOCK_ADMIN_SUMMARY.missingContactCount,
-      missingEmail: MOCK_ADMIN_SUMMARY.missingEmailCount,
-      missingPhone: MOCK_ADMIN_SUMMARY.missingPhoneCount,
-      missingCompany: MOCK_ADMIN_SUMMARY.missingCompanyCount,
-      missingLocation: MOCK_ADMIN_SUMMARY.missingLocationCount
-    };
-  },
-
-  /**
-   * Format & Download CSV File
-   */
-  downloadCSV: (usersList, selectedFields) => {
-    if (!usersList || usersList.length === 0) return false;
-
-    // Field headers map
-    const fieldHeaderMap = {
-      name: 'Name',
-      email: 'Email',
-      phone: 'Phone',
-      role: 'Role',
-      branch: 'Branch',
-      batch: 'Batch',
-      degree: 'Degree',
-      company: 'Company',
-      designation: 'Designation',
-      location: 'Location',
-      industry: 'Industry',
-      skills: 'Skills',
-      linkedin: 'LinkedIn',
-      updatedAt: 'Last Updated'
-    };
-
-    const activeFields = Object.keys(selectedFields).filter((k) => selectedFields[k]);
-    if (activeFields.length === 0) return false;
-
-    // Header row
-    const headers = activeFields.map((f) => fieldHeaderMap[f] || f).join(',');
-
-    // Data rows
-    const rows = usersList.map((u) => {
-      return activeFields
-        .map((field) => {
-          let val = u[field] || '';
-          if (Array.isArray(val)) {
-            val = val.join('; ');
-          }
-          // Escape quotes and commas
-          const stringVal = String(val).replace(/"/g, '""');
-          return `"${stringVal}"`;
-        })
-        .join(',');
+      body: JSON.stringify({
+        userIds,
+        filters,
+        columns: activeColumns
+      })
     });
 
-    const csvContent = [headers, ...rows].join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
+    if (!response.ok) {
+      const errJson = await response.json().catch(() => ({}));
+      throw new Error(errJson.message || 'Failed to export CSV from server');
+    }
+
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
     const link = document.createElement('a');
-    
     const timestamp = new Date().toISOString().slice(0, 10);
     link.setAttribute('href', url);
-    link.setAttribute('download', `jecrc_alumni_export_${timestamp}.csv`);
+    link.setAttribute('download', `jecrc_community_export_${timestamp}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-
+    window.URL.revokeObjectURL(url);
     return true;
+  },
+
+  /**
+   * Fetch system settings and admin profile details
+   */
+  getSettings: async () => {
+    return await apiClient.get('/api/v1/admin/settings');
+  },
+
+  /**
+   * Update system settings, admin profile, and credentials
+   */
+  updateSettings: async (payload) => {
+    return await apiClient.patch('/api/v1/admin/settings', payload);
+  },
+
+  /**
+   * Phase 10: Fetch paginated announcement & notification history
+   */
+  getNotifications: async (params = {}) => {
+    const res = await apiClient.get('/api/v1/admin/notifications', { params });
+    if (Array.isArray(res)) {
+      return {
+        notifications: res,
+        data: res,
+        summary: {
+          totalAnnouncements: res.length,
+          publishedCount: res.filter((n) => n.status === 'PUBLISHED').length,
+          draftCount: res.filter((n) => n.status === 'DRAFT').length,
+          cancelledCount: res.filter((n) => n.status === 'CANCELLED').length,
+        },
+        pagination: {
+          totalCount: res.length,
+          page: params.page || 1,
+          pageSize: params.pageSize || 10,
+          totalPages: Math.ceil(res.length / (params.pageSize || 10)) || 1,
+          hasNext: false,
+          hasPrev: (params.page || 1) > 1,
+        },
+      };
+    }
+    return res;
+  },
+
+  /**
+   * Phase 10: Fetch single announcement by ID
+   */
+  getNotificationById: async (id) => {
+    return await apiClient.get(`/api/v1/admin/notifications/${id}`);
+  },
+
+  /**
+   * Phase 10: Create a new announcement draft
+   */
+  createNotification: async (payload) => {
+    return await apiClient.post('/api/v1/admin/notifications', payload);
+  },
+
+  /**
+   * Phase 10: Update an existing draft announcement
+   */
+  updateNotification: async (id, payload) => {
+    return await apiClient.patch(`/api/v1/admin/notifications/${id}`, payload);
+  },
+
+  /**
+   * Phase 10: Publish an announcement and generate delivery records
+   */
+  publishNotification: async (id) => {
+    return await apiClient.post(`/api/v1/admin/notifications/${id}/publish`, {});
+  },
+
+  /**
+   * Phase 10: Cancel a draft announcement
+   */
+  cancelNotification: async (id) => {
+    return await apiClient.post(`/api/v1/admin/notifications/${id}/cancel`, {});
+  },
+
+  /**
+   * Phase 10: Delete a draft or cancelled announcement
+   */
+  deleteNotification: async (id) => {
+    return await apiClient.delete(`/api/v1/admin/notifications/${id}`);
+  },
+
+  /**
+   * Phase 10: Preview audience recipient count for targeting configuration
+   */
+  previewAudience: async (payload) => {
+    return await apiClient.post('/api/v1/admin/notifications/preview-audience', payload);
   }
 };

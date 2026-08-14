@@ -40,7 +40,24 @@ export class ApiError extends Error {
  */
 export const request = async (endpoint, options = {}) => {
   const token = getAuthToken();
-  const url = `${API_BASE_URL}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
+  let url = `${API_BASE_URL}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
+
+  if (options.params && typeof options.params === 'object') {
+    const searchParams = new URLSearchParams();
+    Object.entries(options.params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        if (Array.isArray(value)) {
+          if (value.length > 0) searchParams.append(key, value.join(','));
+        } else {
+          searchParams.append(key, String(value));
+        }
+      }
+    });
+    const queryString = searchParams.toString();
+    if (queryString) {
+      url += (url.includes('?') ? '&' : '?') + queryString;
+    }
+  }
 
   const headers = {
     'Content-Type': 'application/json',
@@ -78,7 +95,23 @@ export const request = async (endpoint, options = {}) => {
   }
 
   if (!response.ok) {
-    const message = (data && data.message) || `HTTP error ${response.status}`;
+    let defaultMessage = `HTTP error ${response.status}`;
+    if (response.status === 401) {
+      defaultMessage = 'Session expired or unauthorized. Please log in again.';
+      // Clear dead JWT so future requests do not resend it, and notify app.
+      clearAuthToken();
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('auth:session-expired'));
+      }
+    } else if (response.status === 403) {
+      defaultMessage = 'Access denied. Administrative privileges are required.';
+    } else if (response.status === 404) {
+      defaultMessage = 'Requested resource not found.';
+    } else if (response.status >= 500) {
+      defaultMessage = 'Internal server error. Please try again later.';
+    }
+
+    const message = (data && data.message) || defaultMessage;
     const errorCode = (data && data.errorCode) || 'UNKNOWN_ERROR';
     const errors = (data && data.errors) || null;
 
@@ -87,7 +120,27 @@ export const request = async (endpoint, options = {}) => {
 
   // Handle standard ApiResponse wrapper: { success: true, message: '...', data: T }
   if (data && typeof data === 'object' && 'success' in data) {
-    return data.data !== undefined ? data.data : data;
+    if (data.data !== undefined) {
+      // When the payload is a list, always pass through the full enriched
+      // envelope (summary, pagination, etc.) so callers get metadata even
+      // if only one of those keys is present in a given response.
+      if (Array.isArray(data.data)) {
+        return {
+          notifications: data.data,
+          data: data.data,
+          summary: data.summary ?? undefined,
+          pagination: data.pagination ?? undefined,
+          totalCount: data.pagination?.totalCount ?? data.data.length,
+          totalPages: data.pagination?.totalPages ?? 1,
+          page: data.pagination?.page ?? 1,
+          pageSize: data.pagination?.pageSize ?? 20,
+          hasNext: data.pagination?.hasNext ?? false,
+          hasPrev: data.pagination?.hasPrev ?? false,
+        };
+      }
+      return data.data;
+    }
+    return data;
   }
 
   return data;

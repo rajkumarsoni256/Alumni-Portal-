@@ -1,47 +1,148 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { AdminLayout } from '../../components/admin/layout/AdminLayout';
 import { useApp } from '../../context/AppContext';
-import { User, Lock, Save, ShieldCheck } from 'lucide-react';
+import { adminUserService } from '../../services/adminUserService';
+import { 
+  User, 
+  Lock, 
+  Save, 
+  ShieldCheck, 
+  Sliders, 
+  AlertCircle, 
+  CheckCircle2, 
+  RefreshCw,
+  Globe,
+  Mail,
+  ToggleLeft,
+  ToggleRight
+} from 'lucide-react';
 
 export const AdminSettingsPage = () => {
-  const { currentUser, showNotification } = useApp();
+  const { showNotification } = useApp();
 
-  const [name, setName] = useState(currentUser.name || 'Dean of Alumni Relations');
-  const [email, setEmail] = useState(currentUser.email || 'admin@jecrc.ac.in');
+  // Admin Profile State
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+
+  // Global Platform Settings State
+  const [platformName, setPlatformName] = useState('');
+  const [supportEmail, setSupportEmail] = useState('');
+  const [registrationEnabled, setRegistrationEnabled] = useState(true);
+  const [alumniVerificationEnabled, setAlumniVerificationEnabled] = useState(true);
+  const [maintenanceMode, setMaintenanceMode] = useState(false);
+
+  // Password Change State
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [isSaving, setIsSaving] = useState(false);
 
-  const handleSaveProfile = (e) => {
-    e.preventDefault();
-    setIsSaving(true);
+  // Page Status
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [isSavingPlatform, setIsSavingPlatform] = useState(false);
+  const [isSavingPassword, setIsSavingPassword] = useState(false);
+  const [error, setError] = useState(null);
+  const [errorStatus, setErrorStatus] = useState(null);
 
-    setTimeout(() => {
-      setIsSaving(false);
-      showNotification('Admin profile details saved successfully.');
-    }, 300);
+  const navigate = useNavigate();
+
+  const fetchSettings = async () => {
+    setIsLoading(true);
+    setError(null);
+    setErrorStatus(null);
+    try {
+      const data = await adminUserService.getSettings();
+      if (data) {
+        setPlatformName(data.platformName || 'JECRC Community Platform');
+        setSupportEmail(data.supportEmail || 'alumni@jecrc.ac.in');
+        setRegistrationEnabled(data.registrationEnabled !== false);
+        setAlumniVerificationEnabled(data.alumniVerificationEnabled !== false);
+        setMaintenanceMode(Boolean(data.maintenanceMode));
+        if (data.adminProfile) {
+          setName(data.adminProfile.name || 'Dean of Alumni Relations');
+          setEmail(data.adminProfile.email || 'admin@jecrc.ac.in');
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load admin settings:', err);
+      setError(err.message || 'Failed to fetch settings from database.');
+      setErrorStatus(err.status || null);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleChangePassword = (e) => {
+  useEffect(() => {
+    fetchSettings();
+  }, []);
+
+  const handleSaveProfile = async (e) => {
+    e.preventDefault();
+    setIsSavingProfile(true);
+    try {
+      await adminUserService.updateSettings({ name, email });
+      showNotification('Administrator profile saved successfully.', 'success');
+    } catch (err) {
+      console.error('Failed to save admin profile:', err);
+      showNotification(err.message || 'Failed to save admin profile.', 'error');
+    } finally {
+      setIsSavingProfile(false);
+    }
+  };
+
+  const handleSavePlatform = async (e) => {
+    e.preventDefault();
+    setIsSavingPlatform(true);
+    try {
+      await adminUserService.updateSettings({
+        platformName,
+        supportEmail,
+        registrationEnabled,
+        alumniVerificationEnabled,
+        maintenanceMode,
+      });
+      showNotification('Platform configuration updated successfully.', 'success');
+    } catch (err) {
+      console.error('Failed to update platform settings:', err);
+      showNotification(err.message || 'Failed to update platform settings.', 'error');
+    } finally {
+      setIsSavingPlatform(false);
+    }
+  };
+
+  const handleChangePassword = async (e) => {
     e.preventDefault();
     if (newPassword !== confirmPassword) {
-      showNotification('New passwords do not match!');
+      showNotification('New passwords do not match.', 'error');
       return;
     }
-    setIsSaving(true);
-    setTimeout(() => {
-      setIsSaving(false);
+    if (newPassword.length < 6) {
+      showNotification('New password must be at least 6 characters.', 'error');
+      return;
+    }
+
+    setIsSavingPassword(true);
+    try {
+      await adminUserService.updateSettings({
+        currentPassword,
+        newPassword,
+      });
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
-      showNotification('Admin password updated successfully.');
-    }, 300);
+      showNotification('Administrator password updated successfully.', 'success');
+    } catch (err) {
+      console.error('Failed to change password:', err);
+      showNotification(err.message || 'Failed to change password. Verify your current password.', 'error');
+    } finally {
+      setIsSavingPassword(false);
+    }
   };
 
   return (
     <AdminLayout>
-      <div className="space-y-6 max-w-3xl">
+      <div className="space-y-6 max-w-4xl">
         
         {/* Page Header */}
         <div>
@@ -49,119 +150,272 @@ export const AdminSettingsPage = () => {
             Admin Settings
           </h1>
           <p className="text-xs text-slate-500">
-            Manage administrative account information and authentication credentials.
+            Manage administrative account details, platform controls, and security credentials.
           </p>
         </div>
 
-        {/* 1. Admin Profile Information */}
-        <div className="bg-white rounded-xl border border-slate-200/90 p-6 shadow-2xs space-y-4">
-          <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
-            <User className="w-4 h-4 text-red-700" />
-            <h2 className="text-sm font-bold text-slate-900">Admin Information</h2>
-          </div>
-
-          <form onSubmit={handleSaveProfile} className="space-y-4 max-w-md">
-            <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-700 block">
-                Administrator Name
-              </label>
-              <input
-                type="text"
-                required
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900 focus:outline-none focus:border-red-600"
-              />
+        {/* Error Banner */}
+        {error && (
+          <div className="p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <AlertCircle className="w-5 h-5 text-red-600 shrink-0" />
+              <div>
+                <p className="text-xs font-bold text-red-900">
+                  {errorStatus === 401 ? 'Session Expired' : 'Failed to load live settings'}
+                </p>
+                <p className="text-[11px] text-red-700">
+                  {errorStatus === 401
+                    ? 'Your administrator session has expired. Please log in again to continue.'
+                    : error}
+                </p>
+              </div>
             </div>
-
-            <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-700 block">
-                Official Email Address
-              </label>
-              <input
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900 focus:outline-none focus:border-red-600"
-              />
-            </div>
-
-            <div className="pt-2">
+            {errorStatus === 401 ? (
               <button
-                type="submit"
-                disabled={isSaving}
-                className="px-4 py-2 rounded-lg text-xs font-bold text-white bg-red-700 hover:bg-red-800 transition-colors inline-flex items-center gap-1.5 shadow-2xs cursor-pointer disabled:opacity-50"
+                type="button"
+                onClick={() => navigate('/login')}
+                className="px-3 py-1.5 rounded-lg bg-red-700 hover:bg-red-800 text-white text-xs font-semibold shrink-0 cursor-pointer"
               >
-                <Save className="w-3.5 h-3.5" />
-                <span>Save Profile Info</span>
+                Log In Again
               </button>
-            </div>
-          </form>
-        </div>
-
-        {/* 2. Security / Password Change */}
-        <div className="bg-white rounded-xl border border-slate-200/90 p-6 shadow-2xs space-y-4">
-          <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
-            <Lock className="w-4 h-4 text-slate-700" />
-            <h2 className="text-sm font-bold text-slate-900">Security & Password</h2>
-          </div>
-
-          <form onSubmit={handleChangePassword} className="space-y-4 max-w-md">
-            <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-700 block">
-                Current Password
-              </label>
-              <input
-                type="password"
-                required
-                value={currentPassword}
-                onChange={(e) => setCurrentPassword(e.target.value)}
-                placeholder="••••••••"
-                className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900 focus:outline-none focus:border-red-600"
-              />
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-700 block">
-                New Password
-              </label>
-              <input
-                type="password"
-                required
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="••••••••"
-                className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900 focus:outline-none focus:border-red-600"
-              />
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-700 block">
-                Confirm New Password
-              </label>
-              <input
-                type="password"
-                required
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="••••••••"
-                className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900 focus:outline-none focus:border-red-600"
-              />
-            </div>
-
-            <div className="pt-2">
+            ) : (
               <button
-                type="submit"
-                disabled={isSaving}
-                className="px-4 py-2 rounded-lg text-xs font-bold text-white bg-slate-900 hover:bg-slate-800 transition-colors inline-flex items-center gap-1.5 shadow-2xs cursor-pointer disabled:opacity-50"
+                type="button"
+                onClick={fetchSettings}
+                className="px-3 py-1.5 rounded-lg bg-red-700 hover:bg-red-800 text-white text-xs font-semibold shrink-0 cursor-pointer"
               >
-                <ShieldCheck className="w-3.5 h-3.5" />
-                <span>Update Password</span>
+                Retry
               </button>
+            )}
+          </div>
+        )}
+
+        {isLoading ? (
+          <div className="p-12 text-center text-xs text-slate-500 bg-white rounded-xl border border-slate-200 space-y-2">
+            <RefreshCw className="w-5 h-5 animate-spin mx-auto text-red-700" />
+            <p>Loading settings from PostgreSQL database...</p>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            
+            {/* 1. Global Platform Controls & Configuration */}
+            <div className="bg-white rounded-xl border border-slate-200/90 p-6 shadow-2xs space-y-4">
+              <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
+                <Sliders className="w-4 h-4 text-red-700" />
+                <h2 className="text-sm font-bold text-slate-900">Platform Controls & Configuration</h2>
+              </div>
+
+              <form onSubmit={handleSavePlatform} className="space-y-4 max-w-xl">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-slate-700 block">
+                      Platform Display Name
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={platformName}
+                      onChange={(e) => setPlatformName(e.target.value)}
+                      className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900 focus:outline-none focus:border-red-600"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-slate-700 block">
+                      Support Email
+                    </label>
+                    <input
+                      type="email"
+                      required
+                      value={supportEmail}
+                      onChange={(e) => setSupportEmail(e.target.value)}
+                      className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900 focus:outline-none focus:border-red-600"
+                    />
+                  </div>
+                </div>
+
+                {/* Toggles */}
+                <div className="pt-2 space-y-3 border-t border-slate-100">
+                  <div className="flex items-center justify-between p-3 rounded-lg bg-slate-50 border border-slate-200/80">
+                    <div>
+                      <span className="text-xs font-bold text-slate-900 block">User Registration</span>
+                      <span className="text-[11px] text-slate-500">Allow new students and alumni to create accounts</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setRegistrationEnabled(!registrationEnabled)}
+                      className={`px-3 py-1 rounded-md text-xs font-bold transition-colors cursor-pointer ${
+                        registrationEnabled
+                          ? 'bg-emerald-600 text-white'
+                          : 'bg-slate-300 text-slate-700'
+                      }`}
+                    >
+                      {registrationEnabled ? 'Enabled' : 'Disabled'}
+                    </button>
+                  </div>
+
+                  <div className="flex items-center justify-between p-3 rounded-lg bg-slate-50 border border-slate-200/80">
+                    <div>
+                      <span className="text-xs font-bold text-slate-900 block">Alumni Verification Workflow</span>
+                      <span className="text-[11px] text-slate-500">Accept and process alumni degree verification submissions</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setAlumniVerificationEnabled(!alumniVerificationEnabled)}
+                      className={`px-3 py-1 rounded-md text-xs font-bold transition-colors cursor-pointer ${
+                        alumniVerificationEnabled
+                          ? 'bg-emerald-600 text-white'
+                          : 'bg-slate-300 text-slate-700'
+                      }`}
+                    >
+                      {alumniVerificationEnabled ? 'Enabled' : 'Disabled'}
+                    </button>
+                  </div>
+
+                  <div className="flex items-center justify-between p-3 rounded-lg bg-slate-50 border border-slate-200/80">
+                    <div>
+                      <span className="text-xs font-bold text-slate-900 block">Maintenance Mode</span>
+                      <span className="text-[11px] text-slate-500">Display maintenance advisory banner across platform</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setMaintenanceMode(!maintenanceMode)}
+                      className={`px-3 py-1 rounded-md text-xs font-bold transition-colors cursor-pointer ${
+                        maintenanceMode
+                          ? 'bg-amber-600 text-white'
+                          : 'bg-slate-300 text-slate-700'
+                      }`}
+                    >
+                      {maintenanceMode ? 'Active' : 'Off'}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="pt-2">
+                  <button
+                    type="submit"
+                    disabled={isSavingPlatform}
+                    className="px-4 py-2 rounded-lg text-xs font-bold text-white bg-red-700 hover:bg-red-800 transition-colors inline-flex items-center gap-1.5 shadow-2xs cursor-pointer disabled:opacity-50"
+                  >
+                    <Save className="w-3.5 h-3.5" />
+                    <span>{isSavingPlatform ? 'Saving...' : 'Save Platform Controls'}</span>
+                  </button>
+                </div>
+              </form>
             </div>
-          </form>
-        </div>
+
+            {/* 2. Admin Profile Information */}
+            <div className="bg-white rounded-xl border border-slate-200/90 p-6 shadow-2xs space-y-4">
+              <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
+                <User className="w-4 h-4 text-slate-700" />
+                <h2 className="text-sm font-bold text-slate-900">Administrator Profile</h2>
+              </div>
+
+              <form onSubmit={handleSaveProfile} className="space-y-4 max-w-md">
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-slate-700 block">
+                    Administrator Name
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900 focus:outline-none focus:border-red-600"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-slate-700 block">
+                    Official Email Address
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900 focus:outline-none focus:border-red-600"
+                  />
+                </div>
+
+                <div className="pt-2">
+                  <button
+                    type="submit"
+                    disabled={isSavingProfile}
+                    className="px-4 py-2 rounded-lg text-xs font-bold text-white bg-slate-900 hover:bg-slate-800 transition-colors inline-flex items-center gap-1.5 shadow-2xs cursor-pointer disabled:opacity-50"
+                  >
+                    <Save className="w-3.5 h-3.5" />
+                    <span>{isSavingProfile ? 'Saving...' : 'Save Profile Info'}</span>
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            {/* 3. Security / Password Change */}
+            <div className="bg-white rounded-xl border border-slate-200/90 p-6 shadow-2xs space-y-4">
+              <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
+                <Lock className="w-4 h-4 text-slate-700" />
+                <h2 className="text-sm font-bold text-slate-900">Security & Password</h2>
+              </div>
+
+              <form onSubmit={handleChangePassword} className="space-y-4 max-w-md">
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-slate-700 block">
+                    Current Password
+                  </label>
+                  <input
+                    type="password"
+                    required
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900 focus:outline-none focus:border-red-600"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-slate-700 block">
+                    New Password
+                  </label>
+                  <input
+                    type="password"
+                    required
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900 focus:outline-none focus:border-red-600"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-slate-700 block">
+                    Confirm New Password
+                  </label>
+                  <input
+                    type="password"
+                    required
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900 focus:outline-none focus:border-red-600"
+                  />
+                </div>
+
+                <div className="pt-2">
+                  <button
+                    type="submit"
+                    disabled={isSavingPassword}
+                    className="px-4 py-2 rounded-lg text-xs font-bold text-white bg-slate-900 hover:bg-slate-800 transition-colors inline-flex items-center gap-1.5 shadow-2xs cursor-pointer disabled:opacity-50"
+                  >
+                    <ShieldCheck className="w-3.5 h-3.5" />
+                    <span>{isSavingPassword ? 'Updating...' : 'Update Password'}</span>
+                  </button>
+                </div>
+              </form>
+            </div>
+
+          </div>
+        )}
 
       </div>
     </AdminLayout>

@@ -31,6 +31,18 @@ const authenticateToken = async (req, res, next) => {
   }
 };
 
+const requireAdmin = (req, res, next) => {
+  if (!req.user) {
+    return errorResponse(res, 'Full authentication is required to access this resource', 'UNAUTHORIZED', 401);
+  }
+  const role = req.user.role ? String(req.user.role).trim().toUpperCase() : '';
+  if (role !== 'ADMIN') {
+    return errorResponse(res, 'Access denied. Administrative privileges are required.', 'FORBIDDEN', 403);
+  }
+  next();
+};
+
 module.exports = {
   authenticateToken,
+  requireAdmin,
 };
