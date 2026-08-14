@@ -408,10 +408,10 @@ const migrate = async () => {
     await db.query(`
       CREATE TABLE IF NOT EXISTS notifications (
           id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-          recipient_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          recipient_id UUID REFERENCES users(id) ON DELETE CASCADE,
           actor_id UUID REFERENCES users(id) ON DELETE SET NULL,
-          type VARCHAR(64) NOT NULL,
-          title VARCHAR(255) NOT NULL,
+          type VARCHAR(64) NOT NULL DEFAULT 'SYSTEM',
+          title VARCHAR(255),
           message TEXT NOT NULL,
           entity_type VARCHAR(64),
           entity_id UUID,
@@ -421,9 +421,21 @@ const migrate = async () => {
           read_at TIMESTAMP WITH TIME ZONE
       );
     `);
+    await db.query(`ALTER TABLE notifications ADD COLUMN IF NOT EXISTS recipient_id UUID REFERENCES users(id) ON DELETE CASCADE;`).catch(() => {});
+    await db.query(`ALTER TABLE notifications ADD COLUMN IF NOT EXISTS actor_id UUID REFERENCES users(id) ON DELETE SET NULL;`).catch(() => {});
+    await db.query(`ALTER TABLE notifications ADD COLUMN IF NOT EXISTS type VARCHAR(64) DEFAULT 'SYSTEM';`).catch(() => {});
+    await db.query(`ALTER TABLE notifications ADD COLUMN IF NOT EXISTS title VARCHAR(255);`).catch(() => {});
+    await db.query(`ALTER TABLE notifications ADD COLUMN IF NOT EXISTS message TEXT;`).catch(() => {});
+    await db.query(`ALTER TABLE notifications ADD COLUMN IF NOT EXISTS entity_type VARCHAR(64);`).catch(() => {});
+    await db.query(`ALTER TABLE notifications ADD COLUMN IF NOT EXISTS entity_id UUID;`).catch(() => {});
+    await db.query(`ALTER TABLE notifications ADD COLUMN IF NOT EXISTS metadata JSONB;`).catch(() => {});
+    await db.query(`ALTER TABLE notifications ADD COLUMN IF NOT EXISTS is_read BOOLEAN NOT NULL DEFAULT FALSE;`).catch(() => {});
+    await db.query(`ALTER TABLE notifications ADD COLUMN IF NOT EXISTS read_at TIMESTAMP WITH TIME ZONE;`).catch(() => {});
     await db.query(`ALTER TABLE notifications ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES users(id) ON DELETE CASCADE;`).catch(() => {});
     await db.query(`ALTER TABLE notifications ADD COLUMN IF NOT EXISTS actor_name VARCHAR(150);`).catch(() => {});
     await db.query(`ALTER TABLE notifications ADD COLUMN IF NOT EXISTS actor_avatar VARCHAR(512);`).catch(() => {});
+    await db.query(`UPDATE notifications SET recipient_id = user_id WHERE recipient_id IS NULL AND user_id IS NOT NULL;`).catch(() => {});
+    await db.query(`UPDATE notifications SET user_id = recipient_id WHERE user_id IS NULL AND recipient_id IS NOT NULL;`).catch(() => {});
 
     // 22. events table (Phase 9)
     await db.query(`
@@ -612,101 +624,101 @@ const migrate = async () => {
     await db.query(`ALTER TABLE mentorship_requests ALTER COLUMN id SET DEFAULT gen_random_uuid();`).catch(() => {});
 
     // Indices
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);`);
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_user_profiles_company ON user_profiles(company);`);
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_user_profiles_branch ON user_profiles(branch);`);
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_user_profiles_grad_year ON user_profiles(graduation_year);`);
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_user_profiles_location ON user_profiles(location);`);
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_user_profiles_updated_at ON user_profiles(updated_at DESC);`);
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_user_profiles_complete ON user_profiles(is_profile_complete);`);
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);`).catch(() => {});
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_user_profiles_company ON user_profiles(company);`).catch(() => {});
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_user_profiles_branch ON user_profiles(branch);`).catch(() => {});
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_user_profiles_grad_year ON user_profiles(graduation_year);`).catch(() => {});
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_user_profiles_location ON user_profiles(location);`).catch(() => {});
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_user_profiles_updated_at ON user_profiles(updated_at DESC);`).catch(() => {});
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_user_profiles_complete ON user_profiles(is_profile_complete);`).catch(() => {});
 
     // Audit logs indexes
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON audit_logs(created_at DESC);`);
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_audit_logs_user_id ON audit_logs(user_id);`);
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON audit_logs(action);`);
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_audit_logs_target_id ON audit_logs(target_id);`);
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON audit_logs(created_at DESC);`).catch(() => {});
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_audit_logs_user_id ON audit_logs(user_id);`).catch(() => {});
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON audit_logs(action);`).catch(() => {});
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_audit_logs_target_id ON audit_logs(target_id);`).catch(() => {});
 
     // Alumni verifications indexes
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_alumni_verifications_user_id ON alumni_verifications(user_id);`);
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_alumni_verifications_status ON alumni_verifications(status);`);
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_alumni_verifications_user_id ON alumni_verifications(user_id);`).catch(() => {});
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_alumni_verifications_status ON alumni_verifications(status);`).catch(() => {});
 
     // Phase 10 Announcements indexes
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_announcements_status_created ON announcements(status, created_at DESC);`);
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_announcements_created_by ON announcements(created_by);`);
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_announcements_published_at ON announcements(published_at DESC);`);
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_announcement_recipients_user ON announcement_recipients(user_id, is_read);`);
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_announcement_recipients_announcement ON announcement_recipients(announcement_id, is_read);`);
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_announcements_status_created ON announcements(status, created_at DESC);`).catch(() => {});
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_announcements_created_by ON announcements(created_by);`).catch(() => {});
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_announcements_published_at ON announcements(published_at DESC);`).catch(() => {});
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_announcement_recipients_user ON announcement_recipients(user_id, is_read);`).catch(() => {});
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_announcement_recipients_announcement ON announcement_recipients(announcement_id, is_read);`).catch(() => {});
 
     // Connections indexes
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_connections_requester ON connections(requester_id);`);
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_connections_receiver ON connections(receiver_id);`);
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_connections_status ON connections(status);`);
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_connections_requester ON connections(requester_id);`).catch(() => {});
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_connections_receiver ON connections(receiver_id);`).catch(() => {});
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_connections_status ON connections(status);`).catch(() => {});
 
     // Posts & Likes indexes
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_posts_author ON posts(author_id);`);
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_posts_category ON posts(category);`);
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_posts_created_at ON posts(created_at DESC);`);
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_post_likes_post ON post_likes(post_id);`);
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_post_likes_user ON post_likes(user_id);`);
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_post_hashtags_hashtag ON post_hashtags(hashtag_id);`);
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_posts_author ON posts(author_id);`).catch(() => {});
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_posts_category ON posts(category);`).catch(() => {});
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_posts_created_at ON posts(created_at DESC);`).catch(() => {});
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_post_likes_post ON post_likes(post_id);`).catch(() => {});
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_post_likes_user ON post_likes(user_id);`).catch(() => {});
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_post_hashtags_hashtag ON post_hashtags(hashtag_id);`).catch(() => {});
 
     // Comments indexes
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_comments_post ON comments(post_id);`);
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_comments_author ON comments(author_id);`);
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_comments_parent ON comments(parent_comment_id);`);
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_comments_created_at ON comments(created_at ASC);`);
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_comment_likes_comment ON comment_likes(comment_id);`);
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_comment_likes_user ON comment_likes(user_id);`);
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_comments_post ON comments(post_id);`).catch(() => {});
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_comments_author ON comments(author_id);`).catch(() => {});
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_comments_parent ON comments(parent_comment_id);`).catch(() => {});
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_comments_created_at ON comments(created_at ASC);`).catch(() => {});
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_comment_likes_comment ON comment_likes(comment_id);`).catch(() => {});
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_comment_likes_user ON comment_likes(user_id);`).catch(() => {});
 
     // Jobs indexes
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_jobs_posted_by ON jobs(posted_by);`);
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_jobs_type ON jobs(type);`);
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_jobs_location ON jobs(location);`);
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status);`);
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_jobs_created_at ON jobs(created_at DESC);`);
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_job_bookmarks_job ON job_bookmarks(job_id);`);
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_job_bookmarks_user ON job_bookmarks(user_id);`);
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_job_applications_job ON job_applications(job_id);`);
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_job_applications_applicant ON job_applications(applicant_id);`);
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_jobs_posted_by ON jobs(posted_by);`).catch(() => {});
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_jobs_type ON jobs(type);`).catch(() => {});
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_jobs_location ON jobs(location);`).catch(() => {});
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status);`).catch(() => {});
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_jobs_created_at ON jobs(created_at DESC);`).catch(() => {});
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_job_bookmarks_job ON job_bookmarks(job_id);`).catch(() => {});
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_job_bookmarks_user ON job_bookmarks(user_id);`).catch(() => {});
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_job_applications_job ON job_applications(job_id);`).catch(() => {});
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_job_applications_applicant ON job_applications(applicant_id);`).catch(() => {});
 
     // Conversations & Messages indexes
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_conversations_updated_at ON conversations(updated_at DESC);`);
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_conversations_last_msg ON conversations(last_message_at DESC);`);
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_conv_participants_user_id ON conversation_participants(user_id);`);
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_conv_participants_conv_id ON conversation_participants(conversation_id);`);
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_conv_participants_user ON conversation_participants(user_id);`);
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_conv_participants_conv ON conversation_participants(conversation_id);`);
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_messages_conversation_created ON messages(conversation_id, created_at ASC);`);
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id);`);
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_messages_sender_id ON messages(sender_id);`);
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_messages_sender ON messages(sender_id);`);
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_messages_created_at ON messages(created_at ASC);`);
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_conversations_updated_at ON conversations(updated_at DESC);`).catch(() => {});
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_conversations_last_msg ON conversations(last_message_at DESC);`).catch(() => {});
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_conv_participants_user_id ON conversation_participants(user_id);`).catch(() => {});
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_conv_participants_conv_id ON conversation_participants(conversation_id);`).catch(() => {});
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_conv_participants_user ON conversation_participants(user_id);`).catch(() => {});
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_conv_participants_conv ON conversation_participants(conversation_id);`).catch(() => {});
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_messages_conversation_created ON messages(conversation_id, created_at ASC);`).catch(() => {});
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id);`).catch(() => {});
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_messages_sender_id ON messages(sender_id);`).catch(() => {});
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_messages_sender ON messages(sender_id);`).catch(() => {});
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_messages_created_at ON messages(created_at ASC);`).catch(() => {});
 
     // Notifications indexes
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_notifications_recipient ON notifications(recipient_id);`);
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_notifications_created_at ON notifications(created_at DESC);`);
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_notifications_is_read ON notifications(is_read);`);
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_notifications_recipient_read ON notifications(recipient_id, is_read);`);
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_notifications_recipient_created ON notifications(recipient_id, created_at DESC);`);
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_notifications_entity ON notifications(entity_type, entity_id);`);
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_notifications_user_read ON notifications(user_id, is_read);`);
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_notifications_user_created ON notifications(user_id, created_at DESC);`);
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_notifications_recipient ON notifications(recipient_id);`).catch(() => {});
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_notifications_created_at ON notifications(created_at DESC);`).catch(() => {});
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_notifications_is_read ON notifications(is_read);`).catch(() => {});
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_notifications_recipient_read ON notifications(recipient_id, is_read);`).catch(() => {});
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_notifications_recipient_created ON notifications(recipient_id, created_at DESC);`).catch(() => {});
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_notifications_entity ON notifications(entity_type, entity_id);`).catch(() => {});
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_notifications_user_read ON notifications(user_id, is_read);`).catch(() => {});
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_notifications_user_created ON notifications(user_id, created_at DESC);`).catch(() => {});
 
     // Events indexes
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_events_created_by ON events(created_by);`);
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_events_start_at ON events(start_at);`);
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_events_status ON events(status);`);
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_events_category ON events(category);`);
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_events_status_start_at ON events(status, start_at);`);
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_events_created_by ON events(created_by);`).catch(() => {});
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_events_start_at ON events(start_at);`).catch(() => {});
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_events_status ON events(status);`).catch(() => {});
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_events_category ON events(category);`).catch(() => {});
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_events_status_start_at ON events(status, start_at);`).catch(() => {});
 
     // User Settings & Privacy indexes
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_user_settings_user_id ON user_settings(user_id);`);
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_user_blocks_blocker ON user_blocks(blocker_id);`);
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_user_blocks_blocked ON user_blocks(blocked_id);`);
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_user_sessions_user_active ON user_sessions(user_id, is_active);`);
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_email_deliveries_recipient ON email_deliveries(recipient_email);`);
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_email_deliveries_status ON email_deliveries(status);`);
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_verification_codes_email_purpose ON verification_codes(email, purpose);`);
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_user_settings_user_id ON user_settings(user_id);`).catch(() => {});
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_user_blocks_blocker ON user_blocks(blocker_id);`).catch(() => {});
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_user_blocks_blocked ON user_blocks(blocked_id);`).catch(() => {});
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_user_sessions_user_active ON user_sessions(user_id, is_active);`).catch(() => {});
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_email_deliveries_recipient ON email_deliveries(recipient_email);`).catch(() => {});
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_email_deliveries_status ON email_deliveries(status);`).catch(() => {});
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_verification_codes_email_purpose ON verification_codes(email, purpose);`).catch(() => {});
 
     // Seed default settings for all existing users if missing
     await db.query(`
