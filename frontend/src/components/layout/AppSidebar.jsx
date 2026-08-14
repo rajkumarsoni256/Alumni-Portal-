@@ -122,7 +122,7 @@ export const AppSidebar = ({ className = '' }) => {
       {/* Footer Meta */}
       <div className="px-3 text-[11px] text-slate-400 space-y-1">
         <div className="flex items-center justify-between">
-          <span>JECRC Community</span>
+          <span>JU Connect</span>
           <span>v1.2</span>
         </div>
         <div className="flex items-center gap-2 text-[10px] text-slate-400">

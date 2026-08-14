@@ -184,6 +184,7 @@ export const OnboardingPage = ({ defaultRole }) => {
         branch,
         graduationYear,
         currentYear: isStudent ? currentYear : null,
+        currentAcademicYear: isStudent ? currentYear : null,
         company: isStudent ? null : company,
         designation: isStudent ? null : designation,
         location,

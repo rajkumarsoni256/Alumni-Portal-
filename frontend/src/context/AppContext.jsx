@@ -1,19 +1,17 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import {
   MOCK_STUDENT,
-  MOCK_ALUMNI,
-  MOCK_REQUESTS,
-  MOCK_EVENTS,
-  MOCK_COMMUNITY_POSTS,
   MOCK_USERS,
-  MOCK_SUGGESTED_PEOPLE,
-  MOCK_NOTIFICATIONS,
-  MOCK_CONNECTION_REQUESTS
 } from '../data/mockData';
 import { authService } from '../services/authService';
+import { userService } from '../services/userService';
 import { postService } from '../services/postService';
 import { messageService } from '../services/messageService';
 import { profileService } from '../services/profileService';
+import { connectionService } from '../services/connectionService';
+import { notificationService } from '../services/notificationService';
+import { eventService } from '../services/eventService';
+import { mentorshipService } from '../services/mentorshipService';
 
 const AppContext = createContext();
 
@@ -21,8 +19,9 @@ export const AppProvider = ({ children }) => {
   // Authentication State
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [authStatus, setAuthStatus] = useState('UNAUTHENTICATED'); // 'UNAUTHENTICATED' | 'REGISTERED' | 'EMAIL_UNVERIFIED' | 'ONBOARDING' | 'AUTHENTICATED'
+  const [authStatus, setAuthStatus] = useState('UNAUTHENTICATED');
   const [authUser, setAuthUser] = useState(null);
+  const [userProfile, setUserProfile] = useState(null);
   const [pendingRegistration, setPendingRegistration] = useState({
     name: '',
     email: '',
@@ -31,62 +30,31 @@ export const AppProvider = ({ children }) => {
     profileCompleted: false,
   });
 
-  // Active demo role: 'student', 'alumni', or 'admin'
   const [activeRole, setActiveRole] = useState('student');
-
-  // Student state
   const [student, setStudent] = useState(MOCK_STUDENT);
 
-  // Alumni list state
-  const [alumniList, setAlumniList] = useState(MOCK_ALUMNI);
-
-  // Mentorship requests
-  const [requests, setRequests] = useState(MOCK_REQUESTS);
-
-  // Events list
-  const [events, setEvents] = useState(MOCK_EVENTS);
-
-  // Community Feed Posts
-  const [posts, setPosts] = useState(MOCK_COMMUNITY_POSTS);
-
-  // Users lookup map
+  // Real data arrays from PostgreSQL backend
+  const [alumniList, setAlumniList] = useState([]);
+  const [requests, setRequests] = useState([]);
+  const [events, setEvents] = useState([]);
+  const [posts, setPosts] = useState([]);
   const [usersMap, setUsersMap] = useState(MOCK_USERS);
+  const [connectionRequests, setConnectionRequests] = useState([]);
+  const [suggestedPeople, setSuggestedPeople] = useState([]);
+  const [notifications, setNotifications] = useState([]);
+  const [unreadNotifsCount, setUnreadNotifsCount] = useState(0);
 
-  // Incoming Connection Requests
-  const [connectionRequests, setConnectionRequests] = useState(MOCK_CONNECTION_REQUESTS);
-
-  // Suggested Connections
-  const [suggestedPeople, setSuggestedPeople] = useState(MOCK_SUGGESTED_PEOPLE);
-
-  // Notifications
-  const [notifications, setNotifications] = useState(MOCK_NOTIFICATIONS);
-
-  // Unread Messages Count
   const [unreadMessagesCount, setUnreadMessagesCount] = useState(() => messageService.getUnreadCount('st_101'));
 
   const refreshUnreadMessagesCount = (userId = 'st_101') => {
     setUnreadMessagesCount(messageService.getUnreadCount(userId));
   };
 
-  // Saved Post IDs
-  const [savedPostIds, setSavedPostIds] = useState(['post_1']);
-
-  // Feed Filter Tab ('all' | 'alumni' | 'student' | 'jobs' | 'saved')
+  const [savedPostIds, setSavedPostIds] = useState([]);
   const [feedFilter, setFeedFilter] = useState('all');
-
-  // Search query (global community search)
   const [searchQuery, setSearchQuery] = useState('');
-
-  // Saved Alumni IDs
   const [savedAlumniIds, setSavedAlumniIds] = useState(MOCK_STUDENT.savedAlumniIds || []);
 
-  // Filter & Search state for Find Mentor wizard
-  const [selectedInterests, setSelectedInterests] = useState(['AI & Machine Learning', 'Web Development']);
-  const [careerGoal, setCareerGoal] = useState('Software Engineer / AI Product Specialist');
-  const [experienceLevel, setExperienceLevel] = useState('0-2 years (Entry / Campus)');
-  const [preferredIndustry, setPreferredIndustry] = useState('Technology & Software');
-
-  // Toast notification system
   const [toast, setToast] = useState(null);
 
   const showNotification = (message, type = 'success') => {
@@ -96,7 +64,161 @@ export const AppProvider = ({ children }) => {
     }, 4000);
   };
 
-  // Restores auth session from backend using stored JWT on app startup
+  const fetchUserProfile = async () => {
+    try {
+      const profile = await profileService.getCurrentProfile();
+      if (profile) {
+        setUserProfile(profile);
+      }
+      return profile;
+    } catch (err) {
+      console.warn('Failed to load user profile:', err);
+      return null;
+    }
+  };
+
+  const fetchAlumniList = async () => {
+    try {
+      const res = await userService.getUsers({ role: 'ALUMNI', limit: 50 });
+      const currentId = authUser?.id;
+      const filtered = (res.users || []).filter((u) => (u.userId || u.id) !== currentId);
+      setAlumniList(filtered);
+    } catch (err) {
+      console.warn('Failed to load alumni directory:', err);
+      setAlumniList([]);
+    }
+  };
+
+  const fetchSuggestedPeople = async () => {
+    try {
+      const res = await userService.getUsers({ limit: 4 });
+      const currentId = authUser?.id;
+      const mapped = (res.users || [])
+        .filter((u) => (u.userId || u.id) !== currentId)
+        .map((u) => ({
+          id: u.userId || u.id,
+          name: u.fullName || (u.email ? u.email.split('@')[0] : 'Community Member'),
+          role: u.designation || (u.role === 'ALUMNI' ? 'Alumni' : 'Student'),
+          company: u.company || 'JECRC Network',
+          batch: u.graduationYear ? `Class of ${u.graduationYear}` : 'JECRC',
+          avatar: u.avatarUrl || u.avatar || 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=300',
+          connectionStatus: u.connectionStatus || 'none',
+        }));
+      setSuggestedPeople(mapped);
+    } catch (err) {
+      console.warn('Failed to load suggested people:', err);
+      setSuggestedPeople([]);
+    }
+  };
+
+  const fetchIncomingConnectionRequests = async () => {
+    try {
+      const reqs = await connectionService.getIncomingRequests();
+      setConnectionRequests(reqs || []);
+    } catch (err) {
+      console.warn('Failed to load connection requests:', err);
+      setConnectionRequests([]);
+    }
+  };
+
+  const fetchNotifications = async () => {
+    try {
+      const res = await notificationService.getNotifications({ page: 1, limit: 20 });
+      setNotifications(res.notifications || []);
+      setUnreadNotifsCount(res.unreadCount || 0);
+    } catch (err) {
+      console.warn('Failed to load notifications:', err);
+      setNotifications([]);
+      setUnreadNotifsCount(0);
+    }
+  };
+
+  const fetchEvents = async (params = {}) => {
+    try {
+      const res = await eventService.getEvents(params);
+      setEvents(res.events || []);
+    } catch (err) {
+      console.warn('Failed to load events:', err);
+      setEvents([]);
+    }
+  };
+
+  const fetchMentorshipRequests = async () => {
+    try {
+      const res = await mentorshipService.getMentorshipRequests();
+      setRequests(res.requests || []);
+    } catch (err) {
+      console.warn('Failed to load mentorship requests:', err);
+      setRequests([]);
+    }
+  };
+
+  const markNotificationRead = async (id) => {
+    try {
+      await notificationService.markAsRead(id);
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === id ? { ...n, isRead: true, unread: false } : n))
+      );
+      setUnreadNotifsCount((prev) => Math.max(0, prev - 1));
+    } catch (err) {
+      console.warn('Failed to mark notification read:', err);
+    }
+  };
+
+  const markAllNotificationsRead = async () => {
+    try {
+      await notificationService.markAllAsRead();
+      setNotifications((prev) =>
+        prev.map((n) => ({ ...n, isRead: true, unread: false }))
+      );
+      setUnreadNotifsCount(0);
+    } catch (err) {
+      console.warn('Failed to mark all notifications read:', err);
+    }
+  };
+
+  const toggleEventRegistration = async (eventId) => {
+    const targetEvt = events.find((e) => e.id === eventId);
+    if (!targetEvt) return;
+
+    try {
+      if (targetEvt.isRegistered) {
+        const res = await eventService.cancelRegistration(eventId);
+        setEvents((prev) =>
+          prev.map((e) =>
+            e.id === eventId
+              ? {
+                  ...e,
+                  isRegistered: false,
+                  registeredCount: res.registeredCount,
+                  seatsLeft: e.capacity ? Math.max(0, e.capacity - res.registeredCount) : 'Unlimited',
+                }
+              : e
+          )
+        );
+        showNotification(`Unregistered from ${targetEvt.title}`, 'info');
+      } else {
+        const res = await eventService.registerForEvent(eventId);
+        setEvents((prev) =>
+          prev.map((e) =>
+            e.id === eventId
+              ? {
+                  ...e,
+                  isRegistered: true,
+                  registeredCount: res.registeredCount,
+                  seatsLeft: res.seatsLeft,
+                }
+              : e
+          )
+        );
+        showNotification(`Registered for ${targetEvt.title}!`, 'success');
+        await fetchNotifications();
+      }
+    } catch (err) {
+      showNotification(err.message || 'Event registration failed', 'error');
+    }
+  };
+
   useEffect(() => {
     const initializeAuthSession = async () => {
       const token = authService.getToken();
@@ -109,6 +231,15 @@ export const AppProvider = ({ children }) => {
             setAuthUser(user);
             setActiveRole(normalizedRole);
             setIsAuthenticated(true);
+
+            await fetchUserProfile();
+            await fetchAlumniList();
+            await fetchSuggestedPeople();
+            await fetchIncomingConnectionRequests();
+            await fetchNotifications();
+            await fetchEvents();
+            await fetchMentorshipRequests();
+
             if (user.role?.toUpperCase() === 'ADMIN' || isComplete) {
               setAuthStatus('AUTHENTICATED');
             } else {
@@ -118,15 +249,19 @@ export const AppProvider = ({ children }) => {
             authService.clearToken();
             setIsAuthenticated(false);
             setAuthStatus('UNAUTHENTICATED');
+            setUserProfile(null);
           }
         } catch (err) {
+          console.warn('Failed to restore authentication session:', err);
           authService.clearToken();
           setIsAuthenticated(false);
           setAuthStatus('UNAUTHENTICATED');
+          setUserProfile(null);
         }
       } else {
         setIsAuthenticated(false);
         setAuthStatus('UNAUTHENTICATED');
+        setUserProfile(null);
       }
       setIsLoading(false);
     };
@@ -134,40 +269,40 @@ export const AppProvider = ({ children }) => {
     initializeAuthSession();
   }, []);
 
-  // Resolve current logged-in user profile according to activeRole and authUser
-  const currentUser = activeRole === 'alumni'
-    ? {
-      ...MOCK_USERS.alm_1,
-      id: authUser?.id || MOCK_USERS.alm_1.id,
-      email: authUser?.email || MOCK_USERS.alm_1.email,
-      connectionsCount: 1420,
-      profileViewsCount: 890,
-    }
-    : activeRole === 'admin'
-      ? {
-        id: authUser?.id || 'admin_1',
-        email: authUser?.email || 'admin@jecrc.ac.in',
-        name: 'Dean of Alumni Relations',
-        role: 'Admin',
-        headline: 'JECRC University Alumni Administration',
-        batch: 'Faculty & Admin',
-        avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&q=80&w=300',
-        verified: true,
-        isAlumni: true,
-        company: 'JECRC University',
-        connectionsCount: 3400,
-        profileViewsCount: 1950,
-      }
-      : {
-        ...MOCK_USERS.st_101,
-        ...student,
-        id: authUser?.id || MOCK_USERS.st_101.id,
-        email: authUser?.email || MOCK_USERS.st_101.email,
-      };
+  const defaultAvatar = (activeRole === 'alumni')
+    ? 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=300'
+    : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=300';
 
-  // ==========================================
-  // AUTHENTICATION HANDLERS
-  // ==========================================
+  const currentUser = authUser?.role?.toUpperCase() === 'ADMIN'
+    ? {
+        id: authUser.id,
+        name: 'Dean of Alumni Relations',
+        email: authUser.email,
+        role: 'admin',
+        roleUpper: 'ADMIN',
+        avatar: defaultAvatar,
+      }
+    : {
+        id: authUser?.id || (activeRole === 'alumni' ? 'alm_1' : 'st_101'),
+        name: userProfile?.fullName || authUser?.email?.split('@')[0] || (activeRole === 'alumni' ? 'Alumni User' : 'Student User'),
+        fullName: userProfile?.fullName || '',
+        email: authUser?.email || (activeRole === 'alumni' ? 'alumni@jecrc.ac.in' : 'student@jecrc.ac.in'),
+        role: activeRole,
+        roleUpper: activeRole.toUpperCase(),
+        degree: userProfile?.degree || null,
+        branch: userProfile?.branch || null,
+        company: userProfile?.company || null,
+        designation: userProfile?.designation || null,
+        location: userProfile?.location || null,
+        phone: userProfile?.phone || null,
+        linkedinUrl: userProfile?.linkedinUrl || null,
+        githubUrl: userProfile?.githubUrl || null,
+        bio: userProfile?.bio || null,
+        skills: userProfile?.skills || [],
+        interests: userProfile?.interests || [],
+        avatar: userProfile?.avatarUrl || authUser?.avatarUrl || defaultAvatar,
+        verified: true,
+      };
 
   const loginUser = async ({ email, password }) => {
     try {
@@ -179,6 +314,15 @@ export const AppProvider = ({ children }) => {
       setAuthUser(user);
       setActiveRole(normalizedRole);
       setIsAuthenticated(true);
+
+      await fetchUserProfile();
+      await fetchAlumniList();
+      await fetchSuggestedPeople();
+      await fetchIncomingConnectionRequests();
+      await fetchNotifications();
+      await fetchEvents();
+      await fetchMentorshipRequests();
+
       if (user.role?.toUpperCase() === 'ADMIN' || isComplete) {
         setAuthStatus('AUTHENTICATED');
       } else {
@@ -206,35 +350,41 @@ export const AppProvider = ({ children }) => {
       setAuthUser(user);
       setActiveRole(normalizedRole);
       setIsAuthenticated(true);
+
+      await fetchUserProfile();
+      await fetchAlumniList();
+      await fetchSuggestedPeople();
+      await fetchIncomingConnectionRequests();
+      await fetchNotifications();
+      await fetchEvents();
+      await fetchMentorshipRequests();
+
       if (user.role?.toUpperCase() === 'ADMIN' || isComplete) {
         setAuthStatus('AUTHENTICATED');
       } else {
         setAuthStatus('ONBOARDING');
       }
-      showNotification(`Signed in with Google as ${user.email}`);
+      showNotification(`Signed in with Google as ${user.email}!`);
       return user;
     } catch (err) {
-      showNotification(err.message || 'Google authentication failed', 'error');
+      showNotification(err.message || 'Google sign in failed', 'error');
       throw err;
     }
   };
 
-  const registerUser = async ({ name, email, password, role = 'student' }) => {
+  const registerUser = async ({ name, email, password, role }) => {
     try {
       const response = await authService.register({ name, email, password, role });
-      const user = response.user || response;
-      const normalizedRole = role.toLowerCase();
-
       setPendingRegistration({
         name,
         email,
-        role: normalizedRole,
+        role: role.toLowerCase(),
         emailVerified: false,
+        profileCompleted: false,
       });
-      setActiveRole(normalizedRole);
       setAuthStatus('EMAIL_UNVERIFIED');
-      showNotification('Account created! Please verify your email.');
-      return user;
+      showNotification(response.message || 'Registration successful! Verification code sent to email.');
+      return response;
     } catch (err) {
       showNotification(err.message || 'Registration failed', 'error');
       throw err;
@@ -242,40 +392,25 @@ export const AppProvider = ({ children }) => {
   };
 
   const setRegistrationRole = (role) => {
-    setPendingRegistration((prev) => ({
-      ...prev,
-      role,
-    }));
-    setActiveRole(role);
+    setPendingRegistration((prev) => ({ ...prev, role: role.toLowerCase() }));
   };
 
   const verifyUserEmail = async (code) => {
     try {
-      const targetEmail = pendingRegistration?.email;
-      if (!targetEmail) {
-        throw new Error('No email found to verify. Please try logging in or registering again.');
-      }
-      await authService.verifyEmail({ email: targetEmail, code });
-
-      setPendingRegistration((prev) => ({
-        ...prev,
-        emailVerified: true,
-      }));
+      await authService.verifyEmail({ email: pendingRegistration.email, code });
+      setPendingRegistration((prev) => ({ ...prev, emailVerified: true }));
+      showNotification('Email verified successfully! Please log in.');
       setAuthStatus('UNAUTHENTICATED');
-      showNotification('Email verified successfully! Please sign in with your credentials.');
-      return true;
     } catch (err) {
-      showNotification(err.message || 'Email verification failed', 'error');
+      showNotification(err.message || 'Invalid verification code', 'error');
       throw err;
     }
   };
 
   const resendVerificationCode = async () => {
     try {
-      if (pendingRegistration?.email) {
-        await authService.forgotPassword(pendingRegistration.email);
-        showNotification(`Verification request sent for ${pendingRegistration.email}`);
-      }
+      const res = await authService.resendVerificationCode(pendingRegistration.email);
+      showNotification(res.message || 'New verification code sent');
     } catch (err) {
       showNotification(err.message || 'Failed to resend code', 'error');
     }
@@ -283,20 +418,19 @@ export const AppProvider = ({ children }) => {
 
   const sendForgotPasswordLink = async (email) => {
     try {
-      const response = await authService.forgotPassword(email);
-      showNotification(response?.message || 'If an account exists, a reset link has been sent.');
-      return true;
+      const res = await authService.forgotPassword(email);
+      showNotification(res.message || 'Password reset link sent to your email');
     } catch (err) {
-      showNotification(err.message || 'Failed to process forgot password', 'error');
+      showNotification(err.message || 'Failed to request password reset', 'error');
       throw err;
     }
   };
 
-  const resetUserPassword = async ({ token, newPassword }) => {
+  const resetUserPassword = async ({ email, token, newPassword }) => {
     try {
-      await authService.resetPassword({ token, newPassword });
-      showNotification('Your password has been reset successfully! Please sign in.');
-      return true;
+      const res = await authService.resetPassword({ email, token, newPassword });
+      showNotification(res.message || 'Password reset successfully! Please log in with your new password.');
+      return res;
     } catch (err) {
       showNotification(err.message || 'Failed to reset password', 'error');
       throw err;
@@ -305,14 +439,17 @@ export const AppProvider = ({ children }) => {
 
   const completeUserOnboarding = async (onboardingData) => {
     try {
-      await profileService.completeOnboarding(onboardingData);
-      setAuthUser((prev) => (prev ? { ...prev, profileComplete: true } : prev));
-      setIsAuthenticated(true);
+      const profile = await profileService.createOrUpdateProfile(onboardingData);
+      setUserProfile(profile);
+
+      if (authUser) {
+        setAuthUser((prev) => ({ ...prev, profileComplete: true }));
+      }
+
       setAuthStatus('AUTHENTICATED');
-      showNotification('Welcome to JECRC Community! Your profile is ready.');
-      return true;
+      showNotification('Profile completed successfully! Welcome to JECRC Alumni Network.');
     } catch (err) {
-      showNotification(err.message || 'Failed to complete onboarding', 'error');
+      showNotification(err.message || 'Failed to save profile onboarding details', 'error');
       throw err;
     }
   };
@@ -320,506 +457,308 @@ export const AppProvider = ({ children }) => {
   const logoutUser = () => {
     authService.logout();
     setAuthUser(null);
+    setUserProfile(null);
     setIsAuthenticated(false);
     setAuthStatus('UNAUTHENTICATED');
-    showNotification('Signed out from JECRC Community.', 'info');
+    setActiveRole('student');
+    setNotifications([]);
+    setUnreadNotifsCount(0);
+    setEvents([]);
+    setRequests([]);
+    setAlumniList([]);
+    setSuggestedPeople([]);
+    showNotification('Logged out successfully');
   };
 
-// ==========================================
-// COMMUNITY FEED & CORE HANDLERS
-// ==========================================
-
-const createPost = (postPayload) => {
-  const newPost = {
-    id: `post_${Date.now()}`,
-    authorId: currentUser.id,
-    createdAt: 'Just now',
-    timestamp: Date.now(),
-    content: postPayload.content,
-    type: postPayload.type || 'TEXT',
-    category: currentUser.isAlumni ? 'alumni' : 'student',
-    image: postPayload.image || null,
-    jobData: postPayload.jobData || null,
-    achievementData: postPayload.achievementData || null,
-    likes: 0,
-    likedByCurrentUser: false,
-    savedByCurrentUser: false,
-    commentsCount: 0,
-    sharesCount: 0,
-    tags: postPayload.tags || ['#JECRCCommunity'],
-    comments: [],
-  };
-
-  if (!usersMap[currentUser.id]) {
-    setUsersMap((prev) => ({
-      ...prev,
-      [currentUser.id]: currentUser,
-    }));
-  }
-
-  setPosts((prev) => [newPost, ...prev]);
-  showNotification('Post created', 'success');
-  return newPost;
-};
-
-const editPost = (postId, updatedFields) => {
-  setPosts((prev) =>
-    prev.map((p) => {
-      if (p.id === postId) {
-        return {
-          ...p,
-          content: updatedFields.content !== undefined ? updatedFields.content : p.content,
-          tags: updatedFields.tags !== undefined ? updatedFields.tags : p.tags,
-          image: updatedFields.image !== undefined ? updatedFields.image : p.image,
-          type: updatedFields.type !== undefined ? updatedFields.type : p.type,
-          jobData: updatedFields.jobData !== undefined ? updatedFields.jobData : p.jobData,
-          achievementData: updatedFields.achievementData !== undefined ? updatedFields.achievementData : p.achievementData,
-          updatedAt: 'Edited just now',
-        };
+  const toggleSaveAlumni = (alumniId) => {
+    setSavedAlumniIds((prev) => {
+      const exists = prev.includes(alumniId);
+      if (exists) {
+        showNotification('Removed alumni from saved list', 'info');
+        return prev.filter((id) => id !== alumniId);
+      } else {
+        showNotification('Saved alumni profile!', 'success');
+        return [...prev, alumniId];
       }
-      return p;
-    })
-  );
-  showNotification('Post updated', 'success');
-};
-
-const deletePost = (postId) => {
-  setPosts((prev) => prev.filter((p) => p.id !== postId));
-  showNotification('Post deleted', 'info');
-};
-
-const toggleLikePost = (postId) => {
-  setPosts((prev) =>
-    prev.map((p) => {
-      if (p.id === postId) {
-        const nextLiked = !p.likedByCurrentUser;
-        return {
-          ...p,
-          likedByCurrentUser: nextLiked,
-          likes: nextLiked ? p.likes + 1 : Math.max(0, p.likes - 1),
-        };
-      }
-      return p;
-    })
-  );
-};
-
-const toggleSavePost = (postId) => {
-  setPosts((prev) =>
-    prev.map((p) => {
-      if (p.id === postId) {
-        const nextSaved = !p.savedByCurrentUser;
-        showNotification(
-          nextSaved ? 'Post saved' : 'Post removed from saved',
-          'info'
-        );
-        return {
-          ...p,
-          savedByCurrentUser: nextSaved,
-        };
-      }
-      return p;
-    })
-  );
-
-  setSavedPostIds((prev) =>
-    prev.includes(postId) ? prev.filter((id) => id !== postId) : [...prev, postId]
-  );
-};
-
-const addComment = (postId, commentText) => {
-  if (!commentText || !commentText.trim()) return;
-
-  const newComment = {
-    id: `c_${Date.now()}`,
-    authorId: currentUser.id,
-    content: commentText.trim(),
-    createdAt: 'Just now',
-    likes: 0,
-    likedByCurrentUser: false,
-    replies: [],
-  };
-
-  setPosts((prev) =>
-    prev.map((p) => {
-      if (p.id === postId) {
-        return {
-          ...p,
-          commentsCount: (p.commentsCount || 0) + 1,
-          comments: [...(p.comments || []), newComment],
-        };
-      }
-      return p;
-    })
-  );
-  showNotification('Comment added', 'success');
-};
-
-const addReply = (postId, commentId, replyText) => {
-  if (!replyText || !replyText.trim()) return;
-
-  const newReply = {
-    id: `r_${Date.now()}`,
-    authorId: currentUser.id,
-    content: replyText.trim(),
-    createdAt: 'Just now',
-  };
-
-  setPosts((prev) =>
-    prev.map((p) => {
-      if (p.id === postId) {
-        return {
-          ...p,
-          commentsCount: (p.commentsCount || 0) + 1,
-          comments: (p.comments || []).map((c) => {
-            if (c.id === commentId) {
-              return {
-                ...c,
-                replies: [...(c.replies || []), newReply],
-              };
-            }
-            return c;
-          }),
-        };
-      }
-      return p;
-    })
-  );
-  showNotification('Comment added', 'success');
-};
-
-const toggleLikeComment = (postId, commentId) => {
-  setPosts((prev) =>
-    prev.map((p) => {
-      if (p.id === postId) {
-        return {
-          ...p,
-          comments: (p.comments || []).map((c) => {
-            if (c.id === commentId) {
-              const nextLiked = !c.likedByCurrentUser;
-              return {
-                ...c,
-                likedByCurrentUser: nextLiked,
-                likes: nextLiked ? (c.likes || 0) + 1 : Math.max(0, (c.likes || 0) - 1),
-              };
-            }
-            return c;
-          }),
-        };
-      }
-      return p;
-    })
-  );
-};
-
-const toggleConnectUser = (targetUserId) => {
-  let nextStatus = 'pending';
-
-  // 1. Sync usersMap
-  setUsersMap((prev) => {
-    const existing = prev[targetUserId];
-    if (!existing) return prev;
-    const currentStatus = existing.connectionStatus || 'none';
-    nextStatus = currentStatus === 'pending' ? 'none' : 'pending';
-    return {
-      ...prev,
-      [targetUserId]: {
-        ...existing,
-        connectionStatus: nextStatus,
-      },
-    };
-  });
-
-  // 2. Sync suggestedPeople
-  setSuggestedPeople((prev) =>
-    prev.map((person) => {
-      if (person.id === targetUserId) {
-        const currentStatus = person.connectionStatus || 'none';
-        const calculatedStatus = currentStatus === 'pending' ? 'none' : 'pending';
-        return {
-          ...person,
-          connectionStatus: calculatedStatus,
-        };
-      }
-      return person;
-    })
-  );
-
-  showNotification(
-    nextStatus === 'pending'
-      ? `Connection request sent`
-      : `Connection request withdrawn`,
-    'info'
-  );
-};
-
-const acceptConnectionRequest = (requestId, fromUserId) => {
-  setConnectionRequests((prev) => prev.filter((r) => r.id !== requestId));
-  setUsersMap((prev) => {
-    const existing = prev[fromUserId];
-    if (!existing) return prev;
-    return {
-      ...prev,
-      [fromUserId]: {
-        ...existing,
-        connectionStatus: 'connected',
-        connectionsCount: (existing.connectionsCount || 0) + 1,
-      },
-    };
-  });
-  setSuggestedPeople((prev) =>
-    prev.map((person) =>
-      person.id === fromUserId ? { ...person, connectionStatus: 'connected' } : person
-    )
-  );
-  showNotification('Connection request accepted', 'success');
-};
-
-const ignoreConnectionRequest = (requestId) => {
-  setConnectionRequests((prev) => prev.filter((r) => r.id !== requestId));
-  showNotification('Request ignored', 'info');
-};
-
-const markNotificationRead = (notifId) => {
-  setNotifications((prev) =>
-    prev.map((n) => (n.id === notifId ? { ...n, unread: false } : n))
-  );
-};
-
-const toggleSaveAlumni = (alumniId) => {
-  setSavedAlumniIds((prev) => {
-    const exists = prev.includes(alumniId);
-    const next = exists ? prev.filter((id) => id !== alumniId) : [...prev, alumniId];
-    showNotification(
-      exists ? 'Removed alumni from saved list' : 'Saved alumni to your bookmarks'
-    );
-    return next;
-  });
-};
-
-const updateUserProfile = (userId, updatedFields) => {
-  setUsersMap((prev) => {
-    const existing = prev[userId] || {};
-    return {
-      ...prev,
-      [userId]: {
-        ...existing,
-        ...updatedFields,
-      },
-    };
-  });
-
-  if (userId === student.id || userId === 'st_101') {
-    setStudent((prev) => ({
-      ...prev,
-      ...updatedFields,
-    }));
-  }
-
-  showNotification('Profile updated', 'success');
-};
-
-const addUserSkill = (userId, skillName) => {
-  setUsersMap((prev) => {
-    const existing = prev[userId];
-    if (!existing) return prev;
-    const skills = existing.skills || [];
-    if (skills.includes(skillName)) return prev;
-    return {
-      ...prev,
-      [userId]: {
-        ...existing,
-        skills: [...skills, skillName],
-      },
-    };
-  });
-
-  if (userId === student.id || userId === 'st_101') {
-    setStudent((prev) => {
-      const skills = prev.interests || prev.skills || [];
-      if (skills.includes(skillName)) return prev;
-      return {
-        ...prev,
-        skills: [...skills, skillName],
-        interests: [...skills, skillName],
-      };
     });
-  }
-
-  showNotification(`Added skill: ${skillName}`, 'success');
-};
-
-const removeUserSkill = (userId, skillToRemove) => {
-  setUsersMap((prev) => {
-    const existing = prev[userId];
-    if (!existing) return prev;
-    return {
-      ...prev,
-      [userId]: {
-        ...existing,
-        skills: (existing.skills || []).filter((s) => s !== skillToRemove),
-      },
-    };
-  });
-
-  if (userId === student.id || userId === 'st_101') {
-    setStudent((prev) => ({
-      ...prev,
-      skills: (prev.skills || []).filter((s) => s !== skillToRemove),
-      interests: (prev.interests || []).filter((s) => s !== skillToRemove),
-    }));
-  }
-
-  showNotification(`Removed skill: ${skillToRemove}`, 'info');
-};
-
-const submitMentorshipRequest = (newReq) => {
-  const created = {
-    id: `req_${Date.now()}`,
-    studentId: student.id,
-    studentName: student.name,
-    studentAvatar: student.avatar,
-    requestedAt: 'Just now',
-    status: 'Pending',
-    scheduledTime: null,
-    meetingLink: null,
-    ...newReq,
   };
-  setRequests((prev) => [created, ...prev]);
-  showNotification('Mentorship request sent successfully! You can track it in My Connections.');
-  return created;
-};
 
-const updateRequestStatus = (requestId, newStatus, scheduledTime = null) => {
-  setRequests((prev) =>
-    prev.map((req) => {
-      if (req.id === requestId) {
-        return {
-          ...req,
-          status: newStatus,
-          scheduledTime: scheduledTime || req.scheduledTime || 'Upcoming Saturday 3:00 PM',
-          meetingLink: newStatus === 'Accepted' ? 'https://meet.google.com/alum-mentorship' : req.meetingLink,
-        };
+  const createPost = async (postData) => {
+    try {
+      const newPost = await postService.createPost(postData);
+      setPosts((prev) => [newPost, ...prev]);
+      showNotification('Post created successfully!');
+      return newPost;
+    } catch (err) {
+      showNotification(err.message || 'Failed to create post', 'error');
+      throw err;
+    }
+  };
+
+  const editPost = async (postId, content, tags) => {
+    try {
+      const updatedPost = await postService.updatePost(postId, { content, tags });
+      setPosts((prev) => prev.map((p) => (p.id === postId ? updatedPost : p)));
+      showNotification('Post updated successfully!');
+      return updatedPost;
+    } catch (err) {
+      showNotification(err.message || 'Failed to edit post', 'error');
+      throw err;
+    }
+  };
+
+  const deletePost = async (postId) => {
+    try {
+      await postService.deletePost(postId);
+      setPosts((prev) => prev.filter((p) => p.id !== postId));
+      showNotification('Post deleted', 'info');
+    } catch (err) {
+      showNotification(err.message || 'Failed to delete post', 'error');
+      throw err;
+    }
+  };
+
+  const toggleLikePost = async (postId) => {
+    try {
+      const res = await postService.toggleLikePost(postId);
+      setPosts((prev) =>
+        prev.map((p) => {
+          if (p.id === postId) {
+            return {
+              ...p,
+              likes: res.likesCount,
+              likesCount: res.likesCount,
+              likedByCurrentUser: res.likedByCurrentUser,
+              isLiked: res.likedByCurrentUser,
+            };
+          }
+          return p;
+        })
+      );
+    } catch (err) {
+      showNotification(err.message || 'Failed to like post', 'error');
+    }
+  };
+
+  const toggleSavePost = (postId) => {
+    setSavedPostIds((prev) => {
+      const exists = prev.includes(postId);
+      if (exists) {
+        showNotification('Post removed from saved bookmarks', 'info');
+        return prev.filter((id) => id !== postId);
+      } else {
+        showNotification('Post saved!', 'success');
+        return [...prev, postId];
       }
-      return req;
-    })
-  );
-  showNotification(`Mentorship request marked as ${newStatus}`);
-};
+    });
+  };
 
-const toggleEventRegistration = (eventId) => {
-  setEvents((prev) =>
-    prev.map((evt) => {
-      if (evt.id === eventId) {
-        const nextState = !evt.isRegistered;
-        showNotification(
-          nextState
-            ? `Successfully registered for "${evt.title}"!`
-            : `Cancelled registration for "${evt.title}"`,
-          nextState ? 'success' : 'info'
-        );
-        return {
-          ...evt,
-          isRegistered: nextState,
-          registeredCount: nextState ? evt.registeredCount + 1 : evt.registeredCount - 1,
-          seatsLeft: nextState ? evt.seatsLeft - 1 : evt.seatsLeft + 1,
-        };
+  const addComment = async (postId, text) => {
+    try {
+      const res = await postService.addComment(postId, { text });
+      setPosts((prev) =>
+        prev.map((p) => {
+          if (p.id === postId) {
+            return {
+              ...p,
+              commentsCount: res.commentsCount,
+            };
+          }
+          return p;
+        })
+      );
+      showNotification('Comment added!');
+      return res.comment;
+    } catch (err) {
+      showNotification(err.message || 'Failed to add comment', 'error');
+      throw err;
+    }
+  };
+
+  const addReply = async (postId, parentCommentId, text) => {
+    try {
+      const res = await postService.addComment(postId, { text, parentCommentId });
+      setPosts((prev) =>
+        prev.map((p) => {
+          if (p.id === postId) {
+            return {
+              ...p,
+              commentsCount: res.commentsCount,
+            };
+          }
+          return p;
+        })
+      );
+      showNotification('Reply added!');
+      return res.comment;
+    } catch (err) {
+      showNotification(err.message || 'Failed to add reply', 'error');
+      throw err;
+    }
+  };
+
+  const toggleLikeComment = (postId, commentId) => {};
+
+  const toggleConnectUser = async (userId) => {
+    try {
+      const res = await connectionService.sendRequest(userId);
+      showNotification('Connection request sent!', 'success');
+      return res;
+    } catch (err) {
+      const msg = err?.message || '';
+      if (msg.toLowerCase().includes('already pending') || msg.toLowerCase().includes('already connected')) {
+        showNotification(msg, 'info');
+        return { status: 'PENDING_OUTGOING' };
       }
-      return evt;
-    })
+      showNotification(msg || 'Failed to send connection request', 'error');
+      return null;
+    }
+  };
+
+  const acceptConnectionRequest = async (requestId) => {
+    try {
+      await connectionService.acceptRequest(requestId);
+      setConnectionRequests((prev) => prev.filter((r) => r.id !== requestId && r.requestId !== requestId));
+      showNotification('Connection request accepted!', 'success');
+    } catch (err) {
+      showNotification(err.message || 'Failed to accept connection request', 'error');
+    }
+  };
+
+  const ignoreConnectionRequest = async (requestId) => {
+    try {
+      await connectionService.declineRequest(requestId);
+      setConnectionRequests((prev) => prev.filter((r) => r.id !== requestId && r.requestId !== requestId));
+      showNotification('Connection request declined', 'info');
+    } catch (err) {
+      showNotification(err.message || 'Failed to decline connection request', 'error');
+    }
+  };
+
+  const updateUserProfile = async (profileData) => {
+    try {
+      const updated = await profileService.createOrUpdateProfile(profileData);
+      setUserProfile(updated);
+      showNotification('Profile updated successfully!');
+      return updated;
+    } catch (err) {
+      showNotification(err.message || 'Failed to update profile', 'error');
+      throw err;
+    }
+  };
+
+  const submitMentorshipRequest = async (requestData) => {
+    try {
+      const res = await mentorshipService.createMentorshipRequest(requestData);
+      setRequests((prev) => [res.request, ...prev]);
+      showNotification('Mentorship request sent successfully!');
+      return res.request;
+    } catch (err) {
+      showNotification(err.message || 'Failed to send mentorship request', 'error');
+      throw err;
+    }
+  };
+
+  const updateRequestStatus = async (requestId, newStatus) => {
+    try {
+      const res = await mentorshipService.updateMentorshipRequestStatus(requestId, newStatus);
+      setRequests((prev) =>
+        prev.map((r) => (r.id === requestId ? res.request : r))
+      );
+      const msg = newStatus === 'ACCEPTED' ? 'Mentorship request accepted!' : 'Request status updated';
+      showNotification(msg, newStatus === 'ACCEPTED' ? 'success' : 'info');
+      await fetchNotifications();
+      return res.request;
+    } catch (err) {
+      showNotification(err.message || 'Failed to update request status', 'error');
+      throw err;
+    }
+  };
+
+  const handleSetActiveRole = (newRole) => {
+    setActiveRole(newRole);
+    const userId = newRole === 'alumni' ? 'alm_1' : 'st_101';
+    setUnreadMessagesCount(messageService.getUnreadCount(userId));
+  };
+
+  return (
+    <AppContext.Provider
+      value={{
+        isLoading,
+        authUser,
+        userProfile,
+        currentUser,
+        isAuthenticated,
+        authStatus,
+        activeRole,
+        setActiveRole: handleSetActiveRole,
+        loginUser,
+        loginWithGoogle,
+        registerUser,
+        setRegistrationRole,
+        verifyUserEmail,
+        resendVerificationCode,
+        sendForgotPasswordLink,
+        resetUserPassword,
+        completeUserOnboarding,
+        logoutUser,
+        pendingRegistration,
+        student,
+        alumniList,
+        fetchAlumniList,
+        requests,
+        fetchMentorshipRequests,
+        events,
+        fetchEvents,
+        posts,
+        setPosts,
+        usersMap,
+        connectionRequests,
+        fetchIncomingConnectionRequests,
+        suggestedPeople,
+        fetchSuggestedPeople,
+        notifications,
+        unreadNotifsCount,
+        fetchNotifications,
+        unreadMessagesCount,
+        refreshUnreadMessagesCount,
+        savedPostIds,
+        feedFilter,
+        setFeedFilter,
+        searchQuery,
+        setSearchQuery,
+        savedAlumniIds,
+        toggleSaveAlumni,
+        toast,
+        showNotification,
+        createPost,
+        editPost,
+        deletePost,
+        toggleLikePost,
+        toggleSavePost,
+        addComment,
+        addReply,
+        toggleLikeComment,
+        toggleConnectUser,
+        acceptConnectionRequest,
+        ignoreConnectionRequest,
+        markNotificationRead,
+        markAllNotificationsRead,
+        toggleEventRegistration,
+        updateUserProfile,
+        submitMentorshipRequest,
+        updateRequestStatus,
+      }}
+    >
+      {children}
+    </AppContext.Provider>
   );
 };
 
-const handleSetActiveRole = (newRole) => {
-  setActiveRole(newRole);
-  const userId = newRole === 'alumni' ? 'alm_1' : 'st_101';
-  setUnreadMessagesCount(messageService.getUnreadCount(userId));
+export const useApp = () => {
+  const context = useContext(AppContext);
+  if (!context) {
+    throw new Error('useApp must be used within an AppProvider');
+  }
+  return context;
 };
-
-const roleNotifications = notifications.filter((n) => !n.role || n.role === activeRole);
-
-return (
-  <AppContext.Provider
-    value={{
-      isLoading,
-      authUser,
-      isAuthenticated,
-      setIsAuthenticated,
-      authStatus,
-      setAuthStatus,
-      pendingRegistration,
-      setPendingRegistration,
-      loginUser,
-      loginWithGoogle,
-      registerUser,
-      setRegistrationRole,
-      verifyUserEmail,
-      resendVerificationCode,
-      sendForgotPasswordLink,
-      resetUserPassword,
-      completeUserOnboarding,
-      logoutUser,
-      activeRole,
-      setActiveRole: handleSetActiveRole,
-      currentUser,
-      student,
-      setStudent,
-      alumniList,
-      requests,
-      events,
-      posts,
-      setPosts,
-      usersMap,
-      connectionRequests,
-      suggestedPeople,
-      notifications: roleNotifications,
-      savedPostIds,
-      feedFilter,
-      setFeedFilter,
-      searchQuery,
-      setSearchQuery,
-      createPost,
-      editPost,
-      deletePost,
-      toggleLikePost,
-      toggleSavePost,
-      addComment,
-      addReply,
-      toggleLikeComment,
-      toggleConnectUser,
-      acceptConnectionRequest,
-      ignoreConnectionRequest,
-      updateUserProfile,
-      addUserSkill,
-      removeUserSkill,
-      markNotificationRead,
-      savedAlumniIds,
-      toggleSaveAlumni,
-      submitMentorshipRequest,
-      updateRequestStatus,
-      toggleEventRegistration,
-      selectedInterests,
-      setSelectedInterests,
-      careerGoal,
-      setCareerGoal,
-      experienceLevel,
-      setExperienceLevel,
-      preferredIndustry,
-      setPreferredIndustry,
-      unreadMessagesCount,
-      refreshUnreadMessagesCount,
-      toast,
-      showNotification,
-    }}
-  >
-    {children}
-    {toast && (
-      <div className="fixed bottom-5 right-5 z-50 flex items-center gap-2.5 px-4 py-2.5 bg-slate-900 text-white rounded-lg shadow-lg border border-slate-800 text-xs font-medium">
-        <span className={`w-2 h-2 rounded-full shrink-0 ${toast.type === 'info' ? 'bg-blue-400' : toast.type === 'error' ? 'bg-rose-400' : 'bg-emerald-400'}`}></span>
-        <p>{toast.message}</p>
-      </div>
-    )}
-  </AppContext.Provider>
-);
-};
-export const useApp = () => useContext(AppContext);

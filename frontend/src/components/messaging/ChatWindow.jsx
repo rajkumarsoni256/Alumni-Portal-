@@ -6,7 +6,7 @@ import { messageService } from '../../services/messageService';
 
 export const ChatWindow = ({
   conversation,
-  currentUserId = 'st_101',
+  currentUserId,
   usersMap = {},
   onBack,
   onMessageSent,
@@ -18,7 +18,7 @@ export const ChatWindow = ({
   const conversationId = conversation?.id;
   const partner = conversation?.partner;
 
-  // Load conversation messages
+  // Load conversation messages from backend
   const loadMessages = useCallback(async (convId) => {
     if (!convId) return;
     setIsLoading(true);
@@ -35,7 +35,7 @@ export const ChatWindow = ({
   useEffect(() => {
     if (conversationId) {
       loadMessages(conversationId);
-      // Mark read
+      // Mark read in PostgreSQL
       messageService.markAsRead(conversationId);
     }
   }, [conversationId, loadMessages]);
@@ -45,30 +45,13 @@ export const ChatWindow = ({
 
     setIsSending(true);
     try {
-      const newMsg = await messageService.sendMessage(conversationId, text, currentUserId);
-      setMessages((prev) => [...prev, newMsg]);
+      const newMsg = await messageService.sendMessage(conversationId, text);
+      if (newMsg) {
+        setMessages((prev) => [...prev, newMsg]);
 
-      if (onMessageSent) {
-        onMessageSent(conversationId, newMsg);
-      }
-
-      // Optional realistic simulated response from partner after ~1.2s
-      if (conversation?.partnerId && conversation.partnerId !== currentUserId) {
-        setTimeout(async () => {
-          try {
-            const replyMsg = await messageService.generateMockReply(
-              conversationId,
-              conversation.partnerId,
-              usersMap
-            );
-            setMessages((prev) => [...prev, replyMsg]);
-            if (onMessageSent) {
-              onMessageSent(conversationId, replyMsg);
-            }
-          } catch (e) {
-            // Silently ignore mock reply errors
-          }
-        }, 1200);
+        if (onMessageSent) {
+          onMessageSent(conversationId, newMsg);
+        }
       }
     } catch (err) {
       console.error('Failed to send message:', err);
@@ -88,7 +71,7 @@ export const ChatWindow = ({
           <div className="flex-1 flex items-center justify-center text-slate-400">
             <div className="flex items-center gap-2 text-xs">
               <span className="w-2 h-2 rounded-full bg-red-600 animate-pulse" />
-              <span>Loading chat...</span>
+              <span>Loading messages from database...</span>
             </div>
           </div>
         ) : (

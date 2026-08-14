@@ -8,7 +8,7 @@ import { NewMessageModal } from '../components/messaging/NewMessageModal';
 import { EmptyChatState, MessagingErrorState } from '../components/messaging/MessagingStates';
 
 export const MessagesPage = () => {
-  const { currentUser, usersMap } = useApp();
+  const { currentUser, usersMap, showNotification } = useApp();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [conversations, setConversations] = useState([]);
@@ -18,14 +18,14 @@ export const MessagesPage = () => {
   const [hasError, setHasError] = useState(false);
   const [isNewMessageOpen, setIsNewMessageOpen] = useState(false);
 
-  const currentUserId = currentUser?.id || 'st_101';
+  const currentUserId = currentUser?.id;
 
-  // Load conversations from messageService
+  // Load real conversations from backend
   const loadConversations = useCallback(async (autoSelectFirst = false) => {
     setIsLoading(true);
     setHasError(false);
     try {
-      const data = await messageService.getConversations(currentUserId, usersMap);
+      const data = await messageService.getConversations();
       setConversations(data);
 
       // Handle query param ?userId= or ?conv=
@@ -34,14 +34,15 @@ export const MessagesPage = () => {
 
       if (targetUserId) {
         // Find or create conversation with targetUserId
-        const existingConv = data.find((c) => c.participantIds.includes(targetUserId));
-        if (existingConv) {
-          setSelectedConversationId(existingConv.id);
-        } else {
-          const newConv = await messageService.createOrGetConversation(currentUserId, targetUserId, usersMap);
-          const refreshed = await messageService.getConversations(currentUserId, usersMap);
+        try {
+          const conv = await messageService.createOrGetConversation(null, targetUserId);
+          const refreshed = await messageService.getConversations();
           setConversations(refreshed);
-          setSelectedConversationId(newConv.id);
+          setSelectedConversationId(conv.id);
+        } catch (e) {
+          showNotification(e.message || 'Failed to open conversation with user', 'error');
+          // Clear invalid or stale targetUserId query param from URL
+          setSearchParams({});
         }
       } else if (targetConvId) {
         setSelectedConversationId(targetConvId);
@@ -55,7 +56,7 @@ export const MessagesPage = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [currentUserId, usersMap, searchParams]);
+  }, [searchParams, setSearchParams, showNotification]);
 
   useEffect(() => {
     loadConversations(true);
@@ -76,7 +77,8 @@ export const MessagesPage = () => {
     setSelectedConversationId(conv.id);
     setSearchParams({ conv: conv.id });
 
-    // Mark as read in local state
+    // Mark as read in backend & local state
+    messageService.markAsRead(conv.id);
     setConversations((prev) =>
       prev.map((c) => (c.id === conv.id ? { ...c, unreadCount: 0 } : c))
     );
@@ -95,7 +97,7 @@ export const MessagesPage = () => {
         if (c.id === convId) {
           return {
             ...c,
-            lastMessageText: newMsg.text,
+            lastMessageText: newMsg.text || newMsg.content,
             lastMessageAt: newMsg.createdAt,
             updatedAt: newMsg.createdAt,
           };
@@ -110,13 +112,14 @@ export const MessagesPage = () => {
   // Handle starting a new conversation with a specific user
   const handleStartConversationWithUser = async (targetUserId) => {
     try {
-      const conv = await messageService.createOrGetConversation(currentUserId, targetUserId, usersMap);
-      const refreshed = await messageService.getConversations(currentUserId, usersMap);
+      const conv = await messageService.createOrGetConversation(null, targetUserId);
+      const refreshed = await messageService.getConversations();
       setConversations(refreshed);
       setSelectedConversationId(conv.id);
       setSearchParams({ conv: conv.id });
+      setIsNewMessageOpen(false);
     } catch (err) {
-      console.error('Failed to create conversation:', err);
+      showNotification(err.message || 'Failed to start conversation. Ensure you are connected first.', 'error');
     }
   };
 
@@ -132,12 +135,12 @@ export const MessagesPage = () => {
     <>
       <div className="h-[calc(100vh-6.5rem)] min-h-[520px] max-h-[800px] bg-white rounded-xl border border-slate-200 shadow-2xs overflow-hidden flex flex-col md:flex-row">
       
-      {/* Left Column: Conversation List */}
-      <div
-        className={`h-full w-full md:w-80 lg:w-88 shrink-0 ${
-          selectedConversationId ? 'hidden md:flex flex-col' : 'flex flex-col'
-        }`}
-      >
+        {/* Left Column: Conversation List */}
+        <div
+          className={`h-full w-full md:w-80 lg:w-88 shrink-0 ${
+            selectedConversationId ? 'hidden md:flex flex-col' : 'flex flex-col'
+          }`}
+        >
           <ConversationList
             conversations={filteredConversations}
             selectedConversationId={selectedConversationId}

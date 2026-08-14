@@ -7,6 +7,14 @@ const cors = require('cors');
 const migrate = require('./db/migrate');
 const authRoutes = require('./routes/authRoutes');
 const profileRoutes = require('./routes/profileRoutes');
+const userRoutes = require('./routes/userRoutes');
+const connectionRoutes = require('./routes/connectionRoutes');
+const postRoutes = require('./routes/postRoutes');
+const jobRoutes = require('./routes/jobRoutes');
+const messageRoutes = require('./routes/messageRoutes');
+const notificationRoutes = require('./routes/notificationRoutes');
+const eventRoutes = require('./routes/eventRoutes');
+const mentorshipRoutes = require('./routes/mentorshipRoutes');
 const errorHandler = require('./middleware/errorHandler');
 
 const app = express();
@@ -14,9 +22,9 @@ const PORT = process.env.PORT || 8080;
 
 // CORS configuration
 app.use(cors({
-  origin: true, // Allow frontend dev server
+  origin: true,
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 
@@ -32,6 +40,14 @@ app.get('/actuator/health', (req, res) => {
 // API Routes
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/profiles', profileRoutes);
+app.use('/api/v1/users', userRoutes);
+app.use('/api/v1/connections', connectionRoutes);
+app.use('/api/v1/posts', postRoutes);
+app.use('/api/v1/jobs', jobRoutes);
+app.use('/api/v1/conversations', messageRoutes);
+app.use('/api/v1/notifications', notificationRoutes);
+app.use('/api/v1/events', eventRoutes);
+app.use('/api/v1/mentorship', mentorshipRoutes);
 
 // Global Error Handler
 app.use(errorHandler);

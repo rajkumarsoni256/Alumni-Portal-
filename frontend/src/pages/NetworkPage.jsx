@@ -9,10 +9,12 @@ import {
   NetworkEmptyState, 
   NetworkErrorState 
 } from '../components/network/NetworkStates';
-import { Search, X, ArrowRight } from 'lucide-react';
+import { Search, X, ArrowRight, UserCheck } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 export const NetworkPage = () => {
-  const { usersMap } = useApp();
+  const { usersMap, currentUser } = useApp();
+  const currentUserId = currentUser?.id;
 
   // Search & Filter State
   const [searchQuery, setSearchQuery] = useState('');
@@ -45,8 +47,9 @@ export const NetworkPage = () => {
         query: searchQuery,
       });
 
-      // Synchronize with latest connection status from usersMap
-      const syncedUsers = (result.users || []).map((u) => {
+      // Filter out logged in user & synchronize with latest connection status from usersMap
+      const filtered = (result.users || []).filter((u) => u.id !== currentUserId && u.userId !== currentUserId);
+      const syncedUsers = filtered.map((u) => {
         return usersMap[u.id] ? { ...u, ...usersMap[u.id] } : u;
       });
 
@@ -98,8 +101,18 @@ export const NetworkPage = () => {
             </p>
           </div>
 
-          <div className="text-xs text-slate-600 font-semibold self-start sm:self-auto bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg shadow-2xs">
-            {resultCountText}
+          <div className="flex items-center gap-2 self-start sm:self-auto">
+            <Link
+              to="/my-connections"
+              className="px-3.5 py-1.5 rounded-lg text-xs font-bold text-white bg-slate-900 hover:bg-slate-800 transition-colors inline-flex items-center gap-1.5 shadow-2xs cursor-pointer"
+            >
+              <UserCheck className="w-4 h-4 text-emerald-400" />
+              <span>My Connections</span>
+            </Link>
+
+            <div className="text-xs text-slate-600 font-semibold bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg shadow-2xs">
+              {resultCountText}
+            </div>
           </div>
         </div>
 

@@ -1,11 +1,14 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { AlumniCard } from '../components/common/AlumniCard';
-import { Sparkles, Calendar, ShieldCheck, Video, Clock } from 'lucide-react';
+import { userService } from '../services/userService';
+import { Sparkles, Calendar, ShieldCheck, Video, Clock, Loader2 } from 'lucide-react';
 
 export const FindMentor = () => {
-  const { alumniList, selectedInterests } = useApp();
+  const { showNotification } = useApp();
   const [selectedTopic, setSelectedTopic] = useState('All');
+  const [mentorsList, setMentorsList] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   const topics = [
     'All',
@@ -17,19 +20,50 @@ export const FindMentor = () => {
     'Cloud Architecture',
   ];
 
-  const mentors = useMemo(() => {
-    return alumniList.filter((a) => {
-      if (!a.isAvailableForMentorship) return false;
-      if (selectedTopic === 'All') return true;
+  useEffect(() => {
+    const fetchAlumniMentors = async () => {
+      setIsLoading(true);
+      try {
+        const res = await userService.getUsers({ role: 'ALUMNI' });
+        const realAlumni = (res.users || []).map((u) => ({
+          id: u.userId || u.id,
+          userId: u.userId || u.id,
+          name: u.fullName || (u.email ? u.email.split('@')[0] : 'Alumni User'),
+          email: u.email,
+          currentRole: u.designation || 'Software Engineer',
+          company: u.company || 'Tech Leader',
+          graduationYear: u.graduationYear || 2022,
+          degree: u.degree || 'B.Tech',
+          branch: u.branch || 'CSE',
+          location: u.location || 'Jaipur, India',
+          avatar: u.avatarUrl || 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=300',
+          skills: u.skills ? u.skills.split(',').map((s) => s.trim()) : ['System Design', 'Resume Review', 'DSA'],
+          isAvailableForMentorship: true,
+          bio: u.bio || 'Passionate JECRC alumnus guiding students for campus placements and technical interviews.',
+        }));
+        setMentorsList(realAlumni);
+      } catch (err) {
+        showNotification('Failed to fetch alumni mentors', 'error');
+        setMentorsList([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
 
-      const topicLower = selectedTopic.toLowerCase();
-      return (
-        a.skills.some((s) => s.toLowerCase().includes(topicLower)) ||
-        a.domain.toLowerCase().includes(topicLower) ||
-        (a.matchReasons && a.matchReasons.some((r) => r.toLowerCase().includes(topicLower)))
-      );
-    });
-  }, [alumniList, selectedTopic]);
+    fetchAlumniMentors();
+  }, []);
+
+  const filteredMentors = mentorsList.filter((a) => {
+    if (!a.isAvailableForMentorship) return false;
+    if (selectedTopic === 'All') return true;
+
+    const topicLower = selectedTopic.toLowerCase();
+    return (
+      a.skills.some((s) => s.toLowerCase().includes(topicLower)) ||
+      (a.domain && a.domain.toLowerCase().includes(topicLower)) ||
+      (a.company && a.company.toLowerCase().includes(topicLower))
+    );
+  });
 
   return (
     <div className="min-h-screen bg-slate-100/75 py-5">
@@ -89,13 +123,18 @@ export const FindMentor = () => {
         <div className="space-y-2">
           <div className="flex items-center justify-between px-1">
             <span className="text-xs font-semibold text-slate-600">
-              Available Mentors ({mentors.length})
+              Available Mentors ({filteredMentors.length})
             </span>
           </div>
 
-          {mentors.length > 0 ? (
+          {isLoading ? (
+            <div className="bg-white rounded-xl border border-slate-200 p-12 text-center shadow-2xs space-y-3">
+              <Loader2 className="w-7 h-7 text-red-600 animate-spin mx-auto" />
+              <p className="text-xs font-semibold text-slate-600">Loading verified Alumni mentors from JECRC network...</p>
+            </div>
+          ) : filteredMentors.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {mentors.map((mentor) => (
+              {filteredMentors.map((mentor) => (
                 <AlumniCard key={mentor.id} alumni={mentor} showMatchReasons={true} />
               ))}
             </div>

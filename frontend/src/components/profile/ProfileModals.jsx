@@ -31,10 +31,11 @@ export const EditBasicInfoModal = ({ isOpen, onClose, initialData, onSave }) => 
 
     onSave({
       name: name.trim(),
+      fullName: name.trim(),
       headline: headline.trim(),
       location: location.trim(),
       branch: branch.trim(),
-      batch: batch ? Number(batch) : initialData.batch,
+      graduationYear: batch ? Number(batch) : initialData.graduationYear,
       company: company.trim(),
       batchDisplay: `JECRC ${branch.trim() || 'CSE'} • ${batch || '2026'}`,
     });

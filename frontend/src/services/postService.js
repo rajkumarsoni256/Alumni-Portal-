@@ -1,212 +1,115 @@
 /**
  * JECRC Community — Post & Feed Service Layer
  * 
- * Production-ready mock service simulating async REST API responses for posts,
- * comments, likes, shares, bookmarks, and user connections.
- * 
- * Ready to be swapped with backend endpoints (e.g. GET /api/posts?page=1&limit=20).
+ * Interfacing with backend REST API under /api/v1/posts for community feed,
+ * post creation, likes, comments, edit, and deletion.
  */
 
-import { MOCK_COMMUNITY_POSTS, MOCK_USERS } from '../data/mockData';
+import { apiClient } from './apiClient';
 
 export const postService = {
   /**
-   * Fetch paginated and filtered community posts
+   * Fetch paginated and filtered community posts from backend
+   * @param {Object} params
+   * @param {number} [params.page=1]
+   * @param {number} [params.limit=10]
+   * @param {string} [params.filter='all']
+   * @param {string} [params.searchQuery='']
    */
-  getPosts: async ({ page = 1, limit = 20, filter = 'all', searchQuery = '' } = {}) => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        let allPosts = [...MOCK_COMMUNITY_POSTS];
+  getPosts: async ({ page = 1, limit = 10, filter = 'all', searchQuery = '' } = {}) => {
+    try {
+      const queryParams = new URLSearchParams();
+      queryParams.set('page', page);
+      queryParams.set('limit', limit);
+      if (filter && filter !== 'all') queryParams.set('category', filter);
+      if (searchQuery && searchQuery.trim() !== '') queryParams.set('query', searchQuery.trim());
 
-        // Apply tab category filtering
-        let filtered = allPosts.filter((post) => {
-          const author = MOCK_USERS[post.authorId] || {};
+      const data = await apiClient.get(`/api/v1/posts?${queryParams.toString()}`);
 
-          if (filter === 'alumni' && post.category !== 'alumni' && !author.isAlumni) return false;
-          if (filter === 'student' && post.category !== 'student' && author.isAlumni) return false;
-          if (filter === 'jobs' && post.type !== 'JOB') return false;
-          if (filter === 'saved' && !post.savedByCurrentUser) return false;
+      if (!data) {
+        return { posts: [], totalCount: 0, page: 1, totalPages: 1, hasMore: false };
+      }
 
-          // Apply search filtering
-          if (searchQuery && searchQuery.trim()) {
-            const q = searchQuery.toLowerCase().trim();
-            const matchesContent = post.content && post.content.toLowerCase().includes(q);
-            const matchesAuthor = author.name && author.name.toLowerCase().includes(q);
-            const matchesTags = post.tags && post.tags.some((t) => t.toLowerCase().includes(q));
-            const matchesJob = post.jobData && (
-              (post.jobData.title && post.jobData.title.toLowerCase().includes(q)) ||
-              (post.jobData.company && post.jobData.company.toLowerCase().includes(q))
-            );
+      const rawPosts = data.posts || [];
+      const total = data.total !== undefined ? data.total : (data.totalCount || rawPosts.length);
+      const currentPage = data.page || page;
+      const totalPages = data.pages || Math.ceil(total / limit) || 1;
+      const hasMore = data.hasMore !== undefined ? data.hasMore : (currentPage < totalPages);
 
-            return matchesContent || matchesAuthor || matchesTags || matchesJob;
-          }
-
-          return true;
-        });
-
-        const startIndex = (page - 1) * limit;
-        const endIndex = startIndex + limit;
-        const pagedData = filtered.slice(startIndex, endIndex);
-
-        resolve({
-          posts: pagedData,
-          total: filtered.length,
-          page,
-          totalPages: Math.ceil(filtered.length / limit),
-          hasMore: endIndex < filtered.length,
-        });
-      }, 100);
-    });
+      return {
+        posts: rawPosts,
+        total,
+        totalCount: total,
+        page: currentPage,
+        totalPages,
+        hasMore,
+      };
+    } catch (err) {
+      console.warn('Failed to fetch posts from backend:', err);
+      return { posts: [], total: 0, totalCount: 0, page: 1, totalPages: 1, hasMore: false };
+    }
   },
 
   /**
-   * Create a new post
+   * Create a new post in backend PostgreSQL
+   * @param {Object} postData
    */
-  createPost: async (postData, currentUser) => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const newPost = {
-          id: `post_${Date.now()}`,
-          authorId: currentUser.id,
-          createdAt: 'Just now',
-          timestamp: Date.now(),
-          content: postData.content.trim(),
-          type: postData.type || 'TEXT',
-          category: currentUser.isAlumni ? 'alumni' : 'student',
-          image: postData.image || null,
-          jobData: postData.jobData || null,
-          achievementData: postData.achievementData || null,
-          likes: 0,
-          likedByCurrentUser: false,
-          savedByCurrentUser: false,
-          commentsCount: 0,
-          sharesCount: 0,
-          tags: postData.tags || ['#JECRCCommunity'],
-          comments: [],
-        };
-        resolve(newPost);
-      }, 80);
-    });
+  createPost: async (postData) => {
+    const data = await apiClient.post('/api/v1/posts', postData);
+    return data ? (data.post || data) : null;
   },
 
   /**
    * Edit an existing post
+   * @param {string} postId
+   * @param {Object} updatedFields
    */
   editPost: async (postId, updatedFields) => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve({
-          postId,
-          ...updatedFields,
-          updatedAt: 'Edited just now',
-        });
-      }, 80);
-    });
+    const data = await apiClient.put(`/api/v1/posts/${postId}`, updatedFields);
+    return data ? (data.post || data) : null;
   },
 
   /**
    * Delete a post
+   * @param {string} postId
    */
   deletePost: async (postId) => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve({ success: true, postId });
-      }, 80);
-    });
+    return apiClient.delete(`/api/v1/posts/${postId}`);
   },
 
   /**
-   * Toggle Like on a post
+   * Toggle Like on a post in backend
+   * @param {string} postId
    */
-  toggleLike: async (postId, currentlyLiked) => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve({
-          postId,
-          liked: !currentlyLiked,
-        });
-      }, 50);
-    });
+  toggleLike: async (postId) => {
+    return apiClient.post(`/api/v1/posts/${postId}/like`);
   },
 
   /**
-   * Toggle Save on a post
+   * Add a comment to a post in backend
+   * @param {string} postId
+   * @param {Object} commentPayload
    */
-  toggleSave: async (postId, currentlySaved) => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve({
-          postId,
-          saved: !currentlySaved,
-        });
-      }, 50);
-    });
+  addComment: async (postId, commentPayload) => {
+    const data = await apiClient.post(`/api/v1/posts/${postId}/comments`, commentPayload);
+    return data;
   },
 
   /**
-   * Add a comment to a post
+   * Fetch comments for a post from backend
+   * @param {string} postId
    */
-  addComment: async (postId, { content, authorId }) => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const newComment = {
-          id: `c_${Date.now()}`,
-          authorId,
-          content: content.trim(),
-          createdAt: 'Just now',
-          likes: 0,
-          likedByCurrentUser: false,
-          replies: [],
-        };
-        resolve(newComment);
-      }, 80);
-    });
+  getComments: async (postId) => {
+    const data = await apiClient.get(`/api/v1/posts/${postId}/comments`);
+    return data ? (data.comments || []) : [];
   },
 
   /**
-   * Add a single-level reply to a comment
+   * Delete a comment from a post
+   * @param {string} postId
+   * @param {string} commentId
    */
-  addReply: async (postId, commentId, { content, authorId }) => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const newReply = {
-          id: `r_${Date.now()}`,
-          authorId,
-          content: content.trim(),
-          createdAt: 'Just now',
-        };
-        resolve(newReply);
-      }, 80);
-    });
+  deleteComment: async (postId, commentId) => {
+    return apiClient.delete(`/api/v1/posts/${postId}/comments/${commentId}`);
   },
-
-  /**
-   * Toggle Like on a comment
-   */
-  toggleCommentLike: async (postId, commentId, currentlyLiked) => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve({
-          postId,
-          commentId,
-          liked: !currentlyLiked,
-        });
-      }, 50);
-    });
-  },
-
-  /**
-   * Toggle connection request status (none <-> pending)
-   */
-  toggleConnect: async (targetUserId, currentStatus) => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const nextStatus = currentStatus === 'pending' ? 'none' : 'pending';
-        resolve({
-          targetUserId,
-          status: nextStatus,
-        });
-      }, 80);
-    });
-  }
 };

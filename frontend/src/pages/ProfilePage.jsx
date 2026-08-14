@@ -33,17 +33,14 @@ export const ProfilePage = () => {
 
   // Determine target User ID
   const effectiveUserId = useMemo(() => {
-    if (location.pathname === '/student-dashboard') return 'st_101';
-    if (location.pathname === '/alumni-dashboard') return 'alm_1';
-    if (!id || id === 'me') return currentUser?.id || 'st_101';
+    if (!id || id === 'me') return currentUser?.id || 'me';
     return id;
-  }, [id, location.pathname, currentUser]);
+  }, [id, currentUser]);
 
   const isOwnProfile = Boolean(
     id === 'me' || 
-    effectiveUserId === currentUser?.id || 
-    (effectiveUserId === 'st_101' && currentUser?.role?.toLowerCase() === 'student') ||
-    location.pathname === '/student-dashboard'
+    effectiveUserId === 'me' ||
+    effectiveUserId === currentUser?.id
   );
 
   const [profile, setProfile] = useState(null);
@@ -62,18 +59,30 @@ export const ProfilePage = () => {
     setIsNotFound(false);
 
     try {
-      const data = await profileService.getProfileById(effectiveUserId);
-      if (!data) {
-        setIsNotFound(true);
+      if (isOwnProfile) {
+        const data = await profileService.getCurrentProfile();
+        if (data) {
+          setProfile({ ...currentUser, ...data });
+        } else {
+          setProfile(currentUser);
+        }
       } else {
-        // Sync with usersMap state (for connection status, updated headline, etc.)
-        const synced = usersMap[effectiveUserId]
-          ? { ...data, ...usersMap[effectiveUserId] }
-          : data;
-        setProfile(synced);
+        const data = await profileService.getProfileById(effectiveUserId);
+        if (!data) {
+          setIsNotFound(true);
+        } else {
+          const synced = usersMap[effectiveUserId]
+            ? { ...data, ...usersMap[effectiveUserId] }
+            : data;
+          setProfile(synced);
+        }
       }
     } catch (err) {
-      setIsNotFound(true);
+      if (isOwnProfile && currentUser) {
+        setProfile(currentUser);
+      } else {
+        setIsNotFound(true);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -81,7 +90,7 @@ export const ProfilePage = () => {
 
   useEffect(() => {
     loadProfile();
-  }, [effectiveUserId, usersMap]);
+  }, [effectiveUserId, isOwnProfile, currentUser, usersMap]);
 
   // Handlers for profile mutations
   const handleSaveBasicInfo = async (updatedFields) => {
