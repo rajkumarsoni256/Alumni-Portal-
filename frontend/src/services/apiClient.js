@@ -3,7 +3,8 @@
  * Communicates with Spring Boot backend under /api/v1
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
+const rawBaseUrl = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080').trim().replace(/\/+$/, '');
+const API_BASE_URL = rawBaseUrl;
 const JWT_STORAGE_KEY = 'jecrc_community_jwt';
 
 export const getAuthToken = () => {
@@ -40,7 +41,8 @@ export class ApiError extends Error {
  */
 export const request = async (endpoint, options = {}) => {
   const token = getAuthToken();
-  let url = `${API_BASE_URL}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
+  const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  let url = `${API_BASE_URL}${cleanEndpoint}`;
 
   if (options.params && typeof options.params === 'object') {
     const searchParams = new URLSearchParams();
