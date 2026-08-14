@@ -47,7 +47,11 @@ app.use(
       // Allow requests with no origin (e.g. mobile apps, curl, server-to-server)
       if (!origin) return callback(null, true);
 
-      if (allowedOrigins.includes(origin) || allowedOrigins.includes('*')) {
+      const normOrigin = origin.trim().replace(/\/+$/, '').toLowerCase();
+      const isAllowed = allowedOrigins.some((o) => o.trim().replace(/\/+$/, '').toLowerCase() === normOrigin);
+
+      // Allow registered origins, wildcard, or any Vercel deployment domain
+      if (isAllowed || allowedOrigins.includes('*') || normOrigin.endsWith('.vercel.app')) {
         return callback(null, true);
       }
 
@@ -66,6 +70,14 @@ app.use(
   })
 );
 app.options('*', cors());
+
+// Normalize double slashes in request URLs (e.g. //api/v1 -> /api/v1)
+app.use((req, res, next) => {
+  if (req.url && req.url.startsWith('//')) {
+    req.url = req.url.replace(/^\/+/, '/');
+  }
+  next();
+});
 
 // Body parsers with 50MB payload limit for profile photos and banner uploads
 app.use(express.json({ limit: '50mb' }));
