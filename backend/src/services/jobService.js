@@ -39,7 +39,7 @@ const formatJobDTO = (row, authUserId = null) => {
     name: posterName,
     email: row.poster_email,
     role: (row.poster_role || 'ALUMNI').toLowerCase(),
-    avatar: row.poster_avatar || 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=300',
+    avatar: row.poster_avatar || null,
     headline: row.poster_designation ? `${row.poster_designation} @ ${row.poster_company || row.company}` : 'JECRC Alumni',
     company: row.poster_company || row.company,
     designation: row.poster_designation || null,

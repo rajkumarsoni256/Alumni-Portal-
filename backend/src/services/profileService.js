@@ -26,6 +26,8 @@ const formatProfileResponse = (row) => {
 
   const isComplete = !!row.is_profile_complete;
   const currentAcademicYear = row.current_year ? parseInt(row.current_year, 10) : null;
+  const avatar = row.avatar_url || null;
+  const banner = row.banner_url || null;
 
   return {
     id: row.id,
@@ -34,7 +36,11 @@ const formatProfileResponse = (row) => {
     role: row.role,
     fullName: row.full_name,
     phone: row.phone || null,
-    avatarUrl: row.avatar_url || null,
+    avatarUrl: avatar,
+    avatar: avatar,
+    bannerUrl: banner,
+    banner: banner,
+    coverImage: banner,
     bio: row.bio || null,
     degree: row.degree || null,
     branch: row.branch || null,
@@ -68,7 +74,11 @@ const formatProfileResponse = (row) => {
       bio: row.bio || null,
       skills: parseList(row.skills),
       interests: parseList(row.interests),
-      avatarUrl: row.avatar_url || null,
+      avatarUrl: avatar,
+      avatar: avatar,
+      bannerUrl: banner,
+      banner: banner,
+      coverImage: banner,
       profileCompleted: isComplete,
     }
   };
@@ -81,6 +91,14 @@ const validateRoleOnboarding = (role, data) => {
     error.errorCode = 'BAD_REQUEST';
     throw error;
   }
+  if (isBlank(data.avatarUrl) || String(data.avatarUrl).includes('unsplash')) {
+    const error = new Error('Profile photo is mandatory. Please upload or set your profile photo');
+    error.statusCode = 400;
+    error.errorCode = 'BAD_REQUEST';
+    throw error;
+  }
+
+
   if (isBlank(data.phone)) {
     const error = new Error('Mobile number is required');
     error.statusCode = 400;
@@ -238,6 +256,7 @@ const completeOnboarding = async (user, data) => {
 };
 
 const getCurrentProfile = async (user) => {
+  const connectionService = require('./connectionService');
   const result = await db.query(
     `SELECT p.*, u.email, u.role
      FROM user_profiles p
@@ -246,19 +265,26 @@ const getCurrentProfile = async (user) => {
     [user.id]
   );
 
+  const connCount = await connectionService.getConnectionsCount(user.id);
+
   if (result.rows.length === 0) {
     return {
       userId: user.id,
       email: user.email,
       role: user.role,
       fullName: user.fullName || '',
+      connectionsCount: connCount,
+      connectionCount: connCount,
       profileCompleted: false,
       isProfileComplete: false,
       profile: null,
     };
   }
 
-  return formatProfileResponse(result.rows[0]);
+  const profileData = formatProfileResponse(result.rows[0]);
+  profileData.connectionsCount = connCount;
+  profileData.connectionCount = connCount;
+  return profileData;
 };
 
 const updateProfile = async (user, data) => {
@@ -293,18 +319,29 @@ const updateProfile = async (user, data) => {
   const skillsStr = data.skills !== undefined ? formatSkillsInterests(data.skills) : current.skills;
   const interestsStr = data.interests !== undefined ? formatSkillsInterests(data.interests) : current.interests;
 
+  const avatarVal = data.avatarUrl !== undefined
+    ? (data.avatarUrl ? data.avatarUrl.trim() : null)
+    : (data.avatar !== undefined ? (data.avatar ? data.avatar.trim() : null) : current.avatar_url);
+
+  const bannerVal = data.bannerUrl !== undefined
+    ? (data.bannerUrl ? data.bannerUrl.trim() : null)
+    : (data.banner !== undefined
+      ? (data.banner ? data.banner.trim() : null)
+      : (data.coverImage !== undefined ? (data.coverImage ? data.coverImage.trim() : null) : current.banner_url));
+
   const queryText = `
     INSERT INTO user_profiles (
-      id, user_id, full_name, phone, avatar_url, bio, degree, branch,
+      id, user_id, full_name, phone, avatar_url, banner_url, bio, degree, branch,
       graduation_year, current_year, company, designation, location,
       is_available_for_mentorship, linkedin_url, github_url, website_url,
       skills, interests, is_profile_complete, updated_at
     )
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, NOW())
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, NOW())
     ON CONFLICT (user_id) DO UPDATE SET
       full_name = EXCLUDED.full_name,
       phone = EXCLUDED.phone,
       avatar_url = EXCLUDED.avatar_url,
+      banner_url = EXCLUDED.banner_url,
       bio = EXCLUDED.bio,
       degree = EXCLUDED.degree,
       branch = EXCLUDED.branch,
@@ -329,7 +366,8 @@ const updateProfile = async (user, data) => {
     user.id,
     mergedData.fullName ? mergedData.fullName.trim() : user.email,
     mergedData.phone ? mergedData.phone.trim() : null,
-    data.avatarUrl !== undefined ? (data.avatarUrl ? data.avatarUrl.trim() : null) : current.avatar_url,
+    avatarVal,
+    bannerVal,
     data.bio !== undefined ? (data.bio ? data.bio.trim() : null) : current.bio,
     mergedData.degree ? mergedData.degree.trim() : null,
     mergedData.branch ? mergedData.branch.trim() : null,
@@ -351,7 +389,7 @@ const updateProfile = async (user, data) => {
   return formatProfileResponse({ ...result.rows[0], email: user.email, role: user.role });
 };
 
-const getProfileById = async (targetUserId) => {
+const getProfileById = async (targetUserId, authUser = null) => {
   const result = await db.query(
     `SELECT p.*, u.email, u.role
      FROM user_profiles p
@@ -367,7 +405,44 @@ const getProfileById = async (targetUserId) => {
     throw error;
   }
 
-  return formatProfileResponse(result.rows[0]);
+  const profile = formatProfileResponse(result.rows[0]);
+  const connectionService = require('./connectionService');
+  const connCount = await connectionService.getConnectionsCount(targetUserId);
+  profile.connectionsCount = connCount;
+  profile.connectionCount = connCount;
+
+  // Compute relationship status relative to authUser
+  if (authUser && authUser.id) {
+    if (authUser.id === targetUserId) {
+      profile.connectionStatus = 'self';
+    } else {
+      const connRes = await db.query(
+        `SELECT * FROM connections 
+         WHERE (requester_id = $1 AND receiver_id = $2) OR (requester_id = $2 AND receiver_id = $1)`,
+        [authUser.id, targetUserId]
+      );
+      if (connRes.rows.length > 0) {
+        const conn = connRes.rows[0];
+        if (conn.status === 'ACCEPTED') {
+          profile.connectionStatus = 'connected';
+          profile.connectionId = conn.id;
+        } else if (conn.status === 'PENDING') {
+          profile.connectionId = conn.id;
+          if (conn.requester_id === authUser.id) {
+            profile.connectionStatus = 'pending_outgoing';
+          } else {
+            profile.connectionStatus = 'pending_incoming';
+          }
+        }
+      } else {
+        profile.connectionStatus = 'none';
+      }
+    }
+  } else {
+    profile.connectionStatus = 'none';
+  }
+
+  return profile;
 };
 
 module.exports = {

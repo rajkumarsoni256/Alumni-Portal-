@@ -1,5 +1,5 @@
-import React from 'react';
-import { Plus } from 'lucide-react';
+import React, { useState } from 'react';
+import { Plus, ChevronDown } from 'lucide-react';
 import { ConversationSearch } from './ConversationSearch';
 import { ConversationItem } from './ConversationItem';
 import { 
@@ -18,6 +18,24 @@ export const ConversationList = ({
   onNewMessageClick,
   isLoading = false,
 }) => {
+  const [activeFilter, setActiveFilter] = useState('all');
+
+  const filters = [
+    { id: 'all', label: 'All' },
+    { id: 'student', label: 'Students' },
+    { id: 'alumni', label: 'Alumni' },
+    { id: 'mentor', label: 'Mentors' },
+  ];
+
+  const filteredConversations = conversations.filter((conv) => {
+    if (activeFilter === 'all') return true;
+    const role = conv.partner?.role?.toLowerCase() || '';
+    if (activeFilter === 'alumni') return conv.partner?.isAlumni || role === 'alumni';
+    if (activeFilter === 'student') return role === 'student' || role.includes('student');
+    if (activeFilter === 'mentor') return conv.partner?.isAvailableForMentorship || role === 'mentor';
+    return true;
+  });
+
   return (
     <div className="flex flex-col h-full bg-white border-r border-slate-200">
       {/* 1. Header with Title and New Message Action */}
@@ -30,43 +48,76 @@ export const ConversationList = ({
         <button
           type="button"
           onClick={onNewMessageClick}
-          className="p-1.5 sm:px-2.5 sm:py-1.5 rounded-lg text-xs font-semibold text-white bg-red-700 hover:bg-red-800 transition-colors inline-flex items-center gap-1 shadow-2xs cursor-pointer"
+          className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-red-700 hover:bg-red-800 transition-colors inline-flex items-center gap-1.5 shadow-2xs cursor-pointer"
           title="Start new conversation"
           aria-label="Start new conversation"
         >
-          <Plus className="w-4 h-4" />
-          <span className="hidden sm:inline">New message</span>
+          <Plus className="w-3.5 h-3.5" />
+          <span>New message</span>
         </button>
       </div>
 
-      {/* 2. Conversation Search Bar */}
-      <div className="p-3 border-b border-slate-100 bg-slate-50/50">
+      {/* 2. Conversation Search Bar & Filter Pills (Matching Image 1) */}
+      <div className="p-3 border-b border-slate-100 bg-slate-50/50 space-y-2.5">
         <ConversationSearch
           value={searchQuery}
           onChange={onSearchChange}
           onClear={onClearSearch}
         />
+
+        {/* Filter Pills */}
+        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+          {filters.map((f) => (
+            <button
+              key={f.id}
+              type="button"
+              onClick={() => setActiveFilter(f.id)}
+              className={`px-3 py-1 rounded-full text-xs font-semibold transition-all whitespace-nowrap cursor-pointer ${
+                activeFilter === f.id
+                  ? 'bg-red-700 text-white shadow-2xs'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* 3. Conversation List / States */}
-      <div className="flex-1 overflow-y-auto divide-y divide-slate-100 scrollbar-thin scrollbar-thumb-slate-200">
-        {isLoading ? (
-          <MessagingLoadingSkeleton />
-        ) : conversations.length === 0 ? (
-          searchQuery ? (
-            <SearchEmptyState query={searchQuery} onClear={onClearSearch} />
+      <div className="flex-1 overflow-y-auto divide-y divide-slate-100 scrollbar-thin scrollbar-thumb-slate-200 flex flex-col justify-between">
+        <div>
+          {isLoading ? (
+            <MessagingLoadingSkeleton />
+          ) : filteredConversations.length === 0 ? (
+            searchQuery ? (
+              <SearchEmptyState query={searchQuery} onClear={onClearSearch} />
+            ) : (
+              <EmptyConversationsState onNewMessage={onNewMessageClick} />
+            )
           ) : (
-            <EmptyConversationsState onNewMessage={onNewMessageClick} />
-          )
-        ) : (
-          conversations.map((conv) => (
-            <ConversationItem
-              key={conv.id}
-              conversation={conv}
-              isActive={conv.id === selectedConversationId}
-              onSelect={onSelectConversation}
-            />
-          ))
+            filteredConversations.map((conv) => (
+              <ConversationItem
+                key={conv.id}
+                conversation={conv}
+                isActive={conv.id === selectedConversationId}
+                onSelect={onSelectConversation}
+              />
+            ))
+          )}
+        </div>
+
+        {/* Load More button at bottom matching Image 1 */}
+        {filteredConversations.length > 4 && (
+          <div className="p-3 text-center border-t border-slate-100 bg-slate-50/30">
+            <button
+              type="button"
+              className="text-[11px] font-semibold text-slate-500 hover:text-red-700 inline-flex items-center gap-1 cursor-pointer transition-colors"
+            >
+              <span>Load more</span>
+              <ChevronDown className="w-3 h-3" />
+            </button>
+          </div>
         )}
       </div>
     </div>

@@ -72,4 +72,20 @@ export const connectionService = {
     const data = await apiClient.get('/api/v1/users/connections');
     return data ? (data.connections || []) : [];
   },
+
+  /**
+   * Get paginated connections list for any specific user ID with server-side search
+   * @param {string} userId
+   * @param {Object} params { search, page, limit }
+   */
+  getUserConnections: async (userId, params = {}) => {
+    const query = new URLSearchParams();
+    if (params.search) query.append('search', params.search);
+    if (params.page) query.append('page', params.page);
+    if (params.limit) query.append('limit', params.limit);
+
+    const queryString = query.toString();
+    const url = `/api/v1/users/${userId}/connections${queryString ? `?${queryString}` : ''}`;
+    return apiClient.get(url);
+  },
 };

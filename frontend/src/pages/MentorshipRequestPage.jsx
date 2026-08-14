@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
+import { UserAvatar } from '../components/common/UserAvatar';
 import { 
   ArrowLeft, 
   CheckCircle2, 
@@ -80,10 +81,10 @@ export const MentorshipRequestPage = () => {
               <span className="text-[10px] uppercase font-bold text-slate-400 block">Requesting Mentorship From</span>
 
               <div className="flex items-start gap-3">
-                <img
+                <UserAvatar
                   src={alumni.avatar || alumni.avatarUrl}
-                  alt={alumni.name}
-                  className="w-12 h-12 rounded-full object-cover border border-slate-200 shrink-0"
+                  name={alumni.name || alumni.fullName}
+                  className="w-12 h-12 shrink-0"
                 />
                 <div className="min-w-0 space-y-0.5">
                   <h3 className="text-xs font-bold text-slate-900 truncate">{alumni.name || alumni.fullName}</h3>

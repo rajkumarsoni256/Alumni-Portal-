@@ -21,7 +21,7 @@ import {
 export const AlumniProfile = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { savedAlumniIds, toggleSaveAlumni, showNotification, currentUser } = useApp();
+  const { savedAlumniIds, toggleSaveAlumni, showNotification, currentUser, myConnections } = useApp();
 
   const [alumni, setAlumni] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -36,7 +36,23 @@ export const AlumniProfile = () => {
         const data = await userService.getUserById(id);
         if (data) {
           setAlumni(data);
-          setConnectionStatus(data.connectionStatus || 'none');
+          let status = data.connectionStatus || 'none';
+          const targetIdStr = String(data.id || data.userId || id || '').toLowerCase();
+          const targetNameStr = String(data.name || data.fullName || '').trim().toLowerCase();
+
+          const isAlreadyConnected = myConnections && myConnections.some(c => {
+            const cId = String(c.id || c.userId || c.user_id || '').toLowerCase();
+            const cName = String(c.name || c.fullName || '').trim().toLowerCase();
+            return (
+              (targetIdStr && cId && targetIdStr === cId) ||
+              (targetNameStr && cName && targetNameStr === cName)
+            );
+          });
+
+          if (isAlreadyConnected) {
+            status = 'connected';
+          }
+          setConnectionStatus(status);
         } else {
           setAlumni(null);
         }
@@ -48,7 +64,7 @@ export const AlumniProfile = () => {
     };
 
     fetchProfile();
-  }, [id]);
+  }, [id, myConnections]);
 
   const handleToggleConnect = async () => {
     if (!alumni) return;

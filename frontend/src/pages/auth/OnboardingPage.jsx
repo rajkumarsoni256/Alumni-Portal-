@@ -9,7 +9,8 @@ import {
   ArrowRight, 
   ArrowLeft, 
   CheckCircle2, 
-  AlertCircle 
+  AlertCircle,
+  User
 } from 'lucide-react';
 
 export const OnboardingPage = ({ defaultRole }) => {
@@ -26,11 +27,7 @@ export const OnboardingPage = ({ defaultRole }) => {
   // Personal
   const [fullName, setFullName] = useState(currentUser?.fullName || pendingRegistration?.name || '');
   const [phone, setPhone] = useState('');
-  const [avatarUrl, setAvatarUrl] = useState(
-    isStudent 
-      ? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=300'
-      : 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=300'
-  );
+  const [avatarUrl, setAvatarUrl] = useState(currentUser?.avatarUrl || currentUser?.avatar || '');
   const [bio, setBio] = useState('');
 
   // Academic
@@ -100,8 +97,11 @@ export const OnboardingPage = ({ defaultRole }) => {
   const handleAvatarChange = (e) => {
     const file = e.target.files?.[0];
     if (file) {
-      const url = URL.createObjectURL(file);
-      setAvatarUrl(url);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setAvatarUrl(reader.result);
+      };
+      reader.readAsDataURL(file);
     }
   };
 
@@ -109,6 +109,10 @@ export const OnboardingPage = ({ defaultRole }) => {
     setErrorMessage('');
     if (!fullName.trim()) {
       setErrorMessage('Please enter your full name.');
+      return false;
+    }
+    if (!avatarUrl || !avatarUrl.trim() || avatarUrl.includes('unsplash')) {
+      setErrorMessage('Profile photo is mandatory. Please upload your profile photo to continue.');
       return false;
     }
     if (!phone.trim()) {
@@ -285,18 +289,25 @@ export const OnboardingPage = ({ defaultRole }) => {
                 </p>
               </div>
 
-              {/* Avatar Upload */}
+              {/* Avatar Upload (Mandatory) */}
               <div className="flex items-center gap-4 pt-1">
                 <div className="relative group">
-                  <img
-                    src={avatarUrl}
-                    alt="Profile Avatar"
-                    className="w-16 h-16 rounded-full object-cover border-2 border-slate-200 shadow-2xs"
-                  />
+                  {avatarUrl && !avatarUrl.includes('unsplash') ? (
+                    <img
+                      src={avatarUrl}
+                      alt="Profile Avatar"
+                      className="w-16 h-16 rounded-full object-cover border-2 border-red-200 shadow-2xs"
+                    />
+                  ) : (
+                    <div className="w-16 h-16 rounded-full bg-slate-100 border-2 border-dashed border-red-300 text-slate-400 flex items-center justify-center">
+                      <User className="w-8 h-8" />
+                    </div>
+                  )}
+
                   <label
                     htmlFor="avatar-upload"
                     className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
-                    title="Change Photo"
+                    title="Upload Photo"
                   >
                     <Camera className="w-5 h-5" />
                   </label>
@@ -312,12 +323,12 @@ export const OnboardingPage = ({ defaultRole }) => {
                 <div className="space-y-0.5">
                   <label
                     htmlFor="avatar-upload"
-                    className="text-xs font-semibold text-red-700 hover:underline cursor-pointer block"
+                    className="text-xs font-bold text-slate-800 hover:text-red-700 cursor-pointer block"
                   >
-                    Change profile photo
+                    Upload profile photo <span className="text-red-600">* Required</span>
                   </label>
-                  <span className="text-[11px] text-slate-400 block">
-                    Recommended square JPG or PNG.
+                  <span className="text-[11px] text-slate-500 block">
+                    Mandatory for verified directory profile. Recommended square JPG or PNG.
                   </span>
                 </div>
               </div>

@@ -78,6 +78,16 @@ const getMyRegistrations = async (req, res, next) => {
   }
 };
 
+const getUpcomingEvents = async (req, res, next) => {
+  try {
+    const limit = req.query.limit || 5;
+    const data = await eventService.getUpcomingEvents(req.user?.id, limit);
+    return successResponse(res, data, 'Upcoming events fetched successfully');
+  } catch (err) {
+    next(err);
+  }
+};
+
 module.exports = {
   getEvents,
   getEventById,
@@ -87,4 +97,5 @@ module.exports = {
   registerForEvent,
   cancelRegistration,
   getMyRegistrations,
+  getUpcomingEvents,
 };

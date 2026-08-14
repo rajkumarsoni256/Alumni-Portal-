@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
+import { UserConnectionsModal } from '../components/network/UserConnectionsModal';
 import { 
   GraduationCap, 
   MapPin, 
@@ -15,13 +16,16 @@ export const StudentDashboard = () => {
   const { 
     student, 
     currentUser,
+    userProfile,
     alumniList, 
     requests, 
     savedAlumniIds, 
     selectedInterests,
-    showNotification 
+    showNotification,
+    myConnections
   } = useApp();
 
+  const [isConnModalOpen, setIsConnModalOpen] = useState(false);
   const [skillsList, setSkillsList] = useState([
     { name: 'Data Structures & Algorithms', endorsements: 28 },
     { name: 'Python & PyTorch', endorsements: 22 },
@@ -167,9 +171,29 @@ export const StudentDashboard = () => {
 
                   {/* Network stats */}
                   <div className="pt-2 flex items-center gap-3 text-xs">
-                    <span className="font-semibold text-slate-900">48 <span className="text-slate-500 font-normal">connections</span></span>
+                    {(() => {
+                      const countVal = Math.max(
+                        userProfile?.connectionsCount || 0,
+                        userProfile?.connectionCount || 0,
+                        myConnections ? myConnections.length : 0
+                      );
+                      return (
+                        <button
+                          type="button"
+                          onClick={() => setIsConnModalOpen(true)}
+                          className="font-semibold text-slate-900 hover:text-red-700 hover:underline cursor-pointer transition-colors"
+                        >
+                          {countVal >= 500 ? '500+' : countVal} {' '}
+                          <span className="text-slate-500 font-normal font-sans">
+                            {countVal === 1 ? 'connection' : 'connections'}
+                          </span>
+                        </button>
+                      );
+                    })()}
                     <span>•</span>
-                    <span className="font-semibold text-slate-900">Class of 2026</span>
+                    <span className="font-semibold text-slate-900">
+                      {userProfile?.graduationYear ? `Class of ${userProfile.graduationYear}` : 'Class of 2026'}
+                    </span>
                   </div>
                 </div>
 
@@ -425,6 +449,15 @@ Actively preparing for upcoming 2026 software engineering internships and tech p
         </div>
 
       </div>
+
+      {/* User Connections Modal */}
+      <UserConnectionsModal
+        isOpen={isConnModalOpen}
+        onClose={() => setIsConnModalOpen(false)}
+        userId={currentUser?.id || userProfile?.userId}
+        userName={currentUser?.name || userProfile?.fullName}
+        totalCount={userProfile?.connectionsCount || myConnections?.length || 0}
+      />
     </div>
   );
 };

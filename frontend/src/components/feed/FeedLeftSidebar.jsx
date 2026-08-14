@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
+import { UserAvatar } from '../common/UserAvatar';
 import { 
   Home, 
   Compass, 
@@ -18,8 +19,11 @@ import {
 import { getRoleCapabilities } from '../../utils/roleCapabilities';
 
 export const FeedLeftSidebar = () => {
-  const { currentUser, feedFilter, setFeedFilter, activeRole, requests } = useApp();
+  const { currentUser, feedFilter, setFeedFilter, activeRole, requests, myConnections } = useApp();
   const location = useLocation();
+
+  const realCount = myConnections?.length !== undefined ? myConnections.length : (currentUser.connectionsCount || 0);
+  const countDisplay = realCount >= 500 ? '500+' : String(realCount);
 
   const caps = getRoleCapabilities(activeRole);
   const pendingRequestsCount = requests.filter((r) => r.status === 'Pending').length;
@@ -164,10 +168,10 @@ export const FeedLeftSidebar = () => {
         {/* Profile Info */}
         <div className="px-4 pb-4 pt-0 text-center relative">
           <div className="-mt-8 mb-2 inline-block">
-            <img
-              src={currentUser.avatar}
-              alt={currentUser.name}
-              className="w-16 h-16 rounded-full object-cover border-2 border-white shadow-xs mx-auto bg-white"
+            <UserAvatar
+              src={currentUser?.avatarUrl || currentUser?.avatar}
+              name={currentUser?.name}
+              className="w-16 h-16 border-2 border-white shadow-xs mx-auto"
             />
           </div>
 
@@ -194,7 +198,7 @@ export const FeedLeftSidebar = () => {
           <div className="mt-3 pt-3 border-t border-slate-100 grid grid-cols-2 gap-2 text-left text-xs">
             <div className="p-2 rounded bg-slate-50">
               <span className="text-[10px] text-slate-400 font-semibold block uppercase">Connections</span>
-              <span className="font-bold text-slate-900">{currentUser.connectionsCount || 48}</span>
+              <span className="font-bold text-slate-900">{countDisplay}</span>
             </div>
             <div className="p-2 rounded bg-slate-50">
               <span className="text-[10px] text-slate-400 font-semibold block uppercase">Profile Views</span>

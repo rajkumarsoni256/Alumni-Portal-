@@ -66,7 +66,8 @@ const migrate = async () => {
           user_id UUID NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
           full_name VARCHAR(150) NOT NULL,
           phone VARCHAR(20),
-          avatar_url VARCHAR(512),
+          avatar_url TEXT,
+          banner_url TEXT,
           bio TEXT,
           degree VARCHAR(100),
           branch VARCHAR(150),
@@ -87,6 +88,23 @@ const migrate = async () => {
       );
     `);
 
+    // Ensure avatar_url, banner_url, and post image_url columns use TEXT for base64/URL data
+    try {
+      await db.query(`ALTER TABLE user_profiles ALTER COLUMN avatar_url TYPE TEXT;`);
+    } catch (e) {
+      console.warn('[MIGRATION] avatar_url alter warning:', e.message);
+    }
+    try {
+      await db.query(`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS banner_url TEXT;`);
+    } catch (e) {
+      console.warn('[MIGRATION] banner_url add warning:', e.message);
+    }
+    try {
+      await db.query(`ALTER TABLE posts ALTER COLUMN image_url TYPE TEXT;`);
+    } catch (e) {
+      console.warn('[MIGRATION] image_url alter warning:', e.message);
+    }
+
     // 6. connections table (Phase 4)
     await db.query(`
       CREATE TABLE IF NOT EXISTS connections (
@@ -106,12 +124,71 @@ const migrate = async () => {
           id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
           author_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
           content TEXT NOT NULL,
-          image_url VARCHAR(512),
+          image_url TEXT,
           category VARCHAR(32) NOT NULL DEFAULT 'ALL',
           post_type VARCHAR(32) NOT NULL DEFAULT 'TEXT',
           tags TEXT,
           created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
           updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // Extended columns for posts table (Visibility, Job, Achievement)
+    const postColumnQueries = [
+      `ALTER TABLE posts ADD COLUMN IF NOT EXISTS visibility VARCHAR(20) NOT NULL DEFAULT 'PUBLIC';`,
+      `ALTER TABLE posts ADD COLUMN IF NOT EXISTS job_title VARCHAR(255);`,
+      `ALTER TABLE posts ADD COLUMN IF NOT EXISTS company_name VARCHAR(255);`,
+      `ALTER TABLE posts ADD COLUMN IF NOT EXISTS job_location VARCHAR(255);`,
+      `ALTER TABLE posts ADD COLUMN IF NOT EXISTS employment_type VARCHAR(50);`,
+      `ALTER TABLE posts ADD COLUMN IF NOT EXISTS job_description TEXT;`,
+      `ALTER TABLE posts ADD COLUMN IF NOT EXISTS job_url TEXT;`,
+      `ALTER TABLE posts ADD COLUMN IF NOT EXISTS achievement_title VARCHAR(255);`,
+      `ALTER TABLE posts ADD COLUMN IF NOT EXISTS achievement_organization VARCHAR(255);`,
+      `ALTER TABLE posts ADD COLUMN IF NOT EXISTS achievement_description TEXT;`,
+      `ALTER TABLE posts ADD COLUMN IF NOT EXISTS achievement_date DATE;`,
+    ];
+
+    for (const q of postColumnQueries) {
+      try {
+        await db.query(q);
+      } catch (e) {
+        console.warn('[MIGRATION] post column alter warning:', e.message);
+      }
+    }
+
+    // 7b. post_media table
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS post_media (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          post_id UUID NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+          media_type VARCHAR(20) NOT NULL,
+          storage_key TEXT,
+          media_url TEXT NOT NULL,
+          original_filename TEXT,
+          mime_type VARCHAR(100),
+          file_size BIGINT,
+          width INTEGER,
+          height INTEGER,
+          duration INTEGER,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // 7c. hashtags table
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS hashtags (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          name VARCHAR(100) NOT NULL UNIQUE,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // 7d. post_hashtags table
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS post_hashtags (
+          post_id UUID NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+          hashtag_id UUID NOT NULL REFERENCES hashtags(id) ON DELETE CASCADE,
+          PRIMARY KEY (post_id, hashtag_id)
       );
     `);
 
@@ -134,8 +211,23 @@ const migrate = async () => {
           author_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
           parent_comment_id UUID REFERENCES comments(id) ON DELETE CASCADE,
           content TEXT NOT NULL,
+          is_pinned BOOLEAN DEFAULT FALSE,
           created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
           updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    await db.query(`ALTER TABLE comments ADD COLUMN IF NOT EXISTS is_pinned BOOLEAN DEFAULT FALSE;`).catch(() => {});
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_comments_pinned ON comments(post_id, is_pinned DESC, created_at DESC);`).catch(() => {});
+
+    // 9b. comment_likes table
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS comment_likes (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          comment_id UUID NOT NULL REFERENCES comments(id) ON DELETE CASCADE,
+          user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          CONSTRAINT uq_comment_user_like UNIQUE (comment_id, user_id)
       );
     `);
 
@@ -334,6 +426,9 @@ const migrate = async () => {
     await db.query(`CREATE INDEX IF NOT EXISTS idx_comments_parent ON comments(parent_comment_id);`);
     await db.query(`CREATE INDEX IF NOT EXISTS idx_comments_created_at ON comments(created_at ASC);`);
 
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_comment_likes_comment ON comment_likes(comment_id);`);
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_comment_likes_user ON comment_likes(user_id);`);
+
     await db.query(`CREATE INDEX IF NOT EXISTS idx_jobs_posted_by ON jobs(posted_by);`);
     await db.query(`CREATE INDEX IF NOT EXISTS idx_jobs_type ON jobs(type);`);
     await db.query(`CREATE INDEX IF NOT EXISTS idx_jobs_location ON jobs(location);`);
@@ -366,26 +461,133 @@ const migrate = async () => {
     await db.query(`CREATE INDEX IF NOT EXISTS idx_events_start_at ON events(start_at);`);
     await db.query(`CREATE INDEX IF NOT EXISTS idx_events_status ON events(status);`);
     await db.query(`CREATE INDEX IF NOT EXISTS idx_events_category ON events(category);`);
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_events_deadline ON events(registration_deadline);`);
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_post_hashtags_hashtag ON post_hashtags(hashtag_id);`);
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_events_status_start_at ON events(status, start_at);`);
 
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_event_reg_event ON event_registrations(event_id);`);
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_event_reg_user ON event_registrations(user_id);`);
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_event_reg_status ON event_registrations(status);`);
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_event_reg_pair ON event_registrations(event_id, user_id);`);
-
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_mentorship_req_student ON mentorship_requests(student_id);`);
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_mentorship_req_mentor ON mentorship_requests(mentor_id);`);
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_mentorship_req_status ON mentorship_requests(status);`);
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_mentorship_req_created_at ON mentorship_requests(created_at DESC);`);
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_mentorship_req_student_status ON mentorship_requests(student_id, status);`);
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_mentorship_req_mentor_status ON mentorship_requests(mentor_id, status);`);
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_mentorship_req_pair ON mentorship_requests(student_id, mentor_id);`);
-
-    // Unique connection pair index to prevent duplicate relationships regardless of direction
+    // 16. user_settings table
     await db.query(`
-      CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_connection_pair 
-      ON connections (LEAST(requester_id, receiver_id), GREATEST(requester_id, receiver_id));
-    `).catch(() => {});
+      CREATE TABLE IF NOT EXISTS user_settings (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          user_id UUID UNIQUE NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          profile_visibility VARCHAR(30) DEFAULT 'COMMUNITY',
+          email_visibility VARCHAR(30) DEFAULT 'CONNECTIONS',
+          phone_visibility VARCHAR(30) DEFAULT 'ONLY_ME',
+          connections_visibility VARCHAR(30) DEFAULT 'COMMUNITY',
+          search_visibility BOOLEAN DEFAULT TRUE,
+          directory_visibility BOOLEAN DEFAULT TRUE,
+          online_status_visible BOOLEAN DEFAULT TRUE,
+          mentorship_visibility BOOLEAN DEFAULT TRUE,
+          allow_messages_from VARCHAR(30) DEFAULT 'CONNECTIONS',
+          allow_connection_requests_from VARCHAR(30) DEFAULT 'EVERYONE',
+          show_read_receipts BOOLEAN DEFAULT TRUE,
+          show_typing_indicator BOOLEAN DEFAULT TRUE,
+          post_like_notifications BOOLEAN DEFAULT TRUE,
+          post_comment_notifications BOOLEAN DEFAULT TRUE,
+          comment_reply_notifications BOOLEAN DEFAULT TRUE,
+          mention_notifications BOOLEAN DEFAULT TRUE,
+          post_share_notifications BOOLEAN DEFAULT TRUE,
+          connection_request_notifications BOOLEAN DEFAULT TRUE,
+          connection_accepted_notifications BOOLEAN DEFAULT TRUE,
+          message_notifications BOOLEAN DEFAULT TRUE,
+          job_notifications BOOLEAN DEFAULT TRUE,
+          event_notifications BOOLEAN DEFAULT TRUE,
+          mentorship_notifications BOOLEAN DEFAULT TRUE,
+          email_notifications BOOLEAN DEFAULT TRUE,
+          push_notifications BOOLEAN DEFAULT TRUE,
+          career_status VARCHAR(50) DEFAULT 'OPEN_TO_FULLTIME',
+          work_type_remote BOOLEAN DEFAULT TRUE,
+          work_type_hybrid BOOLEAN DEFAULT TRUE,
+          work_type_onsite BOOLEAN DEFAULT TRUE,
+          preferred_roles TEXT DEFAULT 'Software Engineer, Full Stack Developer',
+          preferred_locations TEXT DEFAULT 'Jaipur, Bengaluru, Remote',
+          mentorship_topics TEXT DEFAULT 'Career guidance, Technical skills, Interview preparation',
+          show_company BOOLEAN DEFAULT TRUE,
+          show_designation BOOLEAN DEFAULT TRUE,
+          show_location BOOLEAN DEFAULT TRUE,
+          two_factor_enabled BOOLEAN DEFAULT FALSE,
+          theme VARCHAR(20) DEFAULT 'SYSTEM',
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_user_settings_user_id ON user_settings(user_id);`);
+
+    // 17. user_blocks table
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS user_blocks (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          blocker_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          blocked_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE (blocker_id, blocked_id)
+      );
+    `);
+
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_user_blocks_blocker ON user_blocks(blocker_id);`);
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_user_blocks_blocked ON user_blocks(blocked_id);`);
+
+    // 18. user_sessions table
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS user_sessions (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          device VARCHAR(100) DEFAULT 'Browser / Web Client',
+          ip_address VARCHAR(50) DEFAULT '127.0.0.1',
+          user_agent TEXT,
+          is_active BOOLEAN DEFAULT TRUE,
+          last_active_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_user_sessions_user_active ON user_sessions(user_id, is_active);`);
+
+    // 19. email_deliveries table
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS email_deliveries (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+          recipient_email VARCHAR(255) NOT NULL,
+          email_type VARCHAR(50) NOT NULL,
+          template_name VARCHAR(50) NOT NULL,
+          subject VARCHAR(255) NOT NULL,
+          status VARCHAR(20) DEFAULT 'QUEUED',
+          provider VARCHAR(30),
+          provider_message_id VARCHAR(255),
+          attempt_count INT DEFAULT 1,
+          last_error TEXT,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+          sent_at TIMESTAMP WITH TIME ZONE,
+          failed_at TIMESTAMP WITH TIME ZONE
+      );
+    `);
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_email_deliveries_recipient ON email_deliveries(recipient_email);`);
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_email_deliveries_status ON email_deliveries(status);`);
+
+    // 20. verification_codes table (Secure OTP Hashing Store)
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS verification_codes (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+          email VARCHAR(255) NOT NULL,
+          purpose VARCHAR(30) NOT NULL,
+          code_hash VARCHAR(255) NOT NULL,
+          expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+          attempt_count INT DEFAULT 0,
+          max_attempts INT DEFAULT 5,
+          used_at TIMESTAMP WITH TIME ZONE,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_verification_codes_email_purpose ON verification_codes(email, purpose);`);
+
+    // Seed default settings for all existing users if missing
+    await db.query(`
+      INSERT INTO user_settings (user_id)
+      SELECT id FROM users
+      ON CONFLICT (user_id) DO NOTHING;
+    `);
 
     // Seed default ADMIN user if no ADMIN account exists
     const adminEmail = (process.env.ADMIN_EMAIL || 'admin@jecrc.ac.in').trim().toLowerCase();
@@ -414,7 +616,52 @@ const migrate = async () => {
       adminId = adminCheck.rows[0].id;
     }
 
-    // Default Admin user initialized cleanly. No mock events seeded automatically.
+    // Default Admin user initialized cleanly. Seed initial real upcoming events if events table is empty
+    const eventsCountRes = await db.query(`SELECT COUNT(*) AS count FROM events`);
+    if (parseInt(eventsCountRes.rows[0].count, 10) === 0 && adminId) {
+      const now = new Date();
+      const event1Date = new Date(now.getTime() + 14 * 24 * 3600 * 1000); // 14 days later
+      const event2Date = new Date(now.getTime() + 30 * 24 * 3600 * 1000); // 30 days later
+
+      await db.query(
+        `INSERT INTO events (id, created_by, title, description, event_type, category, speaker, location, is_online, meeting_url, start_at, end_at, registration_deadline, capacity, status)
+         VALUES 
+         ($1, $2, 'Alumni Leadership Summit 2026', 'Annual JECRC Alumni Networking and Keynote Leadership Summit', 'ALUMNI_MEETUP', 'Networking', 'JECRC Leadership', 'Jaipur, Rajasthan', false, null, $3, $4, $5, 200, 'PUBLISHED'),
+         ($6, $2, 'AI & Cloud Innovations Workshop', 'Technical interactive workshop hosted by Senior Alumni Engineers', 'WORKSHOP', 'Workshops', 'Senior Alumni Engineers', 'Online / Virtual', true, 'https://meet.google.com/jecrc-tech', $7, $8, $9, 150, 'PUBLISHED')`,
+        [
+          crypto.randomUUID(), adminId, event1Date, new Date(event1Date.getTime() + 4 * 3600 * 1000), new Date(event1Date.getTime() - 24 * 3600 * 1000),
+          crypto.randomUUID(), event2Date, new Date(event2Date.getTime() + 3 * 3600 * 1000), new Date(event2Date.getTime() - 24 * 3600 * 1000)
+        ]
+      );
+      console.log(`[MIGRATION SEED] Seeded initial published upcoming events in PostgreSQL`);
+    }
+
+    // Clean up duplicate conversation pairs and merge messages into single conversation
+    await db.query(`
+      DO $$
+      DECLARE
+        rec RECORD;
+        keep_conv_id UUID;
+        dup_conv_id UUID;
+      BEGIN
+        FOR rec IN (
+          SELECT cp1.user_id AS u1, cp2.user_id AS u2, ARRAY_AGG(c.id ORDER BY c.last_message_at DESC, c.created_at DESC) AS conv_ids
+          FROM conversations c
+          JOIN conversation_participants cp1 ON c.id = cp1.conversation_id
+          JOIN conversation_participants cp2 ON c.id = cp2.conversation_id AND cp1.user_id < cp2.user_id
+          GROUP BY cp1.user_id, cp2.user_id
+          HAVING COUNT(c.id) > 1
+        ) LOOP
+          keep_conv_id := rec.conv_ids[1];
+          FOR i IN 2..ARRAY_LENGTH(rec.conv_ids, 1) LOOP
+            dup_conv_id := rec.conv_ids[i];
+            UPDATE messages SET conversation_id = keep_conv_id WHERE conversation_id = dup_conv_id;
+            DELETE FROM conversation_participants WHERE conversation_id = dup_conv_id;
+            DELETE FROM conversations WHERE id = dup_conv_id;
+          END LOOP;
+        END LOOP;
+      END $$;
+    `).catch(() => {});
 
     console.log('[MIGRATION] PostgreSQL database schema migration completed successfully.');
   } catch (err) {

@@ -21,3 +21,7 @@ build/
 .idea/
 .DS_Store
 Thumbs.db
+
+# User uploads & scratch scripts
+backend/uploads/
+scratch/

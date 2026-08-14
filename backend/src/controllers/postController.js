@@ -3,7 +3,8 @@ const { successResponse } = require('../utils/response');
 
 const createPost = async (req, res, next) => {
   try {
-    const post = await postService.createPost(req.user, req.body);
+    const files = req.files || (req.file ? [req.file] : []);
+    const post = await postService.createPost(req.user, req.body, files);
     return successResponse(res, post, 'Post created successfully', 201);
   } catch (err) {
     next(err);
@@ -74,8 +75,19 @@ const addComment = async (req, res, next) => {
 const getCommentsByPostId = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const data = await postService.getCommentsByPostId(id);
+    const authUserId = req.user ? req.user.id : null;
+    const data = await postService.getCommentsByPostId(id, authUserId, req.query);
     return successResponse(res, data, 'Comments fetched successfully');
+  } catch (err) {
+    next(err);
+  }
+};
+
+const updateComment = async (req, res, next) => {
+  try {
+    const commentId = req.params.commentId || req.params.id;
+    const data = await postService.updateComment(req.user, commentId, req.body);
+    return successResponse(res, data, 'Comment updated successfully');
   } catch (err) {
     next(err);
   }
@@ -83,9 +95,30 @@ const getCommentsByPostId = async (req, res, next) => {
 
 const deleteComment = async (req, res, next) => {
   try {
-    const { postId, commentId } = req.params;
+    const postId = req.params.postId || req.params.id;
+    const commentId = req.params.commentId || req.params.id;
     const data = await postService.deleteComment(req.user, postId, commentId);
     return successResponse(res, data, 'Comment deleted successfully');
+  } catch (err) {
+    next(err);
+  }
+};
+
+const toggleLikeComment = async (req, res, next) => {
+  try {
+    const commentId = req.params.commentId || req.params.id;
+    const data = await postService.toggleLikeComment(req.user, commentId);
+    return successResponse(res, data, 'Comment like toggled successfully');
+  } catch (err) {
+    next(err);
+  }
+};
+
+const togglePinComment = async (req, res, next) => {
+  try {
+    const commentId = req.params.commentId || req.params.id;
+    const data = await postService.togglePinComment(req.user, commentId);
+    return successResponse(res, data, 'Comment pin status updated successfully');
   } catch (err) {
     next(err);
   }
@@ -100,5 +133,8 @@ module.exports = {
   toggleLikePost,
   addComment,
   getCommentsByPostId,
+  updateComment,
   deleteComment,
+  toggleLikeComment,
+  togglePinComment,
 };

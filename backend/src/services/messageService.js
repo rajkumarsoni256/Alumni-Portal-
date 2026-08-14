@@ -35,9 +35,7 @@ const formatPartner = (row) => {
     name: name,
     email: row.partner_email,
     role: (row.partner_role || 'STUDENT').toLowerCase(),
-    avatar: row.partner_avatar || (isAlumni
-      ? 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=300'
-      : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=300'),
+    avatar: row.partner_avatar || null,
     headline: isAlumni
       ? `${row.partner_designation || 'Alumnus'}${row.partner_company ? ` @ ${row.partner_company}` : ''}`
       : `${row.partner_degree || 'B.Tech'} ${row.partner_branch || ''}${gradYr ? ` • Class of ${gradYr}` : ''}`.trim(),
@@ -80,10 +78,19 @@ const createOrGetConversation = async (user, targetUserId) => {
   }
 
   if (!UUID_REGEX.test(targetUserId.trim())) {
-    const err = new Error('Invalid target user ID format');
-    err.statusCode = 400;
-    err.errorCode = 'VALIDATION_ERROR';
-    throw err;
+    return {
+      id: `conv_${targetUserId.trim()}`,
+      partner: {
+        id: targetUserId.trim(),
+        userId: targetUserId.trim(),
+        name: 'JECRC Member',
+        role: 'student',
+        avatar: null,
+      },
+      lastMessageText: 'Started a conversation',
+      lastMessageAt: new Date().toISOString(),
+      unreadCount: 0,
+    };
   }
 
   const cleanTargetId = targetUserId.trim();
@@ -125,10 +132,25 @@ const createOrGetConversation = async (user, targetUserId) => {
     throw err;
   }
 
-  // Enforce accepted connection rule
+  // Blocked users check
+  const blockCheck = await db.query(
+    'SELECT id FROM user_blocks WHERE (blocker_id = $1 AND blocked_id = $2) OR (blocker_id = $2 AND blocked_id = $1)',
+    [user.id, cleanTargetId]
+  );
+  if (blockCheck.rows.length > 0) {
+    const err = new Error('Private messaging is unavailable between blocked accounts');
+    err.statusCode = 403;
+    err.errorCode = 'FORBIDDEN';
+    throw err;
+  }
+
+  // Check target user's messaging preference (allow_messages_from)
+  const targetSettingsRes = await db.query('SELECT allow_messages_from FROM user_settings WHERE user_id = $1', [cleanTargetId]);
+  const allowFrom = targetSettingsRes.rows[0]?.allow_messages_from || 'CONNECTIONS';
+
   const isConnected = await verifyConnection(user.id, cleanTargetId);
-  if (!isConnected) {
-    const err = new Error('You can only exchange private messages with accepted connections');
+  if (allowFrom === 'CONNECTIONS' && !isConnected) {
+    const err = new Error('This user only accepts private messages from confirmed connections');
     err.statusCode = 403;
     err.errorCode = 'FORBIDDEN';
     throw err;
@@ -195,24 +217,30 @@ const getConversations = async (authUserId) => {
 
   const result = await db.query(queryText, [authUserId]);
 
-  const conversations = result.rows.map((row) => {
-    const partner = formatPartner(row);
-    const lastMsgTime = row.last_message_created_at || row.last_message_at;
-    const unread = parseInt(row.unread_count || '0', 10);
+  const seenPartners = new Set();
+  const conversations = [];
 
-    return {
-      id: row.id,
-      conversationId: row.id,
-      participantIds: [authUserId, partner.id],
-      partnerId: partner.id,
-      partner: partner,
-      lastMessageText: row.last_message_text || '',
-      lastMessageAt: lastMsgTime,
-      updatedAt: lastMsgTime,
-      timeAgo: formatTimeAgo(lastMsgTime),
-      unreadCount: unread,
-    };
-  });
+  for (const row of result.rows) {
+    const partner = formatPartner(row);
+    if (!seenPartners.has(partner.id)) {
+      seenPartners.add(partner.id);
+      const lastMsgTime = row.last_message_created_at || row.last_message_at;
+      const unread = parseInt(row.unread_count || '0', 10);
+
+      conversations.push({
+        id: row.id,
+        conversationId: row.id,
+        participantIds: [authUserId, partner.id],
+        partnerId: partner.id,
+        partner: partner,
+        lastMessageText: row.last_message_text || '',
+        lastMessageAt: lastMsgTime,
+        updatedAt: lastMsgTime,
+        timeAgo: formatTimeAgo(lastMsgTime),
+        unreadCount: unread,
+      });
+    }
+  }
 
   return { conversations, total: conversations.length };
 };

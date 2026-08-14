@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
+import { UserAvatar } from '../components/common/UserAvatar';
 import { connectionService } from '../services/connectionService';
 import { 
   Users, 
@@ -154,9 +155,7 @@ export const MyConnections = () => {
           </button>
         </div>
 
-        {/* ============================================================ */}
-        {/* SECTION 1: MY CONNECTIONS (POSTGRESQL-BACKED) */}
-        {/* ============================================================ */}
+        {/* SECTION 1: MY CONNECTIONS */}
         {sectionTab === 'connections' && (
           <div className="space-y-3">
             {/* Search Connections Input */}
@@ -191,7 +190,7 @@ export const MyConnections = () => {
                   const name = u.fullName || u.name || (u.email ? u.email.split('@')[0] : 'Community Member');
                   const role = u.designation || u.currentRole || (u.role === 'ALUMNI' ? 'Alumni' : 'Student');
                   const company = u.company || (u.role === 'ALUMNI' ? 'Industry Professional' : 'JECRC University');
-                  const avatar = u.avatarUrl || u.avatar || 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=300';
+                  const avatar = u.avatarUrl || u.avatar || null;
                   const branch = u.branch || 'CSE';
                   const batch = u.graduationYear ? `Class of ${u.graduationYear}` : 'JECRC';
                   const location = u.location || 'Jaipur, India';
@@ -204,10 +203,10 @@ export const MyConnections = () => {
                       <div className="space-y-3">
                         <div className="flex items-start gap-3">
                           <Link to={`/profile/${targetUserId}`}>
-                            <img
+                            <UserAvatar
                               src={avatar}
-                              alt={name}
-                              className="w-12 h-12 rounded-full object-cover border border-slate-200 shrink-0 hover:ring-2 hover:ring-red-600/30 transition-all cursor-pointer"
+                              name={name}
+                              className="w-12 h-12 shrink-0 hover:ring-2 hover:ring-red-600/30 transition-all cursor-pointer"
                             />
                           </Link>
 
@@ -288,9 +287,7 @@ export const MyConnections = () => {
           </div>
         )}
 
-        {/* ============================================================ */}
         {/* SECTION 2: MENTORSHIP SESSIONS */}
-        {/* ============================================================ */}
         {sectionTab === 'mentorship' && (
           <div className="space-y-3">
             {/* Sub-tabs Switcher */}
@@ -329,16 +326,16 @@ export const MyConnections = () => {
                     const partnerName = item.mentor?.name || item.student?.name || 'Community Member';
                     const partnerRole = item.mentor?.designation || item.student?.branch || 'JECRC Network';
                     const partnerCompany = item.mentor?.company || 'JECRC University';
-                    const partnerAvatar = item.mentor?.avatar || item.student?.avatar || 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=300';
+                    const partnerAvatar = item.mentor?.avatar || item.student?.avatar || null;
                     const partnerId = item.mentor?.id || item.student?.id;
 
                     return (
                       <div key={item.id} className="pt-3 first:pt-0 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                         <div className="flex items-start gap-3">
-                          <img
+                          <UserAvatar
                             src={partnerAvatar}
-                            alt={partnerName}
-                            className="w-10 h-10 rounded-full object-cover border border-slate-200 shrink-0"
+                            name={partnerName}
+                            className="w-10 h-10 shrink-0"
                           />
                           <div className="space-y-0.5 min-w-0">
                             <div className="flex items-center gap-2">

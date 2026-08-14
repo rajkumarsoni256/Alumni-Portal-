@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, ShieldCheck, User } from 'lucide-react';
+import { ArrowLeft, ShieldCheck, Phone, Video, Search, MoreVertical } from 'lucide-react';
+import { UserAvatar } from '../common/UserAvatar';
 
 export const ChatHeader = ({ partner, onBack }) => {
   if (!partner) return null;
@@ -11,9 +12,6 @@ export const ChatHeader = ({ partner, onBack }) => {
     : partner.id === 'st_101'
     ? '/student-dashboard'
     : `/profile/${partner.id}`;
-
-  const subtitle = partner.headline || (isAlumni ? `Alumni @ ${partner.company || 'JECRC'}` : 'JECRC Student');
-  const batchInfo = partner.batchDisplay || (partner.batch ? `JECRC ${partner.branch || 'CSE'} • ${partner.batch}` : 'JECRC Community');
 
   return (
     <div className="h-16 px-4 border-b border-slate-200 bg-white flex items-center justify-between gap-3 shrink-0 sticky top-0 z-10">
@@ -32,22 +30,20 @@ export const ChatHeader = ({ partner, onBack }) => {
           </button>
         )}
 
-        {/* Avatar with Status */}
+        {/* Avatar with Green Online Status */}
         <Link to={profilePath} className="relative shrink-0 group">
-          <img
-            src={partner.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=300'}
-            alt={partner.name}
-            className="w-10 h-10 rounded-full object-cover border border-slate-200 group-hover:ring-2 group-hover:ring-red-600/20 transition-all"
+          <UserAvatar
+            src={partner.avatar}
+            name={partner.name}
+            className="w-10 h-10 group-hover:ring-2 group-hover:ring-red-600/20 transition-all"
           />
-          {isAlumni && (
-            <span
-              className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-emerald-500 rounded-full border-2 border-white"
-              title="Verified Alumni"
-            />
-          )}
+          <span
+            className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 rounded-full border-2 border-white"
+            title="Online"
+          />
         </Link>
 
-        {/* Identity & Company/Batch */}
+        {/* Identity & Online indicator matching Image 1 */}
         <div className="min-w-0">
           <div className="flex items-center gap-1.5">
             <Link
@@ -60,22 +56,50 @@ export const ChatHeader = ({ partner, onBack }) => {
               <ShieldCheck className="w-3.5 h-3.5 text-red-700 shrink-0" />
             )}
           </div>
-          <p className="text-[11px] text-slate-500 truncate leading-tight">
-            {subtitle} <span className="text-slate-300">•</span> {batchInfo}
-          </p>
+          <div className="flex items-center gap-1 text-[11px] text-emerald-600 font-medium leading-tight">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />
+            <span>Online</span>
+          </div>
         </div>
       </div>
 
-      {/* Right: Quick Profile Link */}
-      <div className="shrink-0">
-        <Link
-          to={profilePath}
-          className="px-2.5 py-1.5 rounded-lg text-xs font-semibold text-slate-700 bg-slate-50 hover:bg-slate-100 border border-slate-200 transition-colors inline-flex items-center gap-1 shadow-2xs"
-          title="View full profile"
+      {/* Right: Phone, Video, Search, 3 Dots Action Icons matching Image 1 */}
+      <div className="flex items-center gap-1 sm:gap-2 text-slate-500">
+        <button
+          type="button"
+          className="p-2 rounded-full hover:bg-slate-100 hover:text-slate-900 transition-colors cursor-pointer"
+          title="Audio Call"
+          aria-label="Audio Call"
         >
-          <User className="w-3.5 h-3.5 text-slate-500" />
-          <span className="hidden sm:inline">Profile</span>
-        </Link>
+          <Phone className="w-4 h-4" />
+        </button>
+
+        <button
+          type="button"
+          className="p-2 rounded-full hover:bg-slate-100 hover:text-slate-900 transition-colors cursor-pointer"
+          title="Video Call"
+          aria-label="Video Call"
+        >
+          <Video className="w-4 h-4" />
+        </button>
+
+        <button
+          type="button"
+          className="p-2 rounded-full hover:bg-slate-100 hover:text-slate-900 transition-colors cursor-pointer"
+          title="Search in Chat"
+          aria-label="Search in Chat"
+        >
+          <Search className="w-4 h-4" />
+        </button>
+
+        <button
+          type="button"
+          className="p-2 rounded-full hover:bg-slate-100 hover:text-slate-900 transition-colors cursor-pointer"
+          title="Options"
+          aria-label="Options"
+        >
+          <MoreVertical className="w-4 h-4" />
+        </button>
       </div>
 
     </div>
