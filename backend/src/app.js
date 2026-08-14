@@ -74,9 +74,13 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 // Serve static upload directory
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
-// Health Check
-app.get('/actuator/health', (req, res) => {
-  res.json({ status: 'UP', service: 'jecrc-community-backend-node' });
+// Health Check Endpoints
+app.get(['/actuator/health', '/api/v1/health'], (req, res) => {
+  res.json({
+    status: 'UP',
+    service: 'jecrc-community-backend',
+    timestamp: new Date().toISOString()
+  });
 });
 
 // API Routes
@@ -102,8 +106,8 @@ app.use(errorHandler);
 const startServer = async () => {
   try {
     await migrate();
-    app.listen(PORT, () => {
-      console.log(`[JECRC Backend] Node.js Express server is listening on port ${PORT}`);
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`[JECRC Backend] Node.js Express server is listening on 0.0.0.0:${PORT}`);
     });
   } catch (err) {
     console.error('Failed to start server:', err);

@@ -659,21 +659,21 @@ const publishNotification = async (adminUserId, id) => {
 
     await client.query(bulkInsertQuery, [id, ...recipParams]);
 
-    // 3. Bulk insert into in-app notifications table ($1 is type, $2 is message)
+    // 3. Bulk insert into in-app notifications table ($1 is type, $2 is title, $3 is message)
     const { whereSql: notifWhereSql, queryParams: notifParams } = buildAudienceWhereClause(
       announcement.audience_type,
       announcement.target_filters,
-      2
+      3
     );
 
     const notifInsertQuery = `
-      INSERT INTO notifications (user_id, type, actor_name, message)
-      SELECT u.id, $1, 'Dean of Alumni Relations', $2
+      INSERT INTO notifications (recipient_id, user_id, type, title, message, actor_name)
+      SELECT u.id, u.id, $1::varchar, $2::varchar, $3::text, 'Dean of Alumni Relations'
       FROM users u
       LEFT JOIN user_profiles p ON u.id = p.user_id
       ${notifWhereSql};
     `;
-    await client.query(notifInsertQuery, [announcement.type || 'SYSTEM', announcement.title, ...notifParams]);
+    await client.query(notifInsertQuery, [announcement.type || 'SYSTEM', announcement.title, announcement.message, ...notifParams]);
 
     // 4. Update announcement status to PUBLISHED
     const updateAnnQuery = `

@@ -7,10 +7,14 @@ const adminVerificationService = require('../services/adminVerificationService')
 
 const JWT_SECRET = process.env.JWT_SECRET || '404E635266556A586E3272357538782F413F4428472B4B6250655368566D5970';
 
+const migrate = require('../db/migrate');
+
 const runPhase6Tests = async () => {
   console.log('================================================================');
   console.log('    PHASE 6 — ALUMNI VERIFICATION & MODERATION TEST SUITE       ');
   console.log('================================================================\n');
+
+  await migrate();
 
   // Start test server on ephemeral port
   const server = http.createServer(app);

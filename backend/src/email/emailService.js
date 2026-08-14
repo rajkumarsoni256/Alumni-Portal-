@@ -10,6 +10,17 @@ const getPasswordChangedTemplate = require('./templates/passwordChanged');
 const getEmailChangedTemplate = require('./templates/emailChanged');
 const { getAccountDeactivatedTemplate, getAccountDeletedTemplate } = require('./templates/accountDeactivated');
 const getPlatformNotificationTemplate = require('./templates/platformNotification');
+const {
+  getWelcomeAccountTemplate,
+  getAlumniVerificationRequestTemplate,
+  getAlumniApprovedTemplate,
+  getAlumniRejectedTemplate,
+  getConnectionEventTemplate,
+  getNewMessageTemplate,
+  getJobApplicationTemplate,
+  getEventRegistrationTemplate,
+  getMentorshipEventTemplate,
+} = require('./templates/transactionalTemplates');
 
 class EmailService {
   constructor() {
@@ -260,6 +271,46 @@ class EmailService {
     const { subject, html, text } = getAccountDeletedTemplate({ name });
     const result = await this.provider.sendEmail({ to: email, subject, html, text });
     await this.logDelivery({ userId, recipientEmail: email, emailType: 'ACCOUNT_DELETED', templateName: 'accountDeleted', subject, result });
+    return result;
+  }
+
+  /**
+   * 8. Send Welcome / Account Verified Email
+   */
+  async sendWelcomeEmail(email, name, userId = null) {
+    const { subject, html, text } = getWelcomeAccountTemplate({ name });
+    const result = await this.provider.sendEmail({ to: email, subject, html, text });
+    await this.logDelivery({ userId, recipientEmail: email, emailType: 'WELCOME', templateName: 'welcomeAccount', subject, result });
+    return result;
+  }
+
+  /**
+   * 9. Send Alumni Verification Request Alert to Admin
+   */
+  async sendAlumniVerificationRequestEmail(adminEmail, applicantData = {}) {
+    const { subject, html, text } = getAlumniVerificationRequestTemplate(applicantData);
+    const result = await this.provider.sendEmail({ to: adminEmail, subject, html, text });
+    await this.logDelivery({ userId: null, recipientEmail: adminEmail, emailType: 'ALUMNI_VERIFICATION_REQUEST', templateName: 'alumniVerificationRequest', subject, result });
+    return result;
+  }
+
+  /**
+   * 10. Send Alumni Account Approved Email
+   */
+  async sendAlumniApprovedEmail(email, name, userId = null) {
+    const { subject, html, text } = getAlumniApprovedTemplate({ name });
+    const result = await this.provider.sendEmail({ to: email, subject, html, text });
+    await this.logDelivery({ userId, recipientEmail: email, emailType: 'ALUMNI_VERIFICATION_APPROVED', templateName: 'alumniApproved', subject, result });
+    return result;
+  }
+
+  /**
+   * 11. Send Alumni Account Rejected Email
+   */
+  async sendAlumniRejectedEmail(email, name, rejectionReason = null, userId = null) {
+    const { subject, html, text } = getAlumniRejectedTemplate({ name, rejectionReason });
+    const result = await this.provider.sendEmail({ to: email, subject, html, text });
+    await this.logDelivery({ userId, recipientEmail: email, emailType: 'ALUMNI_VERIFICATION_REJECTED', templateName: 'alumniRejected', subject, result });
     return result;
   }
 

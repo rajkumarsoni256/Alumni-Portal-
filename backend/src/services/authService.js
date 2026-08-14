@@ -78,7 +78,21 @@ const detectDeviceAndSendAlert = async (user, req = {}, authMethod = 'PASSWORD')
   }
 };
 
-const register = async ({ name, email, password, role }) => {
+const { validateAndNormalizeRollNumber, validateAcademicYears } = require('../utils/courseConfig');
+
+const register = async ({
+  name,
+  email,
+  password,
+  role,
+  rollNumber,
+  universityRollNumber,
+  course,
+  joiningYear,
+  joining_year,
+  graduationYear,
+  graduation_year,
+}) => {
   const normalizedEmail = normalizeEmail(email);
 
   if (!role || typeof role !== 'string') {
@@ -121,36 +135,105 @@ const register = async ({ name, email, password, role }) => {
     throw error;
   }
 
+  let normRollNumber = null;
+  let normCourse = course ? String(course).trim().toUpperCase() : null;
+  let validatedJoiningYear = joiningYear || joining_year ? parseInt(joiningYear || joining_year, 10) : null;
+  let validatedGraduationYear = graduationYear || graduation_year ? parseInt(graduationYear || graduation_year, 10) : null;
+
+  // Student Identity Validation
+  if (upperRole === 'STUDENT') {
+    const rawRoll = rollNumber || universityRollNumber;
+    normRollNumber = validateAndNormalizeRollNumber(rawRoll, normCourse, validatedJoiningYear);
+
+    const years = validateAcademicYears(validatedJoiningYear, validatedGraduationYear);
+    validatedJoiningYear = years.joiningYear;
+    validatedGraduationYear = years.graduationYear;
+
+    // Database Uniqueness check for Roll Number
+    const rollCheck = await db.query(
+      `SELECT user_id FROM user_profiles WHERE university_roll_number = $1 LIMIT 1`,
+      [normRollNumber]
+    );
+    if (rollCheck.rows.length > 0) {
+      const error = new Error(`University Roll Number '${normRollNumber}' is already registered.`);
+      error.statusCode = 409;
+      error.errorCode = 'DUPLICATE_ROLL_NUMBER';
+      throw error;
+    }
+  }
+
+  const initialAccountStatus = upperRole === 'ALUMNI' ? 'PENDING_APPROVAL' : 'ACTIVE';
   const userId = crypto.randomUUID();
   const passwordHash = await bcrypt.hash(password, 10);
   const userResult = await db.query(
     `INSERT INTO users (id, email, password_hash, role, email_verified, account_status)
-     VALUES ($1, $2, $3, $4, false, 'ACTIVE')
+     VALUES ($1, $2, $3, $4, false, $5)
      RETURNING id, email, role, email_verified, account_status`,
-    [userId, normalizedEmail, passwordHash, upperRole]
+    [userId, normalizedEmail, passwordHash, upperRole, initialAccountStatus]
   );
   const user = userResult.rows[0];
 
+  const profileName = name ? name.trim() : normalizedEmail.split('@')[0];
+
   // Create initial profile
   await db.query(
-    `INSERT INTO user_profiles (id, user_id, full_name, is_profile_complete)
-     VALUES ($1, $2, $3, false)`,
-    [crypto.randomUUID(), user.id, name ? name.trim() : normalizedEmail.split('@')[0]]
+    `INSERT INTO user_profiles (id, user_id, full_name, university_roll_number, course, joining_year, graduation_year, is_profile_complete)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, false)`,
+    [
+      crypto.randomUUID(),
+      user.id,
+      profileName,
+      normRollNumber,
+      normCourse,
+      validatedJoiningYear,
+      validatedGraduationYear,
+    ]
   );
 
-  // Send 6-digit OTP verification email
-  try {
-    await emailService.sendVerificationCode(user.email, user.id, name ? name.trim() : null);
-  } catch (err) {
-    console.warn('[Email Verification Dispatch Warning]', err.message);
+  let alumniVerificationStatus = null;
+
+  // Alumni Approval Queue & Notification Engine
+  if (upperRole === 'ALUMNI') {
+    alumniVerificationStatus = 'PENDING';
+    await db.query(
+      `INSERT INTO alumni_verifications (id, user_id, status, created_at, updated_at)
+       VALUES (gen_random_uuid(), $1, 'PENDING', NOW(), NOW());`,
+      [user.id]
+    );
+
+    // Notify active Admins
+    const adminUsersRes = await db.query(
+      `SELECT id FROM users WHERE role = 'ADMIN' AND account_status = 'ACTIVE'`
+    );
+    for (const adminRow of adminUsersRes.rows) {
+      await db.query(
+        `INSERT INTO notifications (id, recipient_id, user_id, type, title, message, actor_name, created_at)
+         VALUES (gen_random_uuid(), $1, $2, 'ALUMNI_VERIFICATION_REQUEST', 'New Alumni Verification Request', $3, $4, NOW());`,
+        [
+          adminRow.id,
+          user.id,
+          `New Alumni verification request submitted by ${profileName} (${user.email}).`,
+          profileName,
+        ]
+      );
+    }
   }
+
+  // Send 6-digit OTP verification email (non-blocking)
+  emailService.sendVerificationCode(user.email, user.id, profileName)
+    .catch((err) => console.warn('[Email Verification Dispatch Warning]', err.message));
 
   return {
     id: user.id,
     email: user.email,
     role: user.role,
-    fullName: name ? name.trim() : null,
+    fullName: profileName,
     profileComplete: false,
+    universityRollNumber: normRollNumber,
+    course: normCourse,
+    joiningYear: validatedJoiningYear,
+    graduationYear: validatedGraduationYear,
+    alumniVerificationStatus,
   };
 };
 
@@ -170,6 +253,12 @@ const verifyEmail = async ({ email, code }) => {
   try {
     await emailService.verifyOTPCode({ email: normalizedEmail, code, purpose: 'EMAIL_VERIFICATION' });
     await db.query('UPDATE users SET email_verified = true, updated_at = NOW() WHERE id = $1', [user.id]);
+    
+    // Fetch profile name for welcome email
+    const profileRes = await db.query('SELECT full_name FROM user_profiles WHERE user_id = $1', [user.id]);
+    const userName = profileRes.rows[0]?.full_name || normalizedEmail.split('@')[0];
+    emailService.sendWelcomeEmail(normalizedEmail, userName, user.id)
+      .catch((err) => console.warn('[Welcome Email Dispatch Warning]', err.message));
     return;
   } catch (otpErr) {
     // Fallback to legacy email_verification_tokens for backward compatibility
@@ -193,6 +282,11 @@ const verifyEmail = async ({ email, code }) => {
 
     await db.query('UPDATE users SET email_verified = true, updated_at = NOW() WHERE id = $1', [user.id]);
     await db.query('UPDATE email_verification_tokens SET used = true WHERE id = $1', [tokenRecord.id]);
+
+    const profileRes = await db.query('SELECT full_name FROM user_profiles WHERE user_id = $1', [user.id]);
+    const userName = profileRes.rows[0]?.full_name || normalizedEmail.split('@')[0];
+    emailService.sendWelcomeEmail(normalizedEmail, userName, user.id)
+      .catch((err) => console.warn('[Welcome Email Dispatch Warning]', err.message));
   }
 };
 
@@ -248,6 +342,20 @@ const login = async ({ email, password, req }) => {
     const error = new Error('Invalid email or password');
     error.statusCode = 401;
     error.errorCode = 'INVALID_CREDENTIALS';
+    throw error;
+  }
+
+  if (user.account_status === 'PENDING_APPROVAL') {
+    const error = new Error('Your alumni account is awaiting administrator approval.');
+    error.statusCode = 403;
+    error.errorCode = 'ALUMNI_APPROVAL_PENDING';
+    throw error;
+  }
+
+  if (user.account_status === 'REJECTED') {
+    const error = new Error('Your alumni registration request was not approved.');
+    error.statusCode = 403;
+    error.errorCode = 'ALUMNI_APPROVAL_REJECTED';
     throw error;
   }
 
@@ -504,7 +612,8 @@ const resetPassword = async ({ token, code, email, newPassword }) => {
 
 const getCurrentUser = async (user) => {
   const result = await db.query(
-    `SELECT u.id, u.email, u.role, p.full_name, p.avatar_url, p.is_profile_complete
+    `SELECT u.id, u.email, u.role, p.full_name, p.avatar_url, p.is_profile_complete,
+            p.university_roll_number, p.course, p.joining_year, p.graduation_year
      FROM users u
      LEFT JOIN user_profiles p ON u.id = p.user_id
      WHERE u.id = $1`,
@@ -519,6 +628,16 @@ const getCurrentUser = async (user) => {
   }
 
   const row = result.rows[0];
+
+  let alumniVerificationStatus = null;
+  const verRes = await db.query(
+    `SELECT status FROM alumni_verifications WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1`,
+    [user.id]
+  );
+  if (verRes.rows.length > 0) {
+    alumniVerificationStatus = verRes.rows[0].status;
+  }
+
   return {
     id: row.id,
     email: row.email,
@@ -526,6 +645,11 @@ const getCurrentUser = async (user) => {
     fullName: row.full_name || null,
     avatarUrl: row.avatar_url || null,
     profileComplete: !!row.is_profile_complete,
+    universityRollNumber: row.university_roll_number || null,
+    course: row.course || null,
+    joiningYear: row.joining_year || null,
+    graduationYear: row.graduation_year || null,
+    alumniVerificationStatus,
   };
 };
 

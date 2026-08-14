@@ -13,8 +13,14 @@ const formatVerificationRecord = (row) => ({
   designation: row.designation || null,
   company: row.company || null,
   degree: row.degree || 'B.Tech',
+  course: row.course || null,
   branch: row.branch || null,
+  universityRollNumber: row.university_roll_number || null,
+  joiningYear: row.joining_year || null,
+  graduationYear: row.graduation_year || null,
   batch: row.graduation_year || row.current_year || null,
+  location: row.location || null,
+  linkedinUrl: row.linkedin_url || null,
   proofDocument: row.proof_document_url ? row.proof_document_url.split('/').pop() : 'Degree Certificate',
   proofDocumentUrl: row.proof_document_url || null,
   status: row.status,
@@ -58,7 +64,8 @@ const getVerifications = async (options = {}) => {
       u.email ILIKE $${idx} OR
       p.company ILIKE $${idx} OR
       p.designation ILIKE $${idx} OR
-      p.branch ILIKE $${idx}
+      p.branch ILIKE $${idx} OR
+      p.university_roll_number ILIKE $${idx}
     )`);
   }
 
@@ -104,11 +111,16 @@ const getVerifications = async (options = {}) => {
         p.full_name,
         p.avatar_url,
         p.degree,
+        p.course,
         p.branch,
+        p.university_roll_number,
+        p.joining_year,
         p.graduation_year,
         p.current_year,
         p.company,
         p.designation,
+        p.location,
+        p.linkedin_url,
         COALESCE(rp.full_name, ru.email) AS reviewer_name
     FROM alumni_verifications av
     JOIN users u ON av.user_id = u.id
@@ -144,15 +156,34 @@ const updateVerificationStatus = async (id, { status, rejectionReason, reviewerI
   try {
     await client.query('BEGIN');
 
-    // 1. Lock and inspect verification row
-    const checkQuery = `
-      SELECT id, user_id, status 
-      FROM alumni_verifications 
-      WHERE id = $1 
-      FOR UPDATE;
-    `;
-    const checkRes = await client.query(checkQuery, [id]);
+    // 1. Lock and inspect verification row (by verification ID or user ID)
+    let checkRes = await client.query(
+      `SELECT id, user_id, status FROM alumni_verifications WHERE id = $1 FOR UPDATE;`,
+      [id]
+    );
+
     if (checkRes.rows.length === 0) {
+      checkRes = await client.query(
+        `SELECT id, user_id, status FROM alumni_verifications WHERE user_id = $1 FOR UPDATE;`,
+        [id]
+      );
+    }
+
+    if (checkRes.rows.length === 0) {
+      const userRes = await client.query(
+        `SELECT id, account_status FROM users WHERE id = $1 FOR UPDATE;`,
+        [id]
+      );
+      if (userRes.rows.length > 0) {
+        await client.query('ROLLBACK');
+        client.release();
+        if (String(status).toUpperCase() === 'APPROVED') {
+          return await approveUserById(id, reviewerId);
+        } else if (String(status).toUpperCase() === 'REJECTED') {
+          return await rejectUserById(id, { rejectionReason, reviewerId });
+        }
+      }
+
       const err = new Error(`Verification record not found with ID: ${id}`);
       err.statusCode = 404;
       err.errorCode = 'VERIFICATION_NOT_FOUND';
@@ -160,6 +191,14 @@ const updateVerificationStatus = async (id, { status, rejectionReason, reviewerI
     }
 
     const currentRecord = checkRes.rows[0];
+
+    // Self-approval defense
+    if (currentRecord.user_id === reviewerId) {
+      const err = new Error('Admin users cannot approve their own verification request.');
+      err.statusCode = 400;
+      err.errorCode = 'CANNOT_APPROVE_SELF';
+      throw err;
+    }
 
     // 2. Validate state transition
     if (currentRecord.status !== 'PENDING') {
@@ -209,15 +248,50 @@ const updateVerificationStatus = async (id, { status, rejectionReason, reviewerI
       id,
     ]);
 
-    // 4. Update related user profile role if approved
+    // 4. Update related user profile role & account_status
     if (normStatus === 'APPROVED') {
       await client.query(
-        `UPDATE users SET role = 'ALUMNI', updated_at = CURRENT_TIMESTAMP WHERE id = $1;`,
+        `UPDATE users SET role = 'ALUMNI', account_status = 'ACTIVE', updated_at = CURRENT_TIMESTAMP WHERE id = $1;`,
+        [currentRecord.user_id]
+      );
+    } else if (normStatus === 'REJECTED') {
+      await client.query(
+        `UPDATE users SET account_status = 'REJECTED', updated_at = CURRENT_TIMESTAMP WHERE id = $1;`,
         [currentRecord.user_id]
       );
     }
 
-    // 5. Fetch updated verification record
+    // 5. Send notification to recipient user
+    const notifType = normStatus === 'APPROVED' ? 'ALUMNI_VERIFICATION_APPROVED' : 'ALUMNI_VERIFICATION_REJECTED';
+    const notifTitle = normStatus === 'APPROVED' ? 'Alumni Account Approved' : 'Alumni Verification Rejected';
+    const notifMsg = normStatus === 'APPROVED'
+      ? 'Your Alumni account has been approved by administrator. Welcome to the Alumni Network!'
+      : `Your Alumni verification request was rejected. Reason: ${String(rejectionReason).trim()}`;
+
+    await client.query(
+      `INSERT INTO notifications (id, recipient_id, user_id, type, title, message, actor_name, created_at)
+       VALUES (gen_random_uuid(), $1, $1, $2, $3, $4, 'System Admin', NOW());`,
+      [currentRecord.user_id, notifType, notifTitle, notifMsg]
+    );
+
+    // Send transactional email (non-blocking)
+    const emailService = require('../email/emailService');
+    const recipientUserRes = await client.query('SELECT email FROM users WHERE id = $1', [currentRecord.user_id]);
+    const recipientProfileRes = await client.query('SELECT full_name FROM user_profiles WHERE user_id = $1', [currentRecord.user_id]);
+    const recipientEmail = recipientUserRes.rows[0]?.email;
+    const recipientName = recipientProfileRes.rows[0]?.full_name || 'Alumni Candidate';
+
+    if (recipientEmail) {
+      if (normStatus === 'APPROVED') {
+        emailService.sendAlumniApprovedEmail(recipientEmail, recipientName, currentRecord.user_id)
+          .catch((err) => console.warn('[Alumni Approved Email Dispatch Warning]', err.message));
+      } else if (normStatus === 'REJECTED') {
+        emailService.sendAlumniRejectedEmail(recipientEmail, recipientName, rejectionReason, currentRecord.user_id)
+          .catch((err) => console.warn('[Alumni Rejected Email Dispatch Warning]', err.message));
+      }
+    }
+
+    // 6. Fetch updated verification record
     const fetchUpdatedQuery = `
       SELECT
           av.id,
@@ -234,11 +308,16 @@ const updateVerificationStatus = async (id, { status, rejectionReason, reviewerI
           p.full_name,
           p.avatar_url,
           p.degree,
+          p.course,
           p.branch,
+          p.university_roll_number,
+          p.joining_year,
           p.graduation_year,
           p.current_year,
           p.company,
           p.designation,
+          p.location,
+          p.linkedin_url,
           COALESCE(rp.full_name, ru.email) AS reviewer_name
       FROM alumni_verifications av
       JOIN users u ON av.user_id = u.id
@@ -250,13 +329,13 @@ const updateVerificationStatus = async (id, { status, rejectionReason, reviewerI
     const updatedRes = await client.query(fetchUpdatedQuery, [id]);
     const updatedRow = updatedRes.rows[0];
 
-    // 6. Record Transactional Audit Event
+    // 7. Record Transactional Audit Event
     const { logAdminAction } = require('./adminAuditService');
     await logAdminAction({
       client,
       adminUserId: reviewerId,
       actorName: updatedRow.reviewer_name,
-      action: normStatus === 'APPROVED' ? 'VERIFICATION_APPROVED' : 'VERIFICATION_REJECTED',
+      action: normStatus === 'APPROVED' ? 'ALUMNI_VERIFICATION_APPROVED' : 'ALUMNI_VERIFICATION_REJECTED',
       targetEntity: 'VERIFICATION',
       targetId: id,
       details: {
@@ -279,7 +358,50 @@ const updateVerificationStatus = async (id, { status, rejectionReason, reviewerI
   }
 };
 
+const approveUserById = async (userId, reviewerId) => {
+  const verRes = await db.query(`SELECT id FROM alumni_verifications WHERE user_id = $1 AND status = 'PENDING' ORDER BY created_at DESC LIMIT 1`, [userId]);
+  let verId;
+  if (verRes.rows.length === 0) {
+    const insertRes = await db.query(
+      `INSERT INTO alumni_verifications (id, user_id, status, created_at, updated_at)
+       VALUES (gen_random_uuid(), $1, 'PENDING', NOW(), NOW()) RETURNING id`,
+      [userId]
+    );
+    verId = insertRes.rows[0].id;
+  } else {
+    verId = verRes.rows[0].id;
+  }
+
+  return await updateVerificationStatus(verId, {
+    status: 'APPROVED',
+    reviewerId,
+  });
+};
+
+const rejectUserById = async (userId, { rejectionReason, reviewerId }) => {
+  const verRes = await db.query(`SELECT id FROM alumni_verifications WHERE user_id = $1 AND status = 'PENDING' ORDER BY created_at DESC LIMIT 1`, [userId]);
+  let verId;
+  if (verRes.rows.length === 0) {
+    const insertRes = await db.query(
+      `INSERT INTO alumni_verifications (id, user_id, status, created_at, updated_at)
+       VALUES (gen_random_uuid(), $1, 'PENDING', NOW(), NOW()) RETURNING id`,
+      [userId]
+    );
+    verId = insertRes.rows[0].id;
+  } else {
+    verId = verRes.rows[0].id;
+  }
+
+  return await updateVerificationStatus(verId, {
+    status: 'REJECTED',
+    rejectionReason: rejectionReason || 'Registration request not approved by administration.',
+    reviewerId,
+  });
+};
+
 module.exports = {
   getVerifications,
   updateVerificationStatus,
+  approveUserById,
+  rejectUserById,
 };
