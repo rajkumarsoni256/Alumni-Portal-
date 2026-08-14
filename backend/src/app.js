@@ -74,6 +74,21 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 // Serve static upload directory
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
+// Root Welcome Route
+app.get('/', (req, res) => {
+  res.json({
+    success: true,
+    message: 'JU Connect / JECRC Community API Backend Service',
+    environment: process.env.NODE_ENV || 'development',
+    version: '1.0.0',
+    endpoints: {
+      health: '/api/v1/health',
+      auth: '/api/v1/auth',
+      admin: '/api/v1/admin'
+    }
+  });
+});
+
 // Health Check Endpoints
 app.get(['/actuator/health', '/api/v1/health', '/healthz', '/heath'], (req, res) => {
   res.json({
