@@ -1,182 +1,158 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { PageContainer } from '../components/layout/PageContainer';
 import { useApp } from '../context/AppContext';
-import { User, Bell, Shield, Check, Save } from 'lucide-react';
+import { AccountSection } from '../components/settings/AccountSection';
+import { ProfileSettingsSection } from '../components/settings/ProfileSettingsSection';
+import { PrivacySection } from '../components/settings/PrivacySection';
+import { NotificationSettingsSection } from '../components/settings/NotificationSettingsSection';
+import { MessagingSettingsSection } from '../components/settings/MessagingSettingsSection';
+import { SecuritySection } from '../components/settings/SecuritySection';
+import { CareerMentorshipSection } from '../components/settings/CareerMentorshipSection';
+import { AppearanceSection } from '../components/settings/AppearanceSection';
+import { DataPrivacySection } from '../components/settings/DataPrivacySection';
+import { BlockedUsersSection } from '../components/settings/BlockedUsersSection';
+import { HelpSupportSection } from '../components/settings/HelpSupportSection';
+
+import { 
+  User, 
+  UserCheck, 
+  Shield, 
+  Bell, 
+  MessageSquare, 
+  Lock, 
+  Briefcase, 
+  Award, 
+  Sun, 
+  Database, 
+  UserX, 
+  HelpCircle,
+  ChevronRight,
+  ArrowLeft
+} from 'lucide-react';
 
 export const SettingsPage = () => {
-  const { currentUser, showNotification } = useApp();
-
+  const { currentUser, userSettings, fetchUserSettings } = useApp();
   const [activeTab, setActiveTab] = useState('account');
-  const [emailNotifs, setEmailNotifs] = useState(true);
-  const [mentorshipAlerts, setMentorshipAlerts] = useState(true);
-  const [profilePublic, setProfilePublic] = useState(true);
+  const [mobileSubScreenOpen, setMobileSubScreenOpen] = useState(false);
 
-  const handleSave = (e) => {
-    e.preventDefault();
-    showNotification('Preferences updated successfully!', 'success');
+  useEffect(() => {
+    fetchUserSettings();
+  }, []);
+
+  const isAlumni = (currentUser?.role || '').toUpperCase() === 'ALUMNI';
+
+  const TABS = [
+    { id: 'account', label: 'Account', icon: User, desc: 'Email, password & status' },
+    { id: 'profile', label: 'Profile Details', icon: UserCheck, desc: 'Public bio & headline' },
+    { id: 'privacy', label: 'Privacy & Visibility', icon: Shield, desc: 'Directory & contact rules' },
+    { id: 'notifications', label: 'Notifications', icon: Bell, desc: 'In-app & email alerts' },
+    { id: 'messaging', label: 'Messaging & Network', icon: MessageSquare, desc: 'Message & request controls' },
+    { id: 'security', label: 'Security & 2FA', icon: Lock, desc: '2FA & active sessions' },
+    { 
+      id: 'career', 
+      label: isAlumni ? 'Professional & Mentorship' : 'Career & Mentorship', 
+      icon: isAlumni ? Award : Briefcase, 
+      desc: isAlumni ? 'Mentorship availability' : 'Job status & preferences' 
+    },
+    { id: 'appearance', label: 'Appearance', icon: Sun, desc: 'Light, dark & system themes' },
+    { id: 'data', label: 'Data & Privacy', icon: Database, desc: 'Export archive & history' },
+    { id: 'blocked', label: 'Blocked Accounts', icon: UserX, desc: 'Manage blocked users' },
+    { id: 'support', label: 'Help & Support', icon: HelpCircle, desc: 'Guidelines & report issue' },
+  ];
+
+  const handleTabClick = (tabId) => {
+    setActiveTab(tabId);
+    setMobileSubScreenOpen(true);
+  };
+
+  const renderActiveSection = () => {
+    switch (activeTab) {
+      case 'account':
+        return <AccountSection />;
+      case 'profile':
+        return <ProfileSettingsSection />;
+      case 'privacy':
+        return <PrivacySection />;
+      case 'notifications':
+        return <NotificationSettingsSection />;
+      case 'messaging':
+        return <MessagingSettingsSection />;
+      case 'security':
+        return <SecuritySection />;
+      case 'career':
+        return <CareerMentorshipSection />;
+      case 'appearance':
+        return <AppearanceSection />;
+      case 'data':
+        return <DataPrivacySection />;
+      case 'blocked':
+        return <BlockedUsersSection />;
+      case 'support':
+        return <HelpSupportSection />;
+      default:
+        return <AccountSection />;
+    }
   };
 
   return (
     <PageContainer
-      title="Settings"
-      description="Manage your account details, notification alerts, and privacy preferences."
+      title="Settings & Preferences"
+      description="Manage account details, privacy visibility, notification channels, security, and career preferences."
     >
-      <div className="bg-white rounded-xl border border-slate-200 shadow-2xs overflow-hidden grid grid-cols-1 md:grid-cols-12">
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-2xs overflow-hidden grid grid-cols-1 md:grid-cols-12 min-h-[620px]">
         
-        {/* Left Settings Sidebar (4 Cols) */}
-        <div className="md:col-span-4 bg-slate-50 border-r border-slate-200 p-3 space-y-1">
-          <button
-            type="button"
-            onClick={() => setActiveTab('account')}
-            className={`w-full px-3 py-2 rounded-lg text-xs font-medium text-left flex items-center gap-2.5 transition-colors cursor-pointer ${
-              activeTab === 'account'
-                ? 'bg-white text-red-700 font-semibold shadow-2xs border border-slate-200'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-            }`}
-          >
-            <User className="w-4 h-4" />
-            <span>Account Profile</span>
-          </button>
+        {/* Left Sidebar Menu (Desktop: 4-cols on MD, 3-cols on LG) */}
+        <div className={`md:col-span-4 lg:col-span-3 bg-slate-50/80 border-r border-slate-200 p-3 space-y-1 ${
+          mobileSubScreenOpen ? 'hidden md:block' : 'block'
+        }`}>
+          <div className="px-3 py-2 pb-2">
+            <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Settings Navigation</span>
+          </div>
 
-          <button
-            type="button"
-            onClick={() => setActiveTab('notifications')}
-            className={`w-full px-3 py-2 rounded-lg text-xs font-medium text-left flex items-center gap-2.5 transition-colors cursor-pointer ${
-              activeTab === 'notifications'
-                ? 'bg-white text-red-700 font-semibold shadow-2xs border border-slate-200'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-            }`}
-          >
-            <Bell className="w-4 h-4" />
-            <span>Notifications</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab('privacy')}
-            className={`w-full px-3 py-2 rounded-lg text-xs font-medium text-left flex items-center gap-2.5 transition-colors cursor-pointer ${
-              activeTab === 'privacy'
-                ? 'bg-white text-red-700 font-semibold shadow-2xs border border-slate-200'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-            }`}
-          >
-            <Shield className="w-4 h-4" />
-            <span>Privacy & Security</span>
-          </button>
+          <div className="space-y-1">
+            {TABS.map((tab) => {
+              const Icon = tab.icon;
+              const isActive = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => handleTabClick(tab.id)}
+                  className={`w-full px-3 py-2.5 rounded-xl text-xs font-semibold text-left flex items-center justify-between transition-all cursor-pointer ${
+                    isActive
+                      ? 'bg-white text-red-700 font-bold shadow-2xs border border-slate-200/80'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/80'
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-red-700' : 'text-slate-500'}`} />
+                    <span className="truncate">{tab.label}</span>
+                  </div>
+                  <ChevronRight className={`w-3.5 h-3.5 shrink-0 transition-transform ${isActive ? 'text-red-700 translate-x-0.5' : 'text-slate-300'}`} />
+                </button>
+              );
+            })}
+          </div>
         </div>
 
-        {/* Right Settings Form (8 Cols) */}
-        <div className="md:col-span-8 p-6 space-y-6">
-          
-          {activeTab === 'account' && (
-            <form onSubmit={handleSave} className="space-y-4">
-              <div className="space-y-1">
-                <h3 className="text-sm font-bold text-slate-900">Account Details</h3>
-                <p className="text-xs text-slate-500">Update your primary display name and email address.</p>
-              </div>
+        {/* Right Content Panel (Desktop: 8-cols on MD, 9-cols on LG) */}
+        <div className={`md:col-span-8 lg:col-span-9 p-4 sm:p-6 md:p-8 bg-white ${
+          !mobileSubScreenOpen ? 'hidden md:block' : 'block'
+        }`}>
+          {/* Mobile Back Header */}
+          <div className="md:hidden flex items-center gap-2 pb-4 mb-4 border-b border-slate-100">
+            <button
+              type="button"
+              onClick={() => setMobileSubScreenOpen(false)}
+              className="p-1.5 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors cursor-pointer flex items-center gap-1 text-xs font-semibold"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span>Back to Menu</span>
+            </button>
+          </div>
 
-              <div className="space-y-3">
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-700 block">Full Name</label>
-                  <input
-                    type="text"
-                    defaultValue={currentUser.name}
-                    className="w-full bg-slate-50 border border-slate-300 focus:border-slate-800 focus:bg-white rounded-md px-3 py-2 text-xs text-slate-900 focus:outline-none"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-700 block">Email Address</label>
-                  <input
-                    type="email"
-                    defaultValue={currentUser.email || 'tokir@jecrc.edu.in'}
-                    className="w-full bg-slate-50 border border-slate-300 focus:border-slate-800 focus:bg-white rounded-md px-3 py-2 text-xs text-slate-900 focus:outline-none"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-700 block">Headline Bio</label>
-                  <input
-                    type="text"
-                    defaultValue={currentUser.headline}
-                    className="w-full bg-slate-50 border border-slate-300 focus:border-slate-800 focus:bg-white rounded-md px-3 py-2 text-xs text-slate-900 focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              <div className="pt-3 border-t border-slate-100 flex justify-end">
-                <button
-                  type="submit"
-                  className="px-4 py-2 rounded-md text-xs font-semibold text-white bg-red-700 hover:bg-red-800 transition-colors inline-flex items-center gap-1.5 shadow-2xs cursor-pointer"
-                >
-                  <Save className="w-3.5 h-3.5" />
-                  <span>Save Changes</span>
-                </button>
-              </div>
-            </form>
-          )}
-
-          {activeTab === 'notifications' && (
-            <div className="space-y-4">
-              <div className="space-y-1">
-                <h3 className="text-sm font-bold text-slate-900">Notification Alerts</h3>
-                <p className="text-xs text-slate-500">Configure how you receive community and mentorship alerts.</p>
-              </div>
-
-              <div className="space-y-3 divide-y divide-slate-100">
-                <div className="pt-2 flex items-center justify-between">
-                  <div>
-                    <span className="text-xs font-bold text-slate-900 block">Email Notifications</span>
-                    <span className="text-[11px] text-slate-500">Receive email digests for post interactions and connection requests.</span>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={emailNotifs}
-                    onChange={(e) => setEmailNotifs(e.target.checked)}
-                    className="w-4 h-4 text-red-700 rounded cursor-pointer"
-                  />
-                </div>
-
-                <div className="pt-3 flex items-center justify-between">
-                  <div>
-                    <span className="text-xs font-bold text-slate-900 block">Mentorship Session Reminders</span>
-                    <span className="text-[11px] text-slate-500">Instant reminders 30 minutes before video call meetings.</span>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={mentorshipAlerts}
-                    onChange={(e) => setMentorshipAlerts(e.target.checked)}
-                    className="w-4 h-4 text-red-700 rounded cursor-pointer"
-                  />
-                </div>
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'privacy' && (
-            <div className="space-y-4">
-              <div className="space-y-1">
-                <h3 className="text-sm font-bold text-slate-900">Privacy & Security</h3>
-                <p className="text-xs text-slate-500">Manage directory visibility and security controls.</p>
-              </div>
-
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <span className="text-xs font-bold text-slate-900 block">Public Directory Profile</span>
-                    <span className="text-[11px] text-slate-500">Allow other JECRC students and alumni to find your profile.</span>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={profilePublic}
-                    onChange={(e) => setProfilePublic(e.target.checked)}
-                    className="w-4 h-4 text-red-700 rounded cursor-pointer"
-                  />
-                </div>
-              </div>
-            </div>
-          )}
-
+          {/* Active Settings Section */}
+          {renderActiveSection()}
         </div>
 
       </div>

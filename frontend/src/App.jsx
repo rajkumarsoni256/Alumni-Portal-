@@ -1,10 +1,11 @@
 import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
-import { AppProvider } from './context/AppContext';
+import { AppProvider, useApp } from './context/AppContext';
 
 // Layout & Protected Route
 import { ProtectedRoute } from './components/layout/ProtectedRoute';
 import { AdminRoute } from './components/layout/AdminRoute';
+import { Navbar } from './components/common/Navbar';
 
 // Public & Authentication Pages
 import { LandingPage } from './pages/LandingPage';
@@ -32,6 +33,7 @@ import { ProfilePage } from './pages/ProfilePage';
 import { MentorshipRequestPage } from './pages/MentorshipRequestPage';
 import { AlumniDashboard } from './pages/AlumniDashboard';
 import { AboutPage } from './pages/AboutPage';
+import { PostDetailPage } from './pages/PostDetailPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 
 // Module 10 — Dedicated Admin Portal Pages
@@ -51,6 +53,44 @@ const ScrollToTop = () => {
   return null;
 };
 
+// Layout for public unauthenticated pages (Navbar + Content)
+const PublicLayout = ({ children }) => {
+  return (
+    <div className="min-h-screen flex flex-col bg-slate-100/75 text-slate-900 font-sans antialiased">
+      <Navbar />
+      <main className="flex-1">{children}</main>
+    </div>
+  );
+};
+
+// Smart root route component: Landing Page for guests, Community Feed for logged-in users
+const RootIndex = () => {
+  const { isAuthenticated, isLoading } = useApp();
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-4 text-white">
+        <div className="w-10 h-10 border-3 border-red-600 border-t-transparent rounded-full animate-spin mb-3"></div>
+        <p className="text-xs font-semibold text-slate-400">Loading JECRC Connect...</p>
+      </div>
+    );
+  }
+
+  if (isAuthenticated) {
+    return (
+      <ProtectedRoute>
+        <CommunityFeed />
+      </ProtectedRoute>
+    );
+  }
+
+  return (
+    <PublicLayout>
+      <LandingPage />
+    </PublicLayout>
+  );
+};
+
 export function App() {
   return (
     <AppProvider>
@@ -60,7 +100,14 @@ export function App() {
           {/* ======================================================= */}
           {/* 1. PUBLIC & AUTHENTICATION ROUTES                        */}
           {/* ======================================================= */}
-          <Route path="/welcome" element={<LandingPage />} />
+          <Route
+            path="/welcome"
+            element={
+              <PublicLayout>
+                <LandingPage />
+              </PublicLayout>
+            }
+          />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/select-role" element={<RoleSelectionPage />} />
@@ -77,14 +124,7 @@ export function App() {
           {/* ======================================================= */}
           {/* 2. AUTHENTICATED COMMUNITY ROUTES (Inside AppShell)      */}
           {/* ======================================================= */}
-          <Route
-            path="/"
-            element={
-              <ProtectedRoute>
-                <CommunityFeed />
-              </ProtectedRoute>
-            }
-          />
+          <Route path="/" element={<RootIndex />} />
           <Route
             path="/home"
             element={
@@ -179,6 +219,15 @@ export function App() {
             element={
               <ProtectedRoute>
                 <SettingsPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/posts/:id"
+            element={
+              <ProtectedRoute>
+                <PostDetailPage />
               </ProtectedRoute>
             }
           />

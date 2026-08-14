@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
+import { UserAvatar } from '../common/UserAvatar';
 import {
   GraduationCap,
   Search,
@@ -25,34 +26,34 @@ export const Navbar = () => {
 
   const location = useLocation();
   const navigate = useNavigate();
-  const { 
+  const {
     isAuthenticated,
     logoutUser,
-    activeRole, 
-    currentUser, 
-    searchQuery, 
-    setSearchQuery, 
-    notifications, 
+    activeRole,
+    currentUser,
+    searchQuery,
+    setSearchQuery,
+    notifications,
     unreadNotifsCount: appUnreadNotifsCount,
     markNotificationRead,
     setFeedFilter,
     unreadMessagesCount,
   } = useApp();
 
-  const unreadNotifsCount = appUnreadNotifsCount ?? notifications.filter((n) => n.unread || n.isRead === false).length;
+  const unreadNotifsCount = appUnreadNotifsCount ?? notifications?.filter((n) => n.unread || n.isRead === false).length ?? 0;
 
   const navLinks = activeRole === 'alumni'
     ? [
-        { name: 'Feed', path: '/' },
-        { name: 'Discover', path: '/network' },
-        { name: 'My Connections', path: '/my-connections' },
-        { name: 'Alumni Directory', path: '/explore' },
-        { name: 'Mentorship Requests', path: '/alumni-dashboard' },
-        { name: 'Jobs', path: '/jobs' },
-        { name: 'Events', path: '/events' },
-      ]
+      { name: 'Feed', path: '/' },
+      { name: 'Discover', path: '/network' },
+      { name: 'My Connections', path: '/my-connections' },
+      { name: 'Alumni Directory', path: '/explore' },
+      { name: 'Mentorship Requests', path: '/alumni-dashboard' },
+      { name: 'Jobs', path: '/jobs' },
+      { name: 'Events', path: '/events' },
+    ]
     : activeRole === 'admin'
-    ? [
+      ? [
         { name: 'Admin Dashboard', path: '/admin-dashboard' },
         { name: 'Feed Preview', path: '/' },
         { name: 'My Connections', path: '/my-connections' },
@@ -60,7 +61,7 @@ export const Navbar = () => {
         { name: 'Jobs', path: '/jobs' },
         { name: 'Events', path: '/events' },
       ]
-    : [
+      : [
         { name: 'Feed', path: '/' },
         { name: 'Discover', path: '/network' },
         { name: 'My Connections', path: '/my-connections' },
@@ -114,19 +115,23 @@ export const Navbar = () => {
     }
   };
 
+  const getProfilePath = () => {
+    if (activeRole === 'student') return '/student-dashboard';
+    if (activeRole === 'alumni') return `/alumni/${currentUser?.id || 'alm_1'}`;
+    return '/admin-dashboard';
+  };
+
   return (
     <header className="sticky top-0 z-40 bg-white border-b border-slate-200 shadow-xs">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16 gap-4">
-          
+
           {/* Logo & Brand Identity */}
           <div className="flex items-center gap-3 shrink-0">
             <Link to="/" className="flex items-center gap-2.5 group">
-              <img
-                src="/ju-alumni-logo.jpg"
-                alt="JU Connect Logo"
-                className="w-9 h-9 rounded-lg object-cover border border-slate-200 shadow-2xs group-hover:opacity-90 transition-opacity"
-              />
+              <div className="w-8 h-8 rounded-lg bg-red-700 text-white flex items-center justify-center font-bold text-sm shadow-2xs group-hover:bg-red-800 transition-colors">
+                JU
+              </div>
               <div className="flex flex-col">
                 <span className="font-bold text-base text-slate-900 leading-tight tracking-tight">
                   JU <span className="text-red-700">Connect</span>
@@ -140,15 +145,15 @@ export const Navbar = () => {
 
           {/* Search Bar */}
           {isAuthenticated && (
-            <div className="hidden md:flex flex-1 max-w-md mx-4">
+            <div className="hidden md:flex flex-1 max-w-sm xl:max-w-md mx-2">
               <form onSubmit={handleSearchSubmit} className="w-full relative">
                 <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
                   type="text"
-                  placeholder="Search alumni by company, skills, or batch..."
+                  placeholder="Search alumni by name, company..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-1.5 text-xs bg-slate-100/80 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-600 transition-all text-slate-900 placeholder:text-slate-500"
+                  className="w-full pl-10 pr-4 py-1.5 text-xs bg-slate-100/90 border border-slate-200/80 rounded-full focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-600 transition-all text-slate-900 placeholder:text-slate-400"
                 />
               </form>
             </div>
@@ -156,17 +161,19 @@ export const Navbar = () => {
 
           {/* Desktop Navigation Links */}
           {isAuthenticated && (
-            <nav className="hidden lg:flex items-center gap-1">
+            <nav className="hidden lg:flex items-center gap-1 xl:gap-2">
               {navLinks.map((link) => {
-                const isActive = location.pathname === link.path;
+                const isActive =
+                  location.pathname === link.path ||
+                  (link.path === '/' && (location.pathname === '/home' || location.pathname === '/feed'));
                 return (
                   <Link
                     key={link.path}
                     to={link.path}
-                    className={`px-3 py-2 rounded-lg text-xs font-semibold transition-colors ${
+                    className={`px-3 py-4 text-xs font-semibold transition-all relative inline-flex items-center ${
                       isActive
-                        ? 'text-red-700 bg-red-50/70'
-                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                        ? 'text-red-700 font-bold border-b-2 border-red-700'
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
                     }`}
                   >
                     {link.name}
@@ -176,34 +183,36 @@ export const Navbar = () => {
             </nav>
           )}
 
-          {/* Right Action Icons & Profile Dropdown */}
-          <div className="flex items-center gap-2">
+          {/* Right Action Icons & Profile / Auth */}
+          <div className="flex items-center gap-2 sm:gap-3">
             {isAuthenticated ? (
               <>
-                {/* Messages Link (Non-Admin only) */}
-                {activeRole !== 'admin' && (
-                  <Link
-                    to="/messages"
-                    className="relative p-2 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors"
-                    title="Messages"
-                  >
-                    <MessageSquare className="w-4 h-4" />
-                    {unreadMessagesCount > 0 && (
-                      <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-red-600" />
-                    )}
-                  </Link>
-                )}
+                {/* Messages Icon */}
+                <Link
+                  to="/messages"
+                  className="relative p-2 rounded-full text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer hidden sm:flex"
+                  title="Messages"
+                >
+                  <MessageSquare className="w-4.5 h-4.5" />
+                  {unreadMessagesCount > 0 && (
+                    <span className="absolute -top-0.5 -right-0.5 bg-red-600 text-white text-[9px] font-bold w-4 h-4 rounded-full flex items-center justify-center shadow-xs">
+                      {unreadMessagesCount}
+                    </span>
+                  )}
+                </Link>
 
                 {/* Notifications Dropdown */}
                 <div className="relative" ref={notifMenuRef}>
                   <button
                     onClick={() => setShowNotifDropdown(!showNotifDropdown)}
-                    className="relative p-2 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer"
+                    className="relative p-2 rounded-full text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer"
                     title="Notifications"
                   >
-                    <Bell className="w-4 h-4" />
+                    <Bell className="w-4.5 h-4.5" />
                     {unreadNotifsCount > 0 && (
-                      <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-red-600" />
+                      <span className="absolute -top-0.5 -right-0.5 bg-red-600 text-white text-[9px] font-bold w-4 h-4 rounded-full flex items-center justify-center shadow-xs">
+                        {unreadNotifsCount}
+                      </span>
                     )}
                   </button>
 
@@ -215,34 +224,27 @@ export const Navbar = () => {
                       </div>
 
                       <div className="max-h-72 overflow-y-auto divide-y divide-slate-100">
-                        {notifications.length > 0 ? (
-                          notifications.map((n) => {
-                            const actorName = n.actor?.name || 'JECRC Member';
-                            return (
-                              <div
-                                key={n.id}
-                                onClick={() => handleNotificationClick(n)}
-                                className={`p-3 flex items-start gap-2.5 hover:bg-slate-50 cursor-pointer transition-colors ${
-                                  n.unread || !n.isRead ? 'bg-red-50/30' : ''
-                                }`}
-                              >
-                                <img
-                                  src={n.avatar}
-                                  alt={actorName}
-                                  className="w-7 h-7 rounded-full object-cover shrink-0 mt-0.5 border border-slate-200"
-                                />
-                                <div className="space-y-0.5 flex-1 min-w-0">
-                                  <p className="text-xs text-slate-700 leading-snug">
-                                    <span className="font-semibold text-slate-900">{n.title || actorName}</span> - {n.message || n.text}
-                                  </p>
-                                  <span className="text-[10px] text-slate-400">{n.time}</span>
-                                </div>
-                                {(n.unread || !n.isRead) && (
-                                  <span className="w-1.5 h-1.5 rounded-full bg-red-600 shrink-0 mt-2" />
-                                )}
+                        {notifications && notifications.length > 0 ? (
+                          notifications.slice(0, 5).map((n) => (
+                            <div
+                              key={n.id}
+                              onClick={() => handleNotificationClick(n)}
+                              className={`p-3 flex items-start gap-2.5 hover:bg-slate-50 cursor-pointer text-xs ${
+                                n.unread || !n.isRead ? 'bg-red-50/20' : ''
+                              }`}
+                            >
+                              <UserAvatar src={n.avatar} name={n.title} className="w-7 h-7" iconClassName="w-3.5 h-3.5" />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-slate-800 text-[11px] leading-snug line-clamp-2">
+                                  <span className="font-semibold text-slate-900">{n.title}</span> - {n.message || n.text}
+                                </p>
+                                <span className="text-[10px] text-slate-400">{n.time}</span>
                               </div>
-                            );
-                          })
+                              {(n.unread || !n.isRead) && (
+                                <span className="w-1.5 h-1.5 rounded-full bg-red-600 shrink-0 mt-2" />
+                              )}
+                            </div>
+                          ))
                         ) : (
                           <div className="p-6 text-center text-xs text-slate-500">
                             No notifications yet
@@ -263,76 +265,70 @@ export const Navbar = () => {
 
                 <div className="h-5 w-px bg-slate-200 mx-1 hidden sm:block" />
 
-                {/* User Profile Avatar Dropdown */}
+                {/* Profile Avatar Dropdown */}
                 <div className="relative" ref={profileMenuRef}>
                   <button
                     onClick={() => setShowProfileMenu(!showProfileMenu)}
                     className="flex items-center gap-2 p-1 pl-1.5 pr-2 rounded-md hover:bg-slate-100 transition-colors cursor-pointer"
                   >
-                    <img
-                      src={currentUser.avatar}
-                      alt={currentUser.name}
-                      className="w-7 h-7 rounded-full object-cover border border-slate-200"
-                    />
-                    <div className="hidden sm:block text-left leading-tight">
-                      <span className="text-xs font-semibold text-slate-900 block truncate max-w-[100px]">
-                        {currentUser.name}
-                      </span>
-                    </div>
-                    <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+                    <UserAvatar src={currentUser?.avatar} name={currentUser?.name} className="w-7 h-7" iconClassName="w-4 h-4" />
+                    <span className="text-xs font-semibold text-slate-800 max-w-[100px] truncate hidden sm:inline-block">
+                      {currentUser?.name?.split(' ')[0] || 'Account'}
+                    </span>
+                    <ChevronDown className="w-3 h-3 text-slate-400" />
                   </button>
 
                   {showProfileMenu && (
-                    <div className="absolute right-0 top-11 z-50 w-56 bg-white rounded-lg border border-slate-200 shadow-lg overflow-hidden py-1">
-                      <div className="px-3.5 py-2.5 border-b border-slate-100 bg-slate-50/50">
-                        <p className="text-xs font-bold text-slate-900 truncate">{currentUser.name}</p>
-                        <p className="text-[11px] text-slate-500 truncate">{currentUser.email}</p>
-                        <span className="inline-block mt-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-red-100 text-red-800 capitalize">
-                          {activeRole} Account
-                        </span>
+                    <div className="absolute right-0 top-11 z-50 w-56 bg-white rounded-lg border border-slate-200 shadow-lg py-1">
+                      <div className="px-3.5 py-2 border-b border-slate-100">
+                        <p className="text-xs font-bold text-slate-900 truncate">
+                          {currentUser?.name}
+                        </p>
+                        <p className="text-[11px] text-slate-500 truncate capitalize">
+                          {activeRole} Profile
+                        </p>
                       </div>
 
-                      <div className="py-1">
-                        <Link
-                          to="/profile"
-                          onClick={() => setShowProfileMenu(false)}
-                          className="flex items-center gap-2 px-3.5 py-2 text-xs text-slate-700 hover:bg-slate-50 font-medium"
-                        >
-                          <User className="w-3.5 h-3.5 text-slate-400" />
-                          <span>My Profile</span>
-                        </Link>
-                        <Link
-                          to="/settings"
-                          onClick={() => setShowProfileMenu(false)}
-                          className="flex items-center gap-2 px-3.5 py-2 text-xs text-slate-700 hover:bg-slate-50 font-medium"
-                        >
-                          <Settings className="w-3.5 h-3.5 text-slate-400" />
-                          <span>Account Settings</span>
-                        </Link>
-                      </div>
+                      <Link
+                        to={getProfilePath()}
+                        onClick={() => setShowProfileMenu(false)}
+                        className="flex items-center gap-2 px-3 py-2 text-xs text-slate-700 hover:bg-slate-50 transition-colors"
+                      >
+                        <User className="w-3.5 h-3.5 text-slate-500" />
+                        <span>View Profile</span>
+                      </Link>
 
-                      <div className="border-t border-slate-100 pt-1">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setShowProfileMenu(false);
-                            logoutUser();
-                          }}
-                          className="flex items-center gap-2 w-full px-3.5 py-2 text-xs text-red-600 hover:bg-red-50 font-medium transition-colors cursor-pointer"
-                        >
-                          <LogOut className="w-3.5 h-3.5" />
-                          <span>Sign Out</span>
-                        </button>
-                      </div>
+                      <Link
+                        to="/settings"
+                        onClick={() => setShowProfileMenu(false)}
+                        className="flex items-center gap-2 px-3 py-2 text-xs text-slate-700 hover:bg-slate-50 transition-colors"
+                      >
+                        <Settings className="w-3.5 h-3.5 text-slate-500" />
+                        <span>Settings</span>
+                      </Link>
+
+                      <div className="border-t border-slate-100 my-1" />
+
+                      <button
+                        onClick={() => {
+                          setShowProfileMenu(false);
+                          logoutUser();
+                          navigate('/welcome');
+                        }}
+                        className="w-full flex items-center gap-2 px-3 py-2 text-xs text-rose-600 hover:bg-rose-50 transition-colors text-left cursor-pointer"
+                      >
+                        <LogOut className="w-3.5 h-3.5" />
+                        <span>Sign Out</span>
+                      </button>
                     </div>
                   )}
                 </div>
 
-                {/* Mobile Menu Toggle */}
+                {/* Mobile Hamburger Toggle */}
                 <button
                   onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                  className="p-2 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 lg:hidden"
-                  aria-label="Toggle Navigation Menu"
+                  className="p-1.5 rounded-lg text-slate-600 hover:bg-slate-100 lg:hidden cursor-pointer"
+                  aria-label="Toggle mobile menu"
                 >
                   {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
                 </button>
@@ -341,7 +337,7 @@ export const Navbar = () => {
               <div className="flex items-center gap-2">
                 <Link
                   to="/login"
-                  className="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-slate-700 hover:text-slate-900 hover:bg-slate-100 transition-colors"
+                  className="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-slate-700 hover:bg-slate-100 transition-colors"
                 >
                   Sign In
                 </Link>

@@ -47,6 +47,12 @@ export const eventService = {
     return data;
   },
 
+  getUpcomingEvents: async (limit = 5) => {
+    const data = await apiClient.get(`/api/v1/events/upcoming?limit=${limit}`);
+    if (Array.isArray(data)) return data;
+    return data?.events || [];
+  },
+
   deleteEvent: async (id) => {
     const data = await apiClient.delete(`/api/v1/events/${id}`);
     return data;

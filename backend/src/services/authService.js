@@ -3,6 +3,7 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const db = require('../config/db');
 const googleAuthService = require('./googleAuthService');
+const emailService = require('../email/emailService');
 
 const JWT_SECRET = process.env.JWT_SECRET || '404E635266556A586E3272357538782F413F4428472B4B6250655368566D5970';
 const JWT_EXPIRATION = process.env.JWT_EXPIRATION || '1h';
@@ -13,6 +14,68 @@ const normalizeEmail = (email) => {
 
 const generateToken = (userId, role) => {
   return jwt.sign({ sub: userId, role }, JWT_SECRET, { expiresIn: JWT_EXPIRATION });
+};
+
+const parseUserAgent = (uaString = '') => {
+  let browser = 'Chrome';
+  if (uaString.includes('Firefox')) browser = 'Firefox';
+  else if (uaString.includes('Safari') && !uaString.includes('Chrome')) browser = 'Safari';
+  else if (uaString.includes('Edg')) browser = 'Edge';
+
+  let os = 'Windows';
+  if (uaString.includes('Macintosh') || uaString.includes('Mac OS')) os = 'macOS';
+  else if (uaString.includes('Android')) os = 'Android';
+  else if (uaString.includes('iPhone') || uaString.includes('iPad')) os = 'iOS';
+  else if (uaString.includes('Linux')) os = 'Linux';
+
+  return {
+    browser,
+    os,
+    deviceName: `${browser} on ${os}`,
+  };
+};
+
+const detectDeviceAndSendAlert = async (user, req = {}, authMethod = 'PASSWORD') => {
+  try {
+    const userAgent = req.headers ? (req.headers['user-agent'] || '') : '';
+    const ipAddress = req.ip || req.headers?.['x-forwarded-for'] || '127.0.0.1';
+    const parsed = parseUserAgent(userAgent);
+    const deviceName = parsed.deviceName;
+
+    const sessionRes = await db.query(
+      `SELECT id, is_active FROM user_sessions WHERE user_id = $1 AND device = $2 LIMIT 1`,
+      [user.id, deviceName]
+    );
+
+    if (sessionRes.rows.length === 0) {
+      // New Device Detected!
+      await db.query(
+        `INSERT INTO user_sessions (id, user_id, device, ip_address, user_agent, is_active, last_active_at)
+         VALUES ($1, $2, $3, $4, $5, true, NOW())`,
+        [crypto.randomUUID(), user.id, deviceName, ipAddress, userAgent]
+      );
+
+      // Trigger New Device Security Email Alert
+      await emailService.sendNewDeviceLoginAlert(user.email, user.id, {
+        userName: user.fullName || user.full_name || user.name || (user.email ? user.email.split('@')[0] : 'Member'),
+        device: deviceName,
+        browser: parsed.browser,
+        os: parsed.os,
+        ip: ipAddress,
+        location: 'Jaipur, Rajasthan, India',
+        timestamp: new Date(),
+        authMethod,
+      });
+    } else {
+      // Known Device: Update last_active_at timestamp
+      await db.query(
+        `UPDATE user_sessions SET last_active_at = NOW(), is_active = true WHERE id = $1`,
+        [sessionRes.rows[0].id]
+      );
+    }
+  } catch (err) {
+    console.warn('[Device Detection Alert Warning]', err.message);
+  }
 };
 
 const register = async ({ name, email, password, role }) => {
@@ -66,17 +129,12 @@ const register = async ({ name, email, password, role }) => {
     [crypto.randomUUID(), user.id, name ? name.trim() : normalizedEmail.split('@')[0]]
   );
 
-  // Generate 6-digit OTP code
-  const verificationCode = String(Math.floor(100000 + Math.random() * 900000));
-  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
-
-  await db.query(
-    `INSERT INTO email_verification_tokens (id, user_id, token, expires_at, used)
-     VALUES ($1, $2, $3, $4, false)`,
-    [crypto.randomUUID(), user.id, verificationCode, expiresAt]
-  );
-
-  console.log(`[DEV EMAIL SERVICE] Sending Email Verification Code to [${user.email}] | Code: [${verificationCode}]`);
+  // Send 6-digit OTP verification email
+  try {
+    await emailService.sendVerificationCode(user.email, user.id, name ? name.trim() : null);
+  } catch (err) {
+    console.warn('[Email Verification Dispatch Warning]', err.message);
+  }
 
   return {
     id: user.id,
@@ -99,32 +157,63 @@ const verifyEmail = async ({ email, code }) => {
   }
   const user = userResult.rows[0];
 
-  const tokenResult = await db.query(
-    `SELECT id, expires_at, used FROM email_verification_tokens
-     WHERE user_id = $1 AND token = $2 AND used = false`,
-    [user.id, code ? code.trim() : '']
-  );
+  // First try verification_codes (Secure OTP engine)
+  try {
+    await emailService.verifyOTPCode({ email: normalizedEmail, code, purpose: 'EMAIL_VERIFICATION' });
+    await db.query('UPDATE users SET email_verified = true, updated_at = NOW() WHERE id = $1', [user.id]);
+    return;
+  } catch (otpErr) {
+    // Fallback to legacy email_verification_tokens for backward compatibility
+    const tokenResult = await db.query(
+      `SELECT id, expires_at, used FROM email_verification_tokens
+       WHERE user_id = $1 AND token = $2 AND used = false`,
+      [user.id, code ? code.trim() : '']
+    );
 
-  if (tokenResult.rows.length === 0) {
-    const error = new Error('Invalid or expired email verification code');
-    error.statusCode = 400;
-    error.errorCode = 'INVALID_TOKEN';
-    throw error;
+    if (tokenResult.rows.length === 0) {
+      throw otpErr; // Re-throw structured OTP error
+    }
+
+    const tokenRecord = tokenResult.rows[0];
+    if (new Date(tokenRecord.expires_at) < new Date()) {
+      const error = new Error('Email verification code has expired. Please request a new code.');
+      error.statusCode = 400;
+      error.errorCode = 'TOKEN_EXPIRED';
+      throw error;
+    }
+
+    await db.query('UPDATE users SET email_verified = true, updated_at = NOW() WHERE id = $1', [user.id]);
+    await db.query('UPDATE email_verification_tokens SET used = true WHERE id = $1', [tokenRecord.id]);
   }
-
-  const tokenRecord = tokenResult.rows[0];
-  if (new Date(tokenRecord.expires_at) < new Date()) {
-    const error = new Error('Email verification code has expired. Please request a new code.');
-    error.statusCode = 400;
-    error.errorCode = 'TOKEN_EXPIRED';
-    throw error;
-  }
-
-  await db.query('UPDATE users SET email_verified = true, updated_at = NOW() WHERE id = $1', [user.id]);
-  await db.query('UPDATE email_verification_tokens SET used = true WHERE id = $1', [tokenRecord.id]);
 };
 
-const login = async ({ email, password }) => {
+const resendVerificationCode = async ({ email }) => {
+  const normalizedEmail = normalizeEmail(email);
+  const userResult = await db.query(
+    `SELECT u.id, u.email, u.email_verified, p.full_name FROM users u LEFT JOIN user_profiles p ON u.id = p.user_id WHERE u.email = $1`,
+    [normalizedEmail]
+  );
+
+  if (userResult.rows.length === 0) {
+    const error = new Error(`User not found with email: '${normalizedEmail}'`);
+    error.statusCode = 404;
+    error.errorCode = 'RESOURCE_NOT_FOUND';
+    throw error;
+  }
+
+  const user = userResult.rows[0];
+  if (user.email_verified) {
+    const error = new Error('This email address has already been verified.');
+    error.statusCode = 400;
+    error.errorCode = 'EMAIL_ALREADY_VERIFIED';
+    throw error;
+  }
+
+  await emailService.sendVerificationCode(user.email, user.id, user.full_name);
+  return { success: true, message: 'New verification code sent to your email.' };
+};
+
+const login = async ({ email, password, req }) => {
   const normalizedEmail = normalizeEmail(email);
 
   const userResult = await db.query(
@@ -167,6 +256,9 @@ const login = async ({ email, password }) => {
     throw error;
   }
 
+  // Device detection and new device alert
+  await detectDeviceAndSendAlert(user, req, 'PASSWORD');
+
   const token = generateToken(user.id, user.role);
 
   return {
@@ -182,7 +274,7 @@ const login = async ({ email, password }) => {
   };
 };
 
-const authenticateWithGoogle = async ({ idToken }) => {
+const authenticateWithGoogle = async ({ idToken, req }) => {
   const payload = await googleAuthService.verifyIdToken(idToken);
   const googleSub = payload.subjectId;
   const normalizedEmail = normalizeEmail(payload.email);
@@ -273,6 +365,9 @@ const authenticateWithGoogle = async ({ idToken }) => {
     }
   }
 
+  // Device detection and new device alert
+  await detectDeviceAndSendAlert(user, req, 'GOOGLE_OAUTH');
+
   const token = generateToken(user.id, user.role);
 
   return {
@@ -290,7 +385,14 @@ const authenticateWithGoogle = async ({ idToken }) => {
 const forgotPassword = async ({ email }) => {
   const normalizedEmail = normalizeEmail(email);
 
-  const userResult = await db.query('SELECT id, account_status FROM users WHERE email = $1', [normalizedEmail]);
+  const userResult = await db.query(
+    `SELECT u.id, u.email, u.account_status, p.full_name
+     FROM users u
+     LEFT JOIN user_profiles p ON u.id = p.user_id
+     WHERE u.email = $1`,
+    [normalizedEmail]
+  );
+
   if (userResult.rows.length > 0) {
     const user = userResult.rows[0];
     if (user.account_status === 'ACTIVE') {
@@ -303,51 +405,92 @@ const forgotPassword = async ({ email }) => {
         [crypto.randomUUID(), user.id, resetToken, expiresAt]
       );
 
-      console.log(`[DEV EMAIL SERVICE] Sending Password Reset Token to [${normalizedEmail}] | Token: [${resetToken}]`);
+      // Trigger 6-digit OTP code & link reset email
+      try {
+        await emailService.sendPasswordResetCode(normalizedEmail, user.id, user.full_name, resetToken);
+      } catch (err) {
+        console.warn('[Password Reset Email Warning]', err.message);
+      }
     }
   }
 
   return 'If an account exists for this email, password reset instructions have been sent';
 };
 
-const resetPassword = async ({ token, newPassword }) => {
-  if (!token || !token.trim()) {
-    const error = new Error('Invalid or unrecognized password reset token');
+const resetPassword = async ({ token, code, email, newPassword }) => {
+  if (!newPassword || newPassword.length < 6) {
+    const error = new Error('Password must be at least 6 characters long');
     error.statusCode = 400;
-    error.errorCode = 'INVALID_TOKEN';
+    error.errorCode = 'VALIDATION_ERROR';
     throw error;
   }
 
-  const tokenResult = await db.query(
-    `SELECT id, user_id, expires_at, used FROM password_reset_tokens WHERE token = $1`,
-    [token.trim()]
-  );
+  let targetUserId = null;
+  let targetUserEmail = null;
+  let targetUserName = null;
 
-  if (tokenResult.rows.length === 0) {
-    const error = new Error('Invalid or unrecognized password reset token');
+  // 1. Try 6-digit code verification
+  if (code && email) {
+    const cleanEmail = normalizeEmail(email);
+    const otpResult = await emailService.verifyOTPCode({ email: cleanEmail, code, purpose: 'PASSWORD_RESET' });
+    targetUserId = otpResult.userId;
+    targetUserEmail = cleanEmail;
+  } else if (token && token.trim()) {
+    // 2. Try token link verification
+    const tokenResult = await db.query(
+      `SELECT pr.id, pr.user_id, pr.expires_at, pr.used, u.email, p.full_name
+       FROM password_reset_tokens pr
+       JOIN users u ON pr.user_id = u.id
+       LEFT JOIN user_profiles p ON u.id = p.user_id
+       WHERE pr.token = $1`,
+      [token.trim()]
+    );
+
+    if (tokenResult.rows.length === 0) {
+      const error = new Error('Invalid or unrecognized password reset token');
+      error.statusCode = 400;
+      error.errorCode = 'INVALID_TOKEN';
+      throw error;
+    }
+
+    const tokenRecord = tokenResult.rows[0];
+    if (tokenRecord.used) {
+      const error = new Error('Password reset token has already been used');
+      error.statusCode = 400;
+      error.errorCode = 'INVALID_TOKEN';
+      throw error;
+    }
+
+    if (new Date(tokenRecord.expires_at) < new Date()) {
+      const error = new Error('Password reset token has expired. Please request a new password reset.');
+      error.statusCode = 400;
+      error.errorCode = 'TOKEN_EXPIRED';
+      throw error;
+    }
+
+    targetUserId = tokenRecord.user_id;
+    targetUserEmail = tokenRecord.email;
+    targetUserName = tokenRecord.full_name;
+
+    await db.query('UPDATE password_reset_tokens SET used = true WHERE id = $1', [tokenRecord.id]);
+  } else {
+    const error = new Error('Verification code or reset token is required');
     error.statusCode = 400;
     error.errorCode = 'INVALID_TOKEN';
-    throw error;
-  }
-
-  const tokenRecord = tokenResult.rows[0];
-  if (tokenRecord.used) {
-    const error = new Error('Password reset token has already been used');
-    error.statusCode = 400;
-    error.errorCode = 'INVALID_TOKEN';
-    throw error;
-  }
-
-  if (new Date(tokenRecord.expires_at) < new Date()) {
-    const error = new Error('Password reset token has expired. Please request a new password reset.');
-    error.statusCode = 400;
-    error.errorCode = 'TOKEN_EXPIRED';
     throw error;
   }
 
   const passwordHash = await bcrypt.hash(newPassword, 10);
-  await db.query('UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2', [passwordHash, tokenRecord.user_id]);
-  await db.query('UPDATE password_reset_tokens SET used = true WHERE id = $1', [tokenRecord.id]);
+  await db.query('UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2', [passwordHash, targetUserId]);
+
+  // Trigger Security Alert Email: Password Changed
+  if (targetUserEmail) {
+    try {
+      await emailService.sendPasswordChangedAlert(targetUserEmail, targetUserId, { userName: targetUserName });
+    } catch (err) {
+      console.warn('[Password Changed Alert Warning]', err.message);
+    }
+  }
 };
 
 const getCurrentUser = async (user) => {
@@ -380,6 +523,7 @@ const getCurrentUser = async (user) => {
 module.exports = {
   register,
   verifyEmail,
+  resendVerificationCode,
   login,
   authenticateWithGoogle,
   forgotPassword,

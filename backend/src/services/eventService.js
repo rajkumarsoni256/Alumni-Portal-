@@ -29,9 +29,7 @@ const formatEventDTO = (row, authUserId = null) => {
     name: creatorName,
     email: row.creator_email,
     role: (row.creator_role || 'ADMIN').toLowerCase(),
-    avatar: row.creator_avatar || (isCreatorAlumni
-      ? 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=300'
-      : 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&q=80&w=300'),
+    avatar: row.creator_avatar || null,
   };
 
   const regCount = parseInt(row.registered_count || '0', 10);
@@ -534,6 +532,17 @@ const getMyRegistrations = async (user) => {
   return { events, total: events.length };
 };
 
+const getUpcomingEvents = async (authUserId, limit = 5) => {
+  const limitVal = Math.min(20, Math.max(1, parseInt(limit || 5, 10)));
+  const data = await getEvents(authUserId, {
+    status: 'PUBLISHED',
+    upcoming: 'true',
+    limit: limitVal,
+    page: 1,
+  });
+  return { events: data.events, total: data.total };
+};
+
 module.exports = {
   getEvents,
   getEventById,
@@ -543,4 +552,5 @@ module.exports = {
   registerForEvent,
   cancelRegistration,
   getMyRegistrations,
+  getUpcomingEvents,
 };

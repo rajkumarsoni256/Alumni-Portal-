@@ -31,7 +31,7 @@ const updateProfile = async (req, res, next) => {
 const getProfileById = async (req, res, next) => {
   try {
     const { userId } = req.params;
-    const profileResponse = await profileService.getProfileById(userId);
+    const profileResponse = await profileService.getProfileById(userId, req.user);
     return successResponse(res, profileResponse, 'User profile fetched successfully');
   } catch (err) {
     next(err);

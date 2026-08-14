@@ -33,7 +33,7 @@ export const MOCK_STUDENT = {
   graduationYear: 2026,
   batch: "JECRC CSE • 2026",
   university: "JECRC University, Jaipur",
-  avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=300",
+  avatar: null,
   email: "tokir.khan@jecrcu.edu.in",
   completionPercentage: 88,
   connectionsCount: 48,

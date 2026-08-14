@@ -6,6 +6,7 @@ const { authenticateToken } = require('../middleware/authMiddleware');
 router.use(authenticateToken);
 
 router.get('/', eventController.getEvents);
+router.get('/upcoming', eventController.getUpcomingEvents);
 router.get('/registrations/me', eventController.getMyRegistrations);
 router.get('/:id', eventController.getEventById);
 router.post('/', eventController.createEvent);

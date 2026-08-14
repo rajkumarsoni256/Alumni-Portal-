@@ -33,10 +33,12 @@ export const messageService = {
 
   /**
    * Create a new conversation or retrieve existing one with target user
-   * @param {string} _currentUserId - Ignored (backend uses req.user.id)
-   * @param {string} targetUserId - UUID of recipient partner
+   * @param {string} param1 - targetUserId or _currentUserId
+   * @param {string} [param2] - targetUserId if param1 is _currentUserId
    */
-  createOrGetConversation: async (_currentUserId, targetUserId) => {
+  createOrGetConversation: async (param1, param2) => {
+    const targetUserId = param2 || param1;
+    if (!targetUserId) throw new Error('Target user ID is required to start a conversation');
     const data = await apiClient.post('/api/v1/conversations', { targetUserId });
     return data ? (data.conversation || data) : null;
   },

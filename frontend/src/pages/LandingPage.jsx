@@ -41,7 +41,7 @@ export const LandingPage = () => {
           degree: u.degree || 'B.Tech',
           branch: u.branch || 'CSE',
           location: u.location || 'Jaipur, India',
-          avatar: u.avatarUrl || 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=300',
+          avatar: u.avatarUrl || null,
           skills: u.skills ? u.skills.split(',').map((s) => s.trim()) : ['System Design', 'Mentorship'],
           isAvailableForMentorship: true,
         }));

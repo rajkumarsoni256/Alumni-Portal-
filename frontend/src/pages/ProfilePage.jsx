@@ -232,6 +232,25 @@ export const ProfilePage = () => {
 
   const isStudent = !profile.isAlumni && profile.role?.toLowerCase() !== 'alumni';
 
+  const handleUpdateAvatar = async (newAvatarUrl) => {
+    await updateUserProfile({ avatarUrl: newAvatarUrl, avatar: newAvatarUrl });
+    setProfile((prev) => ({
+      ...prev,
+      avatarUrl: newAvatarUrl,
+      avatar: newAvatarUrl,
+    }));
+  };
+
+  const handleUpdateBanner = async (newBannerUrl) => {
+    await updateUserProfile({ bannerUrl: newBannerUrl, banner: newBannerUrl, coverImage: newBannerUrl });
+    setProfile((prev) => ({
+      ...prev,
+      bannerUrl: newBannerUrl,
+      banner: newBannerUrl,
+      coverImage: newBannerUrl,
+    }));
+  };
+
   return (
     <div className="min-h-screen bg-slate-100/75 py-5">
       <div className="max-w-4xl mx-auto px-3 sm:px-4 lg:px-6 space-y-4">
@@ -241,6 +260,8 @@ export const ProfilePage = () => {
           profile={profile}
           isOwnProfile={isOwnProfile}
           onEditClick={() => setIsBasicInfoModalOpen(true)}
+          onUpdateAvatar={handleUpdateAvatar}
+          onUpdateBanner={handleUpdateBanner}
         />
 
         {/* 2. Role-Aware Profile Sections Hierarchy */}

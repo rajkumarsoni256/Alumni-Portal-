@@ -3,7 +3,7 @@ const { successResponse } = require('../utils/response');
 
 const createOrGetConversation = async (req, res, next) => {
   try {
-    const { targetUserId } = req.body;
+    const targetUserId = req.body?.targetUserId || req.body?.userId || req.body?.recipientId || req.body?.partnerId || req.body?.id;
     const data = await messageService.createOrGetConversation(req.user, targetUserId);
     return successResponse(res, data, 'Conversation ready', 201);
   } catch (err) {

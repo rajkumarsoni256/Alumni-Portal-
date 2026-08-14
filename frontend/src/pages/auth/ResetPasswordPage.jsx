@@ -78,20 +78,34 @@ export const ResetPasswordPage = () => {
             {/* Form */}
             <form onSubmit={handleSubmit} className="space-y-4">
               {!tokenFromUrl && (
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-700 block">
-                    Reset Token
-                  </label>
-                  <input
-                    type="text"
-                    value={token}
-                    onChange={(e) => {
-                      setToken(e.target.value);
-                      if (error) setError('');
-                    }}
-                    placeholder="Enter reset token from email"
-                    className="w-full bg-slate-50 border border-slate-300 focus:border-slate-800 focus:bg-white rounded-md px-3 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none transition-colors"
-                  />
+                <div className="space-y-3">
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-slate-700 block">
+                      Email address
+                    </label>
+                    <input
+                      type="email"
+                      value={searchParams.get('email') || ''}
+                      onChange={(e) => searchParams.set('email', e.target.value)}
+                      placeholder="Enter your account email"
+                      className="w-full bg-slate-50 border border-slate-300 focus:border-slate-800 focus:bg-white rounded-md px-3 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none transition-colors"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-slate-700 block">
+                      6-Digit Code or Reset Token
+                    </label>
+                    <input
+                      type="text"
+                      value={token}
+                      onChange={(e) => {
+                        setToken(e.target.value);
+                        if (error) setError('');
+                      }}
+                      placeholder="Enter 6-digit OTP code or reset token from email"
+                      className="w-full bg-slate-50 border border-slate-300 focus:border-slate-800 focus:bg-white rounded-md px-3 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none transition-colors"
+                    />
+                  </div>
                 </div>
               )}
               <div className="space-y-1">

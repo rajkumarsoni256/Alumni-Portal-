@@ -21,10 +21,20 @@ const verifyEmail = async (req, res, next) => {
   }
 };
 
+const resendVerificationCode = async (req, res, next) => {
+  try {
+    const { email } = req.body;
+    const data = await authService.resendVerificationCode({ email });
+    return successResponse(res, data, 'Verification code sent to your email address.');
+  } catch (err) {
+    next(err);
+  }
+};
+
 const login = async (req, res, next) => {
   try {
     const { email, password } = req.body;
-    const authResponse = await authService.login({ email, password });
+    const authResponse = await authService.login({ email, password, req });
     return successResponse(res, authResponse, 'Login successful');
   } catch (err) {
     next(err);
@@ -34,7 +44,7 @@ const login = async (req, res, next) => {
 const googleLogin = async (req, res, next) => {
   try {
     const { idToken } = req.body;
-    const authResponse = await authService.authenticateWithGoogle({ idToken });
+    const authResponse = await authService.authenticateWithGoogle({ idToken, req });
     return successResponse(res, authResponse, 'Google authentication successful');
   } catch (err) {
     next(err);
@@ -53,8 +63,8 @@ const forgotPassword = async (req, res, next) => {
 
 const resetPassword = async (req, res, next) => {
   try {
-    const { token, newPassword } = req.body;
-    await authService.resetPassword({ token, newPassword });
+    const { token, code, email, newPassword } = req.body;
+    await authService.resetPassword({ token, code, email, newPassword });
     return successResponse(res, null, 'Password reset successfully. You may now log in with your new password.');
   } catch (err) {
     next(err);
@@ -73,6 +83,7 @@ const getCurrentUser = async (req, res, next) => {
 module.exports = {
   register,
   verifyEmail,
+  resendVerificationCode,
   login,
   googleLogin,
   forgotPassword,

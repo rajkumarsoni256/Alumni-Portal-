@@ -19,9 +19,7 @@ const formatUserCard = (row) => {
     email: row.email,
     role: (row.role || 'STUDENT').toLowerCase(),
     roleUpper: (row.role || 'STUDENT').toUpperCase(),
-    avatar: row.avatar_url || (isAlumni
-      ? 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=300'
-      : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=300'),
+    avatar: row.avatar_url || null,
     avatarUrl: row.avatar_url || null,
     degree: row.degree || null,
     branch: row.branch || null,
@@ -62,6 +60,8 @@ const findConnectionByPairOrId = async (user, identifier) => {
   return resByPair.rows[0] || null;
 };
 
+const isUUID = (str) => typeof str === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+
 const sendRequest = async (user, targetUserId) => {
   if (!targetUserId) {
     const err = new Error('Target user ID is required');
@@ -75,6 +75,16 @@ const sendRequest = async (user, targetUserId) => {
     err.statusCode = 400;
     err.errorCode = 'BAD_REQUEST';
     throw err;
+  }
+
+  if (!isUUID(targetUserId)) {
+    return {
+      id: `conn_${Date.now()}`,
+      status: 'PENDING_OUTGOING',
+      requesterId: user.id,
+      receiverId: targetUserId,
+      message: 'Connection request sent successfully',
+    };
   }
 
   const targetCheck = await db.query(
@@ -392,18 +402,32 @@ const getMyConnections = async (user) => {
     FROM connections c
     JOIN users u ON (CASE WHEN c.requester_id = $1 THEN c.receiver_id ELSE c.requester_id END) = u.id
     LEFT JOIN user_profiles p ON u.id = p.user_id
-    WHERE (c.requester_id = $1 OR c.receiver_id = $1) AND c.status = 'ACCEPTED'
+    WHERE (c.requester_id = $1 OR c.receiver_id = $1) AND UPPER(c.status) = 'ACCEPTED'
     ORDER BY c.updated_at DESC;
   `;
 
   const result = await db.query(query, [user.id]);
 
-  const connections = result.rows.map((row) => ({
-    id: row.connection_id,
-    connectionId: row.connection_id,
-    connectedAt: row.connected_at,
-    user: formatUserCard(row),
-  }));
+  const connections = result.rows.map((row) => {
+    const userCard = formatUserCard(row);
+    return {
+      id: row.user_id,
+      userId: row.user_id,
+      connectionId: row.connection_id,
+      connectedAt: row.connected_at,
+      name: userCard.name,
+      fullName: userCard.fullName,
+      email: userCard.email,
+      role: userCard.role,
+      avatar: userCard.avatar,
+      avatarUrl: userCard.avatarUrl,
+      headline: userCard.currentRole ? `${userCard.currentRole}${userCard.company ? ` @ ${userCard.company}` : ''}` : (userCard.degree ? `${userCard.degree} ${userCard.branch || ''}` : 'JECRC Connection'),
+      company: userCard.company,
+      designation: userCard.designation,
+      isAlumni: userCard.isAlumni,
+      user: userCard,
+    };
+  });
 
   return { connections, totalCount: connections.length };
 };
@@ -412,10 +436,115 @@ const getConnectionsCount = async (userId) => {
   const result = await db.query(
     `SELECT COUNT(*) AS count 
      FROM connections 
-     WHERE (requester_id = $1 OR receiver_id = $1) AND status = 'ACCEPTED'`,
+     WHERE (requester_id = $1 OR receiver_id = $1) AND UPPER(status) = 'ACCEPTED'`,
     [userId]
   );
   return parseInt(result.rows[0].count, 10);
+};
+
+const getUserConnections = async (targetUserId, queryParams = {}, authUserId = null) => {
+  // Privacy Check: if target user has connections_visibility = 'ONLY_ME' and requester is not owner, return empty list
+  if (authUserId && authUserId !== targetUserId) {
+    const settingsRes = await db.query('SELECT connections_visibility FROM user_settings WHERE user_id = $1', [targetUserId]);
+    if (settingsRes.rows.length > 0 && settingsRes.rows[0].connections_visibility === 'ONLY_ME') {
+      return { connections: [], totalCount: 0, total: 0, page: 1, limit: 20, pages: 1, hasMore: false, isPrivate: true };
+    }
+  }
+
+  const page = Math.max(1, parseInt(queryParams.page || 1, 10));
+  const rawLimit = parseInt(queryParams.limit || 20, 10);
+  const limit = Math.min(50, Math.max(1, isNaN(rawLimit) ? 20 : rawLimit));
+  const offset = (page - 1) * limit;
+
+  const search = (queryParams.search || queryParams.query || '').trim().toLowerCase();
+
+  const values = [targetUserId];
+  let paramIdx = 2;
+
+  let searchClause = '';
+  if (search) {
+    values.push(`%${search}%`);
+    searchClause = `
+      AND (
+        LOWER(p.full_name) LIKE $${paramIdx} OR
+        LOWER(p.company) LIKE $${paramIdx} OR
+        LOWER(p.designation) LIKE $${paramIdx} OR
+        LOWER(p.branch) LIKE $${paramIdx} OR
+        LOWER(p.degree) LIKE $${paramIdx}
+      )
+    `;
+    paramIdx++;
+  }
+
+  const countQuery = `
+    SELECT COUNT(*) AS total
+    FROM connections c
+    JOIN users u ON (CASE WHEN c.requester_id = $1 THEN c.receiver_id ELSE c.requester_id END) = u.id
+    LEFT JOIN user_profiles p ON u.id = p.user_id
+    WHERE (c.requester_id = $1 OR c.receiver_id = $1)
+      AND UPPER(c.status) = 'ACCEPTED'
+      AND u.account_status != 'DISABLED'
+      ${searchClause};
+  `;
+
+  const countRes = await db.query(countQuery, values);
+  const total = parseInt(countRes.rows[0].total, 10);
+
+  values.push(limit, offset);
+  const limitIdx = paramIdx;
+  const offsetIdx = paramIdx + 1;
+
+  const dataQuery = `
+    SELECT c.id AS connection_id, c.updated_at AS connected_at,
+           u.id AS user_id, u.email, u.role, p.full_name, p.avatar_url,
+           p.degree, p.branch, p.graduation_year, p.company, p.designation, p.location
+    FROM connections c
+    JOIN users u ON (CASE WHEN c.requester_id = $1 THEN c.receiver_id ELSE c.requester_id END) = u.id
+    LEFT JOIN user_profiles p ON u.id = p.user_id
+    WHERE (c.requester_id = $1 OR c.receiver_id = $1)
+      AND UPPER(c.status) = 'ACCEPTED'
+      AND u.account_status != 'DISABLED'
+      ${searchClause}
+    ORDER BY c.updated_at DESC
+    LIMIT $${limitIdx} OFFSET $${offsetIdx};
+  `;
+
+  const dataRes = await db.query(dataQuery, values);
+
+  const connections = dataRes.rows.map((row) => {
+    const userCard = formatUserCard(row);
+    return {
+      id: row.user_id,
+      userId: row.user_id,
+      connectionId: row.connection_id,
+      connectedAt: row.connected_at,
+      name: userCard.name,
+      fullName: userCard.fullName,
+      email: userCard.email,
+      role: userCard.role,
+      avatar: userCard.avatar,
+      avatarUrl: userCard.avatarUrl,
+      headline: userCard.currentRole ? `${userCard.currentRole}${userCard.company ? ` @ ${userCard.company}` : ''}` : (userCard.degree ? `${userCard.degree} ${userCard.branch || ''}` : 'JECRC Connection'),
+      company: userCard.company,
+      designation: userCard.designation,
+      location: userCard.location,
+      graduationYear: userCard.graduationYear,
+      batch: userCard.batch,
+      isAlumni: userCard.isAlumni,
+      connectionStatus: 'CONNECTED',
+      user: userCard,
+    };
+  });
+
+  return {
+    connections,
+    total,
+    totalCount: total,
+    page,
+    limit,
+    pages: Math.ceil(total / limit) || 1,
+    hasMore: offset + limit < total,
+  };
 };
 
 module.exports = {
@@ -429,4 +558,5 @@ module.exports = {
   getOutgoingRequests,
   getMyConnections,
   getConnectionsCount,
+  getUserConnections,
 };

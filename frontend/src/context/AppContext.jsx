@@ -12,6 +12,7 @@ import { connectionService } from '../services/connectionService';
 import { notificationService } from '../services/notificationService';
 import { eventService } from '../services/eventService';
 import { mentorshipService } from '../services/mentorshipService';
+import { settingsService } from '../services/settingsService';
 
 const AppContext = createContext();
 
@@ -54,6 +55,8 @@ export const AppProvider = ({ children }) => {
   const [feedFilter, setFeedFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [savedAlumniIds, setSavedAlumniIds] = useState(MOCK_STUDENT.savedAlumniIds || []);
+  const [myConnections, setMyConnections] = useState([]);
+  const [userSettings, setUserSettings] = useState(null);
 
   const [toast, setToast] = useState(null);
 
@@ -62,6 +65,75 @@ export const AppProvider = ({ children }) => {
     setTimeout(() => {
       setToast(null);
     }, 4000);
+  };
+
+  const applyTheme = (theme) => {
+    const root = document.documentElement;
+    if (theme === 'DARK') {
+      root.classList.add('dark');
+    } else if (theme === 'LIGHT') {
+      root.classList.remove('dark');
+    } else {
+      if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        root.classList.add('dark');
+      } else {
+        root.classList.remove('dark');
+      }
+    }
+  };
+
+  const fetchUserSettings = async () => {
+    try {
+      const settings = await settingsService.getSettings();
+      setUserSettings(settings);
+      if (settings?.appearance?.theme) {
+        applyTheme(settings.appearance.theme);
+      }
+      return settings;
+    } catch (err) {
+      console.warn('Failed to load user settings:', err);
+      return null;
+    }
+  };
+
+  const updateUserSettings = async (patch) => {
+    setUserSettings((prev) => (prev ? { ...prev, ...patch } : patch));
+    try {
+      const updated = await settingsService.updateSettings(patch);
+      setUserSettings(updated);
+      if (patch.theme || updated?.appearance?.theme) {
+        applyTheme(patch.theme || updated.appearance.theme);
+      }
+      return updated;
+    } catch (err) {
+      showNotification(err.message || 'Failed to update settings', 'error');
+      fetchUserSettings();
+      throw err;
+    }
+  };
+
+  const blockUser = async (targetUserId) => {
+    try {
+      const res = await settingsService.blockUser(targetUserId);
+      showNotification('User blocked', 'info');
+      await fetchSuggestedPeople();
+      await fetchAlumniList();
+      return res;
+    } catch (err) {
+      showNotification(err.message || 'Failed to block user', 'error');
+      throw err;
+    }
+  };
+
+  const unblockUser = async (targetUserId) => {
+    try {
+      const res = await settingsService.unblockUser(targetUserId);
+      showNotification('User unblocked', 'info');
+      return res;
+    } catch (err) {
+      showNotification(err.message || 'Failed to unblock user', 'error');
+      throw err;
+    }
   };
 
   const fetchUserProfile = async () => {
@@ -153,6 +225,19 @@ export const AppProvider = ({ children }) => {
     }
   };
 
+  const fetchMyConnections = async () => {
+    try {
+      const res = await connectionService.getMyConnections();
+      const list = Array.isArray(res) ? res : (res?.connections || []);
+      setMyConnections(list);
+      return list;
+    } catch (err) {
+      console.warn('Failed to load accepted connections:', err);
+      setMyConnections([]);
+      return [];
+    }
+  };
+
   const markNotificationRead = async (id) => {
     try {
       await notificationService.markAsRead(id);
@@ -233,9 +318,11 @@ export const AppProvider = ({ children }) => {
             setIsAuthenticated(true);
 
             await fetchUserProfile();
+            await fetchUserSettings();
             await fetchAlumniList();
             await fetchSuggestedPeople();
             await fetchIncomingConnectionRequests();
+            await fetchMyConnections();
             await fetchNotifications();
             await fetchEvents();
             await fetchMentorshipRequests();
@@ -269,9 +356,7 @@ export const AppProvider = ({ children }) => {
     initializeAuthSession();
   }, []);
 
-  const defaultAvatar = (activeRole === 'alumni')
-    ? 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=300'
-    : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=300';
+  const defaultAvatar = null;
 
   const currentUser = authUser?.role?.toUpperCase() === 'ADMIN'
     ? {
@@ -280,7 +365,7 @@ export const AppProvider = ({ children }) => {
         email: authUser.email,
         role: 'admin',
         roleUpper: 'ADMIN',
-        avatar: defaultAvatar,
+        avatar: userProfile?.avatarUrl || authUser?.avatarUrl || null,
       }
     : {
         id: authUser?.id || (activeRole === 'alumni' ? 'alm_1' : 'st_101'),
@@ -300,7 +385,7 @@ export const AppProvider = ({ children }) => {
         bio: userProfile?.bio || null,
         skills: userProfile?.skills || [],
         interests: userProfile?.interests || [],
-        avatar: userProfile?.avatarUrl || authUser?.avatarUrl || defaultAvatar,
+        avatar: userProfile?.avatarUrl || authUser?.avatarUrl || null,
         verified: true,
       };
 
@@ -519,23 +604,46 @@ export const AppProvider = ({ children }) => {
   };
 
   const toggleLikePost = async (postId) => {
+    // Optimistic UI toggle
+    setPosts((prev) =>
+      prev.map((p) => {
+        if (p.id === postId) {
+          const currentlyLiked = p.isLiked || p.likedByCurrentUser;
+          const newCount = currentlyLiked ? Math.max(0, (p.likesCount || p.likes || 0) - 1) : (p.likesCount || p.likes || 0) + 1;
+          return {
+            ...p,
+            isLiked: !currentlyLiked,
+            likedByCurrentUser: !currentlyLiked,
+            likesCount: newCount,
+            likes: newCount,
+          };
+        }
+        return p;
+      })
+    );
+
     try {
-      const res = await postService.toggleLikePost(postId);
-      setPosts((prev) =>
-        prev.map((p) => {
-          if (p.id === postId) {
-            return {
-              ...p,
-              likes: res.likesCount,
-              likesCount: res.likesCount,
-              likedByCurrentUser: res.likedByCurrentUser,
-              isLiked: res.likedByCurrentUser,
-            };
-          }
-          return p;
-        })
-      );
+      const res = await postService.toggleLike(postId);
+      if (res) {
+        const isLiked = res.isLiked ?? res.liked ?? res.likedByCurrentUser;
+        const likesCount = res.likesCount ?? res.likeCount ?? res.likes;
+        setPosts((prev) =>
+          prev.map((p) => {
+            if (p.id === postId) {
+              return {
+                ...p,
+                isLiked: isLiked,
+                likedByCurrentUser: isLiked,
+                likesCount: likesCount,
+                likes: likesCount,
+              };
+            }
+            return p;
+          })
+        );
+      }
     } catch (err) {
+      console.warn('Failed to update like status:', err);
       showNotification(err.message || 'Failed to like post', 'error');
     }
   };
@@ -553,55 +661,106 @@ export const AppProvider = ({ children }) => {
     });
   };
 
-  const addComment = async (postId, text) => {
+  const addComment = async (postId, contentOrPayload) => {
+    const payload = typeof contentOrPayload === 'string'
+      ? { content: contentOrPayload.trim() }
+      : { ...contentOrPayload, content: (contentOrPayload.content || contentOrPayload.text || '').trim() };
+
+    if (!payload.content) return;
+
     try {
-      const res = await postService.addComment(postId, { text });
+      const res = await postService.addComment(postId, payload);
+      const newComment = res?.comment || res;
+
       setPosts((prev) =>
         prev.map((p) => {
           if (p.id === postId) {
+            const existingComments = p.comments || [];
             return {
               ...p,
-              commentsCount: res.commentsCount,
+              comments: [...existingComments, newComment],
+              commentsCount: res?.commentsCount !== undefined ? res.commentsCount : (p.commentsCount || 0) + 1,
             };
           }
           return p;
         })
       );
-      showNotification('Comment added!');
-      return res.comment;
+      showNotification(payload.parentCommentId ? 'Reply posted successfully!' : 'Comment posted successfully!', 'success');
+      return newComment;
     } catch (err) {
-      showNotification(err.message || 'Failed to add comment', 'error');
+      showNotification(err.message || 'Failed to post comment', 'error');
       throw err;
     }
   };
 
   const addReply = async (postId, parentCommentId, text) => {
+    return addComment(postId, { content: text, parentCommentId });
+  };
+
+  const toggleLikeComment = async (postId, commentId) => {
+    const targetCommentId = commentId || postId;
     try {
-      const res = await postService.addComment(postId, { text, parentCommentId });
+      const res = await postService.toggleLikeComment(targetCommentId);
+      return res;
+    } catch (err) {
+      showNotification(err.message || 'Failed to update comment like', 'error');
+      throw err;
+    }
+  };
+
+  const togglePinComment = async (commentId) => {
+    try {
+      const res = await postService.togglePinComment(commentId);
+      showNotification(res.message || 'Comment pin status updated', 'info');
+      return res;
+    } catch (err) {
+      showNotification(err.message || 'Failed to pin/unpin comment', 'error');
+      throw err;
+    }
+  };
+
+  const editComment = async (commentId, content) => {
+    try {
+      const res = await postService.editComment(commentId, { content });
+      showNotification('Comment updated', 'info');
+      return res;
+    } catch (err) {
+      showNotification(err.message || 'Failed to edit comment', 'error');
+      throw err;
+    }
+  };
+
+  const deleteComment = async (postId, commentId) => {
+    const targetCommentId = commentId || postId;
+    try {
+      const res = await postService.deleteComment(postId, targetCommentId);
       setPosts((prev) =>
         prev.map((p) => {
           if (p.id === postId) {
             return {
               ...p,
-              commentsCount: res.commentsCount,
+              commentsCount: Math.max(0, (p.commentsCount || 1) - 1),
             };
           }
           return p;
         })
       );
-      showNotification('Reply added!');
-      return res.comment;
+      showNotification('Comment deleted', 'info');
+      return res;
     } catch (err) {
-      showNotification(err.message || 'Failed to add reply', 'error');
+      showNotification(err.message || 'Failed to delete comment', 'error');
       throw err;
     }
   };
 
-  const toggleLikeComment = (postId, commentId) => {};
-
-  const toggleConnectUser = async (userId) => {
+  const toggleConnectUser = async (target) => {
+    const targetUserId = typeof target === 'object' ? (target?.id || target?.userId || target?.user_id) : target;
+    if (!targetUserId) {
+      showNotification('Target user ID is required', 'error');
+      return null;
+    }
     try {
-      const res = await connectionService.sendRequest(userId);
+      const res = await connectionService.sendRequest(targetUserId);
       showNotification('Connection request sent!', 'success');
       return res;
     } catch (err) {
@@ -637,10 +796,38 @@ export const AppProvider = ({ children }) => {
 
   const updateUserProfile = async (profileData) => {
     try {
-      const updated = await profileService.createOrUpdateProfile(profileData);
-      setUserProfile(updated);
-      showNotification('Profile updated successfully!');
-      return updated;
+      const updated = await profileService.updateProfile(profileData);
+      const merged = { ...(userProfile || {}), ...(updated || profileData) };
+      setUserProfile(merged);
+
+      const avatarVal = profileData.avatarUrl || profileData.avatar || updated?.avatarUrl || updated?.avatar;
+      const bannerVal = profileData.bannerUrl || profileData.banner || profileData.coverImage || updated?.bannerUrl || updated?.banner;
+
+      setAuthUser((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          ...merged,
+          ...(avatarVal ? { avatar: avatarVal, avatarUrl: avatarVal } : {}),
+          ...(bannerVal ? { bannerUrl: bannerVal, banner: bannerVal, coverImage: bannerVal } : {}),
+        };
+      });
+
+      if (merged.id || merged.userId) {
+        const uid = merged.id || merged.userId;
+        setUsersMap((prev) => ({
+          ...prev,
+          [uid]: {
+            ...prev[uid],
+            ...merged,
+            ...(avatarVal ? { avatar: avatarVal, avatarUrl: avatarVal } : {}),
+            ...(bannerVal ? { bannerUrl: bannerVal, banner: bannerVal, coverImage: bannerVal } : {}),
+          },
+        }));
+      }
+
+      showNotification('Profile updated successfully!', 'success');
+      return merged;
     } catch (err) {
       showNotification(err.message || 'Failed to update profile', 'error');
       throw err;
@@ -715,6 +902,8 @@ export const AppProvider = ({ children }) => {
         usersMap,
         connectionRequests,
         fetchIncomingConnectionRequests,
+        myConnections,
+        fetchMyConnections,
         suggestedPeople,
         fetchSuggestedPeople,
         notifications,
@@ -738,7 +927,10 @@ export const AppProvider = ({ children }) => {
         toggleSavePost,
         addComment,
         addReply,
+        editComment,
+        deleteComment,
         toggleLikeComment,
+        togglePinComment,
         toggleConnectUser,
         acceptConnectionRequest,
         ignoreConnectionRequest,
@@ -748,6 +940,11 @@ export const AppProvider = ({ children }) => {
         updateUserProfile,
         submitMentorshipRequest,
         updateRequestStatus,
+        userSettings,
+        fetchUserSettings,
+        updateUserSettings,
+        blockUser,
+        unblockUser,
       }}
     >
       {children}

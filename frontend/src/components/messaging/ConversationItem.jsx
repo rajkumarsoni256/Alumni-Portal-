@@ -1,5 +1,6 @@
-import React from 'react';
-import { ShieldCheck } from 'lucide-react';
+import React, { useState } from 'react';
+import { ShieldCheck, Star } from 'lucide-react';
+import { UserAvatar } from '../common/UserAvatar';
 
 const formatTimeAgo = (isoString) => {
   if (!isoString) return '';
@@ -19,34 +20,46 @@ const formatTimeAgo = (isoString) => {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 };
 
-export const ConversationItem = ({ conversation, isActive, onSelect }) => {
-  const { partner, lastMessageText, lastMessageAt, unreadCount } = conversation;
+export const ConversationItem = ({
+  conversation,
+  isActive,
+  onSelect,
+  onToggleBookmark,
+}) => {
+  const partner = conversation.partner || {};
+  const [isStarred, setIsStarred] = useState(Boolean(conversation.isStarred));
+  const unreadCount = conversation.unreadCount || 0;
+  const { lastMessageText, lastMessageAt } = conversation;
   const isAlumni = Boolean(partner?.isAlumni || partner?.role?.toLowerCase() === 'alumni');
   const formattedTime = formatTimeAgo(lastMessageAt || conversation.updatedAt);
 
   return (
-    <button
-      type="button"
+    <div
+      role="button"
+      tabIndex={0}
       onClick={() => onSelect(conversation)}
-      className={`w-full text-left p-3.5 flex items-start gap-3 transition-colors border-b border-slate-100 last:border-b-0 cursor-pointer ${
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          onSelect(conversation);
+        }
+      }}
+      className={`w-full text-left p-3 flex items-start gap-3 transition-colors border-b border-slate-100 last:border-b-0 cursor-pointer relative ${
         isActive
-          ? 'bg-red-50/70 relative after:absolute after:left-0 after:top-0 after:bottom-0 after:w-1 after:bg-red-700'
+          ? 'bg-rose-50/70 after:absolute after:left-0 after:top-0 after:bottom-0 after:w-1 after:bg-red-700'
           : 'hover:bg-slate-50'
       }`}
     >
-      {/* Avatar with optional Verified Alum status */}
+      {/* Avatar with status green dot */}
       <div className="relative shrink-0 mt-0.5">
-        <img
-          src={partner?.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=300'}
-          alt={partner?.name || 'Member'}
-          className="w-10 h-10 rounded-full object-cover border border-slate-200"
+        <UserAvatar
+          src={partner?.avatar}
+          name={partner?.name}
+          className="w-10 h-10"
         />
-        {isAlumni && (
-          <span
-            className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-emerald-500 rounded-full border-2 border-white"
-            title="Verified JECRC Alumni"
-          />
-        )}
+        <span
+          className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 rounded-full border-2 border-white"
+          title="Online"
+        />
       </div>
 
       {/* Info & Message Snippet */}
@@ -78,7 +91,7 @@ export const ConversationItem = ({ conversation, isActive, onSelect }) => {
           </span>
         </div>
 
-        {/* Last Message Preview & Unread Count Badge */}
+        {/* Last Message Preview & Unread Count Badge / Star */}
         <div className="flex items-center justify-between gap-2">
           <p
             className={`text-xs truncate ${
@@ -90,13 +103,29 @@ export const ConversationItem = ({ conversation, isActive, onSelect }) => {
             {lastMessageText || 'Started a conversation'}
           </p>
 
-          {unreadCount > 0 && (
-            <span className="shrink-0 text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-red-700 text-white min-w-4 text-center">
-              {unreadCount}
-            </span>
-          )}
+          <div className="flex items-center gap-1 shrink-0">
+            {unreadCount > 0 ? (
+              <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-red-700 text-white min-w-4 text-center">
+                {unreadCount}
+              </span>
+            ) : (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsStarred(!isStarred);
+                }}
+                className="text-slate-300 hover:text-amber-500 p-0.5 transition-colors cursor-pointer"
+                title={isStarred ? 'Unstar conversation' : 'Star conversation'}
+              >
+                <Star
+                  className={`w-3.5 h-3.5 ${isStarred ? 'fill-amber-400 text-amber-500' : ''}`}
+                />
+              </button>
+            )}
+          </div>
         </div>
       </div>
-    </button>
+    </div>
   );
 };

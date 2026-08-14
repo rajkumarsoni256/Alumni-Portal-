@@ -27,6 +27,8 @@ const formatPublicUser = (row, authUserId = null) => {
     }
   }
 
+  const connCount = row.connections_count !== undefined ? parseInt(row.connections_count, 10) : 0;
+
   return {
     id: row.user_id,
     userId: row.user_id,
@@ -36,9 +38,7 @@ const formatPublicUser = (row, authUserId = null) => {
     email: row.email,
     role: (row.role || 'STUDENT').toLowerCase(),
     roleUpper: (row.role || 'STUDENT').toUpperCase(),
-    avatar: row.avatar_url || (isAlumni
-      ? 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=300'
-      : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=300'),
+    avatar: row.avatar_url || null,
     avatarUrl: row.avatar_url || null,
     degree: row.degree || null,
     branch: row.branch || null,
@@ -69,7 +69,8 @@ const formatPublicUser = (row, authUserId = null) => {
     profileCompleted: !!row.is_profile_complete,
     connectionStatus: connectionStatus,
     connectionId: connectionId,
-    connectionsCount: 42,
+    connectionsCount: connCount,
+    connectionCount: connCount,
     profileViewsCount: 120,
   };
 };
@@ -81,14 +82,16 @@ const discoverUsers = async (queryParams, authUserId = null) => {
   const offset = (page - 1) * limit;
 
   const whereClauses = [`UPPER(u.role) != 'ADMIN'`, `u.account_status != 'DISABLED'`];
+  whereClauses.push(`NOT EXISTS (SELECT 1 FROM user_settings st WHERE st.user_id = u.id AND st.search_visibility = FALSE)`);
   const values = [];
   let paramIndex = 1;
 
-  // Exclude current logged in user from network discovery & suggestions
+  // Exclude current logged in user and blocked users from network discovery & suggestions
   if (authUserId) {
     whereClauses.push(`u.id != $${paramIndex}`);
     values.push(authUserId);
     paramIndex++;
+    whereClauses.push(`NOT EXISTS (SELECT 1 FROM user_blocks ub WHERE (ub.blocker_id = $1 AND ub.blocked_id = u.id) OR (ub.blocker_id = u.id AND ub.blocked_id = $1))`);
   }
 
   // 1. Role Filter (type or role parameter)
@@ -167,7 +170,8 @@ const discoverUsers = async (queryParams, authUserId = null) => {
            p.current_year, p.company, p.designation, p.location,
            p.is_available_for_mentorship, p.linkedin_url, p.github_url,
            p.website_url, p.skills, p.interests, p.is_profile_complete,
-           p.created_at, p.updated_at
+           p.created_at, p.updated_at,
+           (SELECT COUNT(*) FROM connections conn WHERE (conn.requester_id = u.id OR conn.receiver_id = u.id) AND UPPER(conn.status) = 'ACCEPTED') AS connections_count
            ${authUserId ? ', c.id AS conn_id, c.requester_id AS conn_requester, c.receiver_id AS conn_receiver, c.status AS conn_status' : ''}
     FROM users u
     LEFT JOIN user_profiles p ON u.id = p.user_id
@@ -216,7 +220,8 @@ const getPublicUserById = async (targetUserId, authUserId = null) => {
            p.graduation_year, p.current_year, p.company, p.designation,
            p.location, p.is_available_for_mentorship, p.linkedin_url,
            p.github_url, p.website_url, p.skills, p.interests,
-           p.is_profile_complete, p.created_at, p.updated_at
+           p.is_profile_complete, p.created_at, p.updated_at,
+           (SELECT COUNT(*) FROM connections conn WHERE (conn.requester_id = u.id OR conn.receiver_id = u.id) AND UPPER(conn.status) = 'ACCEPTED') AS connections_count
            ${connSelect}
     FROM users u
     LEFT JOIN user_profiles p ON u.id = p.user_id

@@ -3,7 +3,7 @@ const router = express.Router();
 const userController = require('../controllers/userController');
 const profileController = require('../controllers/profileController');
 const connectionController = require('../controllers/connectionController');
-const { authenticateToken } = require('../middleware/authMiddleware');
+const { authenticateToken, optionalAuthenticateToken } = require('../middleware/authMiddleware');
 
 // Profile & Connection aliases under /users
 router.get('/me', authenticateToken, profileController.getCurrentProfile);
@@ -12,11 +12,12 @@ router.put('/onboarding', authenticateToken, profileController.completeOnboardin
 router.post('/onboarding', authenticateToken, profileController.completeOnboarding);
 router.put('/profile', authenticateToken, profileController.updateProfile);
 router.get('/connections', authenticateToken, connectionController.getMyConnections);
+router.get('/:userId/connections', authenticateToken, connectionController.getUserConnections);
 
-// Discovery API
-router.get('/', authenticateToken, userController.getUsers);
+// Discovery API (Optional auth for public featured alumni landing page)
+router.get('/', optionalAuthenticateToken, userController.getUsers);
 
 // Public profile retrieval by ID
-router.get('/:id', authenticateToken, userController.getUserById);
+router.get('/:id', optionalAuthenticateToken, userController.getUserById);
 
 module.exports = router;

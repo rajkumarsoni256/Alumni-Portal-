@@ -1,4 +1,6 @@
 import React from 'react';
+import { CheckCheck } from 'lucide-react';
+import { UserAvatar } from '../common/UserAvatar';
 
 const formatMessageTime = (isoString) => {
   if (!isoString) return '';
@@ -28,10 +30,11 @@ export const MessageBubble = ({
       {!isCurrentUser && (
         <div className="w-7 h-7 shrink-0">
           {showAvatar ? (
-            <img
-              src={senderProfile?.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=300'}
-              alt={senderProfile?.name || 'Member'}
-              className="w-7 h-7 rounded-full object-cover border border-slate-200"
+            <UserAvatar
+              src={senderProfile?.avatar}
+              name={senderProfile?.name}
+              className="w-7 h-7"
+              iconClassName="w-3.5 h-3.5"
             />
           ) : (
             <div className="w-7 h-7" />
@@ -42,20 +45,30 @@ export const MessageBubble = ({
       {/* Message Bubble Container */}
       <div className={`flex flex-col ${isCurrentUser ? 'items-end' : 'items-start'} max-w-[80%] sm:max-w-[75%]`}>
         <div
-          className={`px-3.5 py-2.5 text-xs leading-relaxed break-words whitespace-pre-wrap ${
+          className={`px-3.5 py-2.5 text-xs leading-relaxed break-words whitespace-pre-wrap relative group ${
             isCurrentUser
-              ? 'bg-slate-900 text-white rounded-2xl rounded-tr-xs shadow-2xs'
-              : 'bg-slate-100 text-slate-900 border border-slate-200/80 rounded-2xl rounded-tl-xs'
+              ? 'bg-rose-100/90 text-slate-900 border border-red-200/60 rounded-2xl rounded-tr-xs shadow-2xs'
+              : 'bg-slate-100/90 text-slate-900 border border-slate-200/80 rounded-2xl rounded-tl-xs'
           }`}
         >
           {message.text}
+
+          {/* Reaction badge if message has reaction */}
+          {message.reaction && (
+            <span className="absolute -bottom-2 -right-1 bg-white border border-slate-200 shadow-2xs rounded-full text-[10px] px-1">
+              {message.reaction}
+            </span>
+          )}
         </div>
 
-        {/* Timestamp */}
+        {/* Timestamp & Read Receipts */}
         {formattedTime && (
-          <span className="text-[10px] text-slate-400 mt-1 px-1 select-none">
-            {formattedTime}
-          </span>
+          <div className="flex items-center gap-1 text-[10px] text-slate-400 mt-1 px-1 select-none">
+            <span>{formattedTime}</span>
+            {isCurrentUser && (
+              <CheckCheck className="w-3 h-3 text-red-600" />
+            )}
+          </div>
         )}
       </div>
 

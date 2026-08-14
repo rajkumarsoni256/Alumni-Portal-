@@ -55,7 +55,24 @@ export const postService = {
    * @param {Object} postData
    */
   createPost: async (postData) => {
-    const data = await apiClient.post('/api/v1/posts', postData);
+    let body = postData;
+    if (postData.mediaFile || postData.file || (postData.mediaFiles && postData.mediaFiles.length > 0)) {
+      const formData = new FormData();
+      Object.keys(postData).forEach(key => {
+        if (key === 'mediaFile' || key === 'file') {
+          if (postData[key]) formData.append('media', postData[key]);
+        } else if (key === 'mediaFiles' && Array.isArray(postData[key])) {
+          postData[key].forEach(f => formData.append('media', f));
+        } else if (Array.isArray(postData[key])) {
+          formData.append(key, postData[key].join(','));
+        } else if (postData[key] !== null && postData[key] !== undefined) {
+          formData.append(key, postData[key]);
+        }
+      });
+      body = formData;
+    }
+
+    const data = await apiClient.post('/api/v1/posts', body);
     return data ? (data.post || data) : null;
   },
 
@@ -86,22 +103,49 @@ export const postService = {
   },
 
   /**
-   * Add a comment to a post in backend
+   * Add a comment or reply to a post in backend
    * @param {string} postId
-   * @param {Object} commentPayload
+   * @param {Object|string} commentPayload
    */
   addComment: async (postId, commentPayload) => {
-    const data = await apiClient.post(`/api/v1/posts/${postId}/comments`, commentPayload);
+    const payload = typeof commentPayload === 'string' ? { content: commentPayload } : commentPayload;
+    const data = await apiClient.post(`/api/v1/posts/${postId}/comments`, payload);
     return data;
   },
 
   /**
-   * Fetch comments for a post from backend
+   * Fetch comments for a post from backend with sorting and pagination
    * @param {string} postId
+   * @param {Object} [params] { page, limit, sort }
    */
-  getComments: async (postId) => {
-    const data = await apiClient.get(`/api/v1/posts/${postId}/comments`);
-    return data ? (data.comments || []) : [];
+  getComments: async (postId, params = {}) => {
+    const query = new URLSearchParams();
+    if (params.page) query.append('page', params.page);
+    if (params.limit) query.append('limit', params.limit);
+    if (params.sort) query.append('sort', params.sort);
+
+    const queryString = query.toString();
+    const data = await apiClient.get(`/api/v1/posts/${postId}/comments${queryString ? `?${queryString}` : ''}`);
+
+    if (Array.isArray(data)) {
+      return { comments: data, total: data.length, totalCount: data.length, hasMore: false };
+    }
+    return {
+      comments: data?.comments || [],
+      total: data?.total !== undefined ? data.total : (data?.totalCount || 0),
+      totalCount: data?.total !== undefined ? data.total : (data?.totalCount || 0),
+      hasMore: Boolean(data?.hasMore),
+      page: data?.page || 1,
+    };
+  },
+
+  /**
+   * Edit a comment
+   * @param {string} commentId
+   * @param {Object} payload { content }
+   */
+  editComment: async (commentId, payload) => {
+    return apiClient.patch(`/api/v1/comments/${commentId}`, payload);
   },
 
   /**
@@ -110,6 +154,23 @@ export const postService = {
    * @param {string} commentId
    */
   deleteComment: async (postId, commentId) => {
-    return apiClient.delete(`/api/v1/posts/${postId}/comments/${commentId}`);
+    const targetId = commentId || postId;
+    return apiClient.delete(`/api/v1/comments/${targetId}`);
+  },
+
+  /**
+   * Toggle Like on a comment in backend
+   * @param {string} commentId
+   */
+  toggleLikeComment: async (commentId) => {
+    return apiClient.post(`/api/v1/comments/${commentId}/like`);
+  },
+
+  /**
+   * Toggle Pin status on a comment in backend
+   * @param {string} commentId
+   */
+  togglePinComment: async (commentId) => {
+    return apiClient.patch(`/api/v1/comments/${commentId}/pin`);
   },
 };

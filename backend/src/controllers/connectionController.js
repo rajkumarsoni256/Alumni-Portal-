@@ -3,7 +3,7 @@ const { successResponse } = require('../utils/response');
 
 const sendRequest = async (req, res, next) => {
   try {
-    const { targetUserId } = req.body;
+    const targetUserId = req.body?.targetUserId || req.body?.userId || req.body?.receiverId || req.body?.id;
     const result = await connectionService.sendRequest(req.user, targetUserId);
     return successResponse(res, result, 'Connection request sent successfully', 201);
   } catch (err) {
@@ -88,6 +88,16 @@ const getMyConnections = async (req, res, next) => {
   }
 };
 
+const getUserConnections = async (req, res, next) => {
+  try {
+    const userId = req.params.userId || req.params.id || req.user.id;
+    const result = await connectionService.getUserConnections(userId, req.query);
+    return successResponse(res, result, 'User connections fetched successfully');
+  } catch (err) {
+    next(err);
+  }
+};
+
 module.exports = {
   sendRequest,
   acceptRequest,
@@ -98,4 +108,5 @@ module.exports = {
   getIncomingRequests,
   getOutgoingRequests,
   getMyConnections,
+  getUserConnections,
 };

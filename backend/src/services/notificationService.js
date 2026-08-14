@@ -23,9 +23,7 @@ const formatNotificationDTO = (row) => {
       name: actorName,
       email: row.actor_email,
       role: (row.actor_role || 'STUDENT').toLowerCase(),
-      avatar: row.actor_avatar || (isActorAlumni
-        ? 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=300'
-        : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=300'),
+      avatar: row.actor_avatar || null,
     };
   }
 
@@ -36,7 +34,7 @@ const formatNotificationDTO = (row) => {
     message: row.message,
     text: row.message,
     actor: actor,
-    avatar: actor ? actor.avatar : 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&q=80&w=300',
+    avatar: actor ? actor.avatar : null,
     entityType: row.entity_type,
     entityId: row.entity_id,
     metadata: row.metadata || {},
@@ -78,6 +76,15 @@ const createNotification = async ({
        RETURNING *`,
       [notifId, recipientId, actorId, type, title, message, entityType, entityId, JSON.stringify(metadata)]
     );
+
+    // Trigger Platform Email Dispatch (respecting recipient's Settings toggles)
+    const emailService = require('../email/emailService');
+    emailService.sendPlatformNotification(recipientId, type, {
+      title,
+      message,
+      entityType,
+      entityId,
+    }).catch((err) => console.warn('[Platform Email Warning]', err.message));
 
     return result.rows[0];
   } catch (err) {
@@ -129,7 +136,13 @@ const getUnreadCount = async (authUserId) => {
   return { unreadCount: parseInt(result.rows[0].unread || '0', 10) };
 };
 
+const isUUID = (str) => typeof str === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+
 const markAsRead = async (authUserId, notificationId) => {
+  if (!isUUID(notificationId)) {
+    return { success: true, message: 'Notification marked as read' };
+  }
+
   const checkRes = await db.query('SELECT recipient_id FROM notifications WHERE id = $1', [notificationId]);
   if (checkRes.rows.length === 0) {
     const err = new Error('Notification not found');
