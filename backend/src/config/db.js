@@ -5,31 +5,25 @@ const path = require('path');
 require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
 
 const getPoolConfig = () => {
-  // If DB_PASSWORD or DB_USER are explicitly defined, use discrete options
-  if (process.env.DB_USER && process.env.DB_PASSWORD) {
+  const connectionString = process.env.DATABASE_URL || process.env.DB_URL;
+
+  if (connectionString) {
+    const isProduction = process.env.NODE_ENV === 'production';
+    const isCloudDb = connectionString.includes('render.com') || connectionString.includes('neon.tech') || connectionString.includes('sslmode=require');
+
     return {
-      host: process.env.DB_HOST || 'localhost',
-      port: parseInt(process.env.DB_PORT || '5432', 10),
-      database: process.env.DB_NAME || 'jecrc_community',
-      user: String(process.env.DB_USER),
-      password: String(process.env.DB_PASSWORD),
+      connectionString,
+      ssl: (isProduction || isCloudDb) ? { rejectUnauthorized: false } : false,
     };
   }
 
-  // Fallback to connectionString if discrete parameters are not provided
-  if (process.env.DB_URL) {
-    return {
-      connectionString: process.env.DB_URL,
-    };
-  }
-
-  // Default development fallback
+  // Discrete parameters fallback
   return {
-    host: 'localhost',
-    port: 5432,
-    database: 'jecrc_community',
-    user: 'postgres',
-    password: '12345678',
+    host: process.env.DB_HOST || 'localhost',
+    port: parseInt(process.env.DB_PORT || '5432', 10),
+    database: process.env.DB_NAME || 'jecrc_community',
+    user: process.env.DB_USER ? String(process.env.DB_USER) : 'postgres',
+    password: process.env.DB_PASSWORD ? String(process.env.DB_PASSWORD) : '12345678',
   };
 };
 
