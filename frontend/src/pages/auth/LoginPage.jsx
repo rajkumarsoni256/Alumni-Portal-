@@ -10,6 +10,7 @@ import {
   GraduationCap, 
   AlertCircle 
 } from 'lucide-react';
+import { GoogleAuthButton } from '../../components/auth/GoogleAuthButton';
 
 export const LoginPage = () => {
   const navigate = useNavigate();
@@ -44,42 +45,6 @@ export const LoginPage = () => {
       setIsLoading(false);
     }
   };
-
-  useEffect(() => {
-    const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '792367093796-odhflll8ul8kgk83cci4aamgqgrvlk8p.apps.googleusercontent.com';
-    
-    const initGoogle = () => {
-      if (window.google?.accounts?.id) {
-        try {
-          window.google.accounts.id.initialize({
-            client_id: googleClientId,
-            callback: async (response) => {
-              if (response && response.credential) {
-                await handleGoogleSuccess(response.credential);
-              }
-            },
-          });
-
-          const btnContainer = document.getElementById('googleSignInBtnContainer');
-          if (btnContainer && btnContainer.children.length === 0) {
-            window.google.accounts.id.renderButton(btnContainer, {
-              theme: 'outline',
-              size: 'large',
-              width: '100%',
-              text: 'continue_with',
-              shape: 'rectangular',
-            });
-          }
-        } catch (e) {
-          console.warn('Google Identity Services initialization warning:', e);
-        }
-      }
-    };
-
-    initGoogle();
-    const timer = setTimeout(initGoogle, 400);
-    return () => clearTimeout(timer);
-  }, []);
 
   const validateForm = () => {
     const newErrors = {};
@@ -317,9 +282,14 @@ export const LoginPage = () => {
               </span>
             </div>
 
-            {/* Real Google OAuth Integration */}
+            {/* Google OAuth Integration */}
             <div className="w-full flex flex-col items-center justify-center gap-2">
-              <div id="googleSignInBtnContainer" className="w-full flex justify-center min-h-[40px]"></div>
+              <GoogleAuthButton
+                onSuccess={handleGoogleSuccess}
+                onError={(err) => setErrorMessage(err.message || 'Google authentication failed.')}
+                text="continue_with"
+                disabled={isLoading}
+              />
             </div>
           </div>
 

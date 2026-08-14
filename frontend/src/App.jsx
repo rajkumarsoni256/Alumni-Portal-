@@ -43,6 +43,7 @@ import { AdminUsersPage } from './pages/admin/AdminUsersPage';
 import { AdminUserDetailsPage } from './pages/admin/AdminUserDetailsPage';
 import { AdminDataManagementPage } from './pages/admin/AdminDataManagementPage';
 import { AdminSettingsPage } from './pages/admin/AdminSettingsPage';
+import { AdminCommunicationsPage } from './pages/admin/AdminCommunicationsPage';
 
 // Scroll to top component on route changes
 const ScrollToTop = () => {
@@ -352,6 +353,22 @@ export function App() {
             element={
               <AdminRoute>
                 <AdminSettingsPage />
+              </AdminRoute>
+            }
+          />
+          <Route
+            path="/admin/communications"
+            element={
+              <AdminRoute>
+                <AdminCommunicationsPage />
+              </AdminRoute>
+            }
+          />
+          <Route
+            path="/admin/notifications"
+            element={
+              <AdminRoute>
+                <AdminCommunicationsPage />
               </AdminRoute>
             }
           />

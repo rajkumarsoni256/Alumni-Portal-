@@ -103,6 +103,15 @@ const register = async ({ name, email, password, role }) => {
     throw error;
   }
 
+  // Check system settings for registration permission
+  const settingsRes = await db.query(`SELECT registration_enabled FROM system_settings WHERE id = 'default'`).catch(() => ({ rows: [] }));
+  if (settingsRes.rows.length > 0 && settingsRes.rows[0].registration_enabled === false) {
+    const error = new Error('Public registration is currently disabled by administrator.');
+    error.statusCode = 403;
+    error.errorCode = 'REGISTRATION_DISABLED';
+    throw error;
+  }
+
   // Check existing user
   const existingResult = await db.query('SELECT id FROM users WHERE email = $1', [normalizedEmail]);
   if (existingResult.rows.length > 0) {

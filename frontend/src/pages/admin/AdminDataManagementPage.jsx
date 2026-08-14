@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AdminLayout } from '../../components/admin/layout/AdminLayout';
 import { adminUserService } from '../../services/adminUserService';
@@ -10,14 +10,46 @@ import {
   Mail, 
   Phone, 
   Building2, 
-  MapPin,
-  ArrowRight,
-  ShieldCheck
+  MapPin, 
+  ArrowRight, 
+  ShieldCheck 
 } from 'lucide-react';
 
 export const AdminDataManagementPage = () => {
   const navigate = useNavigate();
-  const qualityStats = adminUserService.getDataQualityStats();
+  const [qualityStats, setQualityStats] = useState({
+    complete: 0,
+    incomplete: 0,
+    needsUpdate: 0,
+    missingContact: 0,
+    missingEmail: 0,
+    missingPhone: 0,
+    missingCompany: 0,
+    missingLocation: 0,
+  });
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [errorStatus, setErrorStatus] = useState(null);
+
+  const fetchStats = async () => {
+    setIsLoading(true);
+    setError(null);
+    setErrorStatus(null);
+    try {
+      const data = await adminUserService.getDataQualityStats();
+      if (data) setQualityStats(data);
+    } catch (err) {
+      console.error('Failed to fetch data quality stats:', err);
+      setError(err.message || 'Failed to fetch data quality stats from database.');
+      setErrorStatus(err.status || null);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchStats();
+  }, []);
 
   return (
     <AdminLayout>
@@ -32,6 +64,42 @@ export const AdminDataManagementPage = () => {
             Monitor database record freshness, completeness, and identify stale entries.
           </p>
         </div>
+
+        {/* Error Banner */}
+        {error && (
+          <div className="p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <AlertCircle className="w-5 h-5 text-red-600 shrink-0" />
+              <div>
+                <p className="text-xs font-bold text-red-900">
+                  {errorStatus === 401 ? 'Session Expired' : 'Failed to load data quality stats'}
+                </p>
+                <p className="text-[11px] text-red-700">
+                  {errorStatus === 401
+                    ? 'Your administrator session has expired. Please log in again to continue.'
+                    : error}
+                </p>
+              </div>
+            </div>
+            {errorStatus === 401 ? (
+              <button
+                type="button"
+                onClick={() => navigate('/login')}
+                className="px-3 py-1.5 rounded-lg bg-red-700 hover:bg-red-800 text-white text-xs font-semibold shrink-0 cursor-pointer"
+              >
+                Log In Again
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={fetchStats}
+                className="px-3 py-1.5 rounded-lg bg-red-700 hover:bg-red-800 text-white text-xs font-semibold shrink-0 cursor-pointer"
+              >
+                Retry
+              </button>
+            )}
+          </div>
+        )}
 
         {/* 1. Four Interactive Quality Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

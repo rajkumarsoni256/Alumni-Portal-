@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
-import { MOCK_ADMIN_STATS } from '../data/mockData';
+import { adminUserService } from '../services/adminUserService';
 import { AdminCharts } from '../components/admin/AdminCharts';
 import { 
   Shield, 
@@ -10,21 +10,59 @@ import {
   CheckCircle2, 
   Check, 
   X, 
-  Sparkles
+  Sparkles,
+  Clock
 } from 'lucide-react';
 
 export const AdminDashboard = () => {
   const { showNotification } = useApp();
-  const [verifications, setVerifications] = useState(MOCK_ADMIN_STATS.pendingVerifications);
+  const [verifications, setVerifications] = useState([]);
+  const [isLoadingVerifications, setIsLoadingVerifications] = useState(true);
+  const [dashboardStats, setDashboardStats] = useState({
+    overview: { totalUsers: 0, students: 0, alumni: 0, admins: 0, needsUpdate: 0 },
+    verification: { pending: 0, approved: 0, rejected: 0, total: 0 },
+    growth: { newUsersThisWeek: 0, newUsersThisMonth: 0, newUsersLastMonth: 0, monthlyTimeSeries: [] },
+    distribution: { branches: [], batches: [] },
+  });
 
-  const handleVerify = (id, approved) => {
-    setVerifications((prev) => prev.filter((v) => v.id !== id));
-    showNotification(
-      approved
-        ? 'Alumni account verified & approved!'
-        : 'Alumni verification request declined.',
-      approved ? 'success' : 'info'
-    );
+  const loadDashboardData = async () => {
+    setIsLoadingVerifications(true);
+    try {
+      const [verifRes, statsRes] = await Promise.all([
+        adminUserService.getVerifications({ status: 'PENDING' }),
+        adminUserService.getDashboardAnalytics().catch(() => null),
+      ]);
+      setVerifications(verifRes?.verifications || []);
+      if (statsRes) setDashboardStats(statsRes);
+    } catch (err) {
+      console.error('Failed to load admin dashboard data:', err);
+      setVerifications([]);
+    } finally {
+      setIsLoadingVerifications(false);
+    }
+  };
+
+  useEffect(() => {
+    loadDashboardData();
+  }, []);
+
+  const handleVerify = async (id, approved) => {
+    try {
+      await adminUserService.updateVerificationStatus(id, {
+        status: approved ? 'APPROVED' : 'REJECTED',
+        rejectionReason: approved ? undefined : 'Declined during administrative review',
+      });
+      setVerifications((prev) => prev.filter((v) => v.id !== id));
+      showNotification(
+        approved
+          ? 'Alumni account verified & approved!'
+          : 'Alumni verification request declined.',
+        approved ? 'success' : 'info'
+      );
+    } catch (err) {
+      console.error('Failed to update verification status:', err);
+      showNotification(err.message || 'Failed to update verification status.', 'error');
+    }
   };
 
   return (
@@ -53,48 +91,51 @@ export const AdminDashboard = () => {
         {/* 5 Metric Cards */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
           <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-2xs space-y-1">
-            <span className="text-[10px] font-bold uppercase text-slate-400">Total Students</span>
+            <span className="text-[10px] font-bold uppercase text-slate-400">Total Users</span>
             <p className="text-xl font-bold text-slate-900">
-              {MOCK_ADMIN_STATS.totalStudents.toLocaleString()}
+              {dashboardStats.overview.totalUsers.toLocaleString()}
             </p>
-            <span className="text-[10px] text-emerald-600 font-medium">+8% this year</span>
+            <span className="text-[10px] text-emerald-600 font-medium">Active database</span>
           </div>
 
           <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-2xs space-y-1">
             <span className="text-[10px] font-bold uppercase text-slate-400">Total Alumni</span>
             <p className="text-xl font-bold text-slate-900">
-              {MOCK_ADMIN_STATS.totalAlumni.toLocaleString()}
+              {dashboardStats.overview.alumni.toLocaleString()}
             </p>
-            <span className="text-[10px] text-slate-500 font-medium">Across 40+ countries</span>
+            <span className="text-[10px] text-slate-500 font-medium">Graduates</span>
           </div>
 
           <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-2xs space-y-1">
-            <span className="text-[10px] font-bold uppercase text-slate-400">Active Mentors</span>
+            <span className="text-[10px] font-bold uppercase text-slate-400">Total Students</span>
             <p className="text-xl font-bold text-slate-900">
-              {MOCK_ADMIN_STATS.activeMentors}
+              {dashboardStats.overview.students.toLocaleString()}
             </p>
-            <span className="text-[10px] text-emerald-600 font-medium">Available for 1-on-1s</span>
+            <span className="text-[10px] text-blue-600 font-medium">Undergraduates</span>
           </div>
 
           <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-2xs space-y-1">
-            <span className="text-[10px] font-bold uppercase text-slate-400">Mentorship Pairings</span>
+            <span className="text-[10px] font-bold uppercase text-slate-400">Pending Verifications</span>
             <p className="text-xl font-bold text-slate-900">
-              {MOCK_ADMIN_STATS.mentorshipConnections.toLocaleString()}
+              {dashboardStats.verification.pending.toLocaleString()}
             </p>
-            <span className="text-[10px] text-slate-500 font-medium">Completed</span>
+            <span className="text-[10px] text-amber-600 font-medium">Review queue</span>
           </div>
 
           <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-2xs space-y-1">
-            <span className="text-[10px] font-bold uppercase text-slate-400">Avg Satisfaction</span>
+            <span className="text-[10px] font-bold uppercase text-slate-400">Needs Update</span>
             <p className="text-xl font-bold text-slate-900">
-              {MOCK_ADMIN_STATS.avgSessionRating}★
+              {dashboardStats.overview.needsUpdate.toLocaleString()}
             </p>
-            <span className="text-[10px] text-emerald-600 font-medium">98% positive rating</span>
+            <span className="text-[10px] text-amber-700 font-medium">&gt; 1 year stale</span>
           </div>
         </div>
 
         {/* Charts Section */}
-        <AdminCharts />
+        <AdminCharts 
+          branches={dashboardStats.distribution?.branches} 
+          batches={dashboardStats.distribution?.batches} 
+        />
 
         {/* Pending Alumni Verifications Table */}
         <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-2xs space-y-4">

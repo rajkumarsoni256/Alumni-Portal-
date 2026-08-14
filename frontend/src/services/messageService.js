@@ -95,6 +95,9 @@ export const messageService = {
    * Fetch total unread message count across all conversations
    */
   getUnreadCount: async () => {
+    if (!apiClient.getAuthToken()) {
+      return 0;
+    }
     try {
       const data = await apiClient.get('/api/v1/conversations/unread-count');
       return data ? (data.unreadCount || 0) : 0;

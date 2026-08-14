@@ -69,28 +69,31 @@ export const ExportModal = ({
     setSelectedFields(reset);
   };
 
-  const handleExport = () => {
-    // If no explicit list passed, fetch current default list
-    let list = usersToExport;
-    if (!list || list.length === 0) {
-      const res = adminUserService.getAdminUsers({ pageSize: 1000 });
-      list = res.users;
-    }
+  const [isExporting, setIsExporting] = useState(false);
 
-    const success = adminUserService.downloadCSV(list, selectedFields);
-    if (success) {
-      const count = list.length;
-      showNotification(`CSV exported successfully (${count} records).`);
+  const handleExport = async () => {
+    setIsExporting(true);
+    try {
+      if (isSelectionExport && usersToExport && usersToExport.length > 0) {
+        const userIds = usersToExport.map((u) => (typeof u === 'string' ? u : u.id)).filter(Boolean);
+        await adminUserService.exportUsersCSV({ userIds, selectedFields });
+      } else {
+        await adminUserService.exportUsersCSV({ selectedFields });
+      }
+      showNotification('CSV exported successfully.');
       onClose();
-    } else {
-      showNotification('Please select at least one field to export.');
+    } catch (err) {
+      console.error('Server export failed:', err);
+      showNotification(err.message || 'Failed to generate export. Please select at least one field.', 'error');
+    } finally {
+      setIsExporting(false);
     }
   };
 
   const activeFieldCount = Object.values(selectedFields).filter(Boolean).length;
   const countToDisplay = isSelectionExport 
     ? usersToExport.length 
-    : (exportCount || usersToExport.length || adminUserService.getAdminUsers().totalCount);
+    : (exportCount || usersToExport.length || 'All matching');
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">

@@ -13,8 +13,11 @@ export const notificationService = {
   },
 
   getUnreadCount: async () => {
+    if (!apiClient.getAuthToken()) {
+      return { unreadCount: 0 };
+    }
     const data = await apiClient.get('/api/v1/notifications/unread-count');
-    return data;
+    return data || { unreadCount: 0 };
   },
 
   markAsRead: async (id) => {

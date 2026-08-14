@@ -5,6 +5,7 @@ import {
   LayoutDashboard, 
   Users, 
   Database, 
+  Megaphone,
   Settings, 
   ShieldCheck, 
   Home,
@@ -18,6 +19,7 @@ export const AdminSidebar = ({ className = '' }) => {
   const navItems = [
     { name: 'Dashboard', path: '/admin', icon: LayoutDashboard, exact: true },
     { name: 'Users Directory', path: '/admin/users', icon: Users },
+    { name: 'Communications', path: '/admin/communications', icon: Megaphone },
     { name: 'Data Management', path: '/admin/data', icon: Database },
     { name: 'Admin Settings', path: '/admin/settings', icon: Settings },
   ];

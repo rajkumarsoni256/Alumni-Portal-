@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { AdminLayout } from '../../components/admin/layout/AdminLayout';
 import { adminUserService } from '../../services/adminUserService';
@@ -23,15 +23,54 @@ import {
 export const AdminUserDetailsPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const user = adminUserService.getAdminUserById(id);
+  const [user, setUser] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  if (!user) {
+  useEffect(() => {
+    let isMounted = true;
+    const fetchUser = async () => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const data = await adminUserService.getAdminUserById(id);
+        if (isMounted) setUser(data);
+      } catch (err) {
+        if (isMounted) {
+          console.error('Failed to fetch user details:', err);
+          setError(err.message || 'User record not found');
+          setUser(null);
+        }
+      } finally {
+        if (isMounted) setIsLoading(false);
+      }
+    };
+    if (id) fetchUser();
+    return () => {
+      isMounted = false;
+    };
+  }, [id]);
+
+  if (isLoading) {
+    return (
+      <AdminLayout>
+        <div className="py-20 text-center space-y-3 bg-white rounded-xl border border-slate-200 p-8">
+          <div className="w-8 h-8 border-2 border-red-700 border-t-transparent rounded-full animate-spin mx-auto"></div>
+          <p className="text-xs font-semibold text-slate-500">Loading user profile from PostgreSQL...</p>
+        </div>
+      </AdminLayout>
+    );
+  }
+
+  if (error || !user) {
     return (
       <AdminLayout>
         <div className="py-16 text-center space-y-4 bg-white rounded-xl border border-slate-200 p-8">
           <AlertCircle className="w-10 h-10 text-amber-500 mx-auto" />
           <h2 className="text-lg font-bold text-slate-900">User Record Not Found</h2>
-          <p className="text-xs text-slate-500">The requested record ID "{id}" does not exist in the database.</p>
+          <p className="text-xs text-slate-500">
+            {error || `The requested record ID "${id}" does not exist in the database.`}
+          </p>
           <button
             type="button"
             onClick={() => navigate('/admin/users')}
