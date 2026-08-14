@@ -1,26 +1,25 @@
 import React from 'react';
-import { Navbar } from '../../common/Navbar';
+import { AdminHeader } from './AdminHeader';
 import { AdminSidebar } from './AdminSidebar';
 import { MobileBottomNav } from '../../common/MobileBottomNav';
 
 /**
- * AdminLayout — Authenticated Admin Shell
- * Uses the exact same shell layout, navbar, background theme, font typography,
- * and responsive grid as Student and Alumni experiences.
+ * AdminLayout — Authenticated Institutional Admin Shell
+ * Clean, modern, enterprise admin shell with global AdminHeader and AdminSidebar.
  */
-export const AdminLayout = ({ children }) => {
+export const AdminLayout = ({ children, onSearch }) => {
   return (
-    <div className="min-h-screen flex flex-col bg-slate-100/75 text-slate-900 font-sans antialiased selection:bg-red-700 selection:text-white pb-16 md:pb-0">
+    <div className="min-h-screen flex flex-col bg-[#F7F8FA] text-slate-900 font-sans antialiased selection:bg-red-700 selection:text-white pb-16 md:pb-0">
       
-      {/* Global Top Navbar */}
-      <Navbar />
+      {/* Global Admin Top Header */}
+      <AdminHeader onSearch={onSearch} />
 
       {/* Main Layout Container */}
-      <div className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-4 lg:px-8 py-4 sm:py-6">
+      <div className="flex-1 max-w-[1440px] w-full mx-auto px-4 sm:px-6 lg:px-8 py-5">
         <div className="flex items-start gap-6">
           
           {/* Left Admin Navigation Sidebar (Desktop) */}
-          <div className="hidden lg:block sticky top-20">
+          <div className="hidden lg:block sticky top-24">
             <AdminSidebar />
           </div>
 

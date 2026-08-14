@@ -6,18 +6,23 @@ import {
   Compass,
   Users, 
   MessageSquare, 
-  Bell 
+  Bell,
+  LayoutDashboard,
+  Layers,
+  Megaphone,
+  Settings
 } from 'lucide-react';
 
 export const MobileBottomNav = () => {
-  const { isAuthenticated, notifications, unreadMessagesCount } = useApp();
+  const { isAuthenticated, activeRole, notifications, unreadMessagesCount } = useApp();
   const location = useLocation();
 
   if (!isAuthenticated) return null;
 
-  const unreadNotifsCount = notifications.filter((n) => n.unread || !n.isRead).length;
+  const isAdmin = activeRole === 'admin';
+  const unreadNotifsCount = (notifications || []).filter((n) => n.unread || !n.isRead).length;
 
-  const navItems = [
+  const communityNavItems = [
     { 
       name: 'Home', 
       icon: Home, 
@@ -47,8 +52,39 @@ export const MobileBottomNav = () => {
     },
   ];
 
+  const adminNavItems = [
+    {
+      name: 'Dashboard',
+      icon: LayoutDashboard,
+      path: '/admin/dashboard',
+    },
+    {
+      name: 'Users',
+      icon: Users,
+      path: '/admin/users',
+    },
+    {
+      name: 'Content',
+      icon: Layers,
+      path: '/admin/content',
+    },
+    {
+      name: 'Comms',
+      icon: Megaphone,
+      path: '/admin/communications',
+    },
+    {
+      name: 'Settings',
+      icon: Settings,
+      path: '/admin/settings',
+    },
+  ];
+
+  const navItems = isAdmin ? adminNavItems : communityNavItems;
+
   const isItemActive = (item) => {
     if (item.name === 'Home') return location.pathname === '/' || location.pathname === '/home';
+    if (item.path === '/admin/dashboard') return location.pathname === '/admin' || location.pathname === '/admin/dashboard';
     return location.pathname.startsWith(item.path);
   };
 

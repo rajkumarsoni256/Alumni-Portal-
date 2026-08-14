@@ -44,6 +44,9 @@ import { AdminUserDetailsPage } from './pages/admin/AdminUserDetailsPage';
 import { AdminDataManagementPage } from './pages/admin/AdminDataManagementPage';
 import { AdminSettingsPage } from './pages/admin/AdminSettingsPage';
 import { AdminCommunicationsPage } from './pages/admin/AdminCommunicationsPage';
+import { AdminContentManagementPage } from './pages/admin/AdminContentManagementPage';
+import { AdminProfilePage } from './pages/admin/AdminProfilePage';
+import { AdminVerificationPage } from './pages/admin/AdminVerificationPage';
 
 // Scroll to top component on route changes
 const ScrollToTop = () => {
@@ -64,9 +67,9 @@ const PublicLayout = ({ children }) => {
   );
 };
 
-// Smart root route component: Landing Page for guests, Community Feed for logged-in users
+// Smart root route component: Landing Page for guests, Community Feed for logged-in users, Admin Dashboard for Admins
 const RootIndex = () => {
-  const { isAuthenticated, isLoading } = useApp();
+  const { isAuthenticated, isLoading, activeRole, authUser } = useApp();
 
   if (isLoading) {
     return (
@@ -78,6 +81,10 @@ const RootIndex = () => {
   }
 
   if (isAuthenticated) {
+    const isAdmin = authUser?.role?.toUpperCase() === 'ADMIN' || activeRole === 'admin';
+    if (isAdmin) {
+      return <Navigate to="/admin/dashboard" replace />;
+    }
     return (
       <ProtectedRoute>
         <CommunityFeed />
@@ -369,6 +376,70 @@ export function App() {
             element={
               <AdminRoute>
                 <AdminCommunicationsPage />
+              </AdminRoute>
+            }
+          />
+          <Route
+            path="/admin/content"
+            element={
+              <AdminRoute>
+                <AdminContentManagementPage />
+              </AdminRoute>
+            }
+          />
+          <Route
+            path="/admin/jobs"
+            element={
+              <AdminRoute>
+                <AdminContentManagementPage />
+              </AdminRoute>
+            }
+          />
+          <Route
+            path="/admin/events"
+            element={
+              <AdminRoute>
+                <AdminContentManagementPage />
+              </AdminRoute>
+            }
+          />
+          <Route
+            path="/admin/profile"
+            element={
+              <AdminRoute>
+                <AdminProfilePage />
+              </AdminRoute>
+            }
+          />
+          <Route
+            path="/admin/approvals"
+            element={
+              <AdminRoute>
+                <AdminVerificationPage />
+              </AdminRoute>
+            }
+          />
+          <Route
+            path="/admin/users/verification"
+            element={
+              <AdminRoute>
+                <AdminVerificationPage />
+              </AdminRoute>
+            }
+          />
+          <Route
+            path="/admin/mentorship"
+            element={
+              <AdminRoute>
+                <AdminContentManagementPage />
+              </AdminRoute>
+            }
+          />
+          <Route
+            path="/admin/audit-logs"
+            element={
+              <AdminRoute>
+                <AdminDashboardPage />
               </AdminRoute>
             }
           />

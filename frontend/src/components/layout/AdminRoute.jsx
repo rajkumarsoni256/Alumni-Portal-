@@ -1,13 +1,15 @@
 import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
+import { getPortalHomePath } from '../../utils/navigation';
 
 /**
  * AdminRoute Wrapper
  * Protects administrative routes and ensures active user has Admin capabilities.
+ * If authenticated user is a Student or Alumni, redirects them to their community home.
  */
 export const AdminRoute = ({ children }) => {
-  const { isLoading, isAuthenticated, activeRole } = useApp();
+  const { isLoading, isAuthenticated, activeRole, authUser } = useApp();
   const location = useLocation();
 
   if (isLoading) {
@@ -19,8 +21,14 @@ export const AdminRoute = ({ children }) => {
     );
   }
 
-  if (!isAuthenticated || activeRole !== 'admin') {
+  if (!isAuthenticated) {
     return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  const isAdmin = authUser?.role?.toUpperCase() === 'ADMIN' || activeRole === 'admin';
+
+  if (!isAdmin) {
+    return <Navigate to={getPortalHomePath(activeRole)} replace />;
   }
 
   return children;

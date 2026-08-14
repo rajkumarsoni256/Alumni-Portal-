@@ -155,6 +155,7 @@ export const AdminDashboard = () => {
                 <thead>
                   <tr className="border-b border-slate-200 text-slate-400 uppercase text-[10px]">
                     <th className="py-2.5 px-3">Alumni Candidate</th>
+                    <th className="py-2.5 px-3">Roll No & Course</th>
                     <th className="py-2.5 px-3">Role & Company</th>
                     <th className="py-2.5 px-3">Graduation</th>
                     <th className="py-2.5 px-3">Document Proof</th>
@@ -167,7 +168,7 @@ export const AdminDashboard = () => {
                       <td className="py-3 px-3">
                         <div className="flex items-center gap-2.5">
                           <img
-                            src={v.avatar}
+                            src={v.avatar || '/ju-alumni-logo.jpg'}
                             alt={v.name}
                             className="w-8 h-8 rounded-full object-cover border border-slate-200"
                           />
@@ -178,12 +179,20 @@ export const AdminDashboard = () => {
                         </div>
                       </td>
                       <td className="py-3 px-3">
-                        <span className="font-semibold text-slate-800 block">{v.currentRole}</span>
-                        <span className="text-[11px] text-slate-500">{v.company}</span>
+                        <span className="font-mono text-xs font-semibold text-slate-800 block">
+                          {v.universityRollNumber || 'N/A'}
+                        </span>
+                        <span className="text-[11px] text-slate-500">{v.course || v.branch || 'N/A'}</span>
+                      </td>
+                      <td className="py-3 px-3">
+                        <span className="font-semibold text-slate-800 block">{v.currentRole || 'Applicant'}</span>
+                        <span className="text-[11px] text-slate-500">{v.company || v.location || 'N/A'}</span>
                       </td>
                       <td className="py-3 px-3">
                         <span className="font-medium text-slate-800 block">{v.degree}</span>
-                        <span className="text-[11px] text-slate-400">Class of {v.batch}</span>
+                        <span className="text-[11px] text-slate-400">
+                          {v.joiningYear ? `${v.joiningYear} - ${v.batch}` : `Class of ${v.batch}`}
+                        </span>
                       </td>
                       <td className="py-3 px-3">
                         <span className="text-slate-700 bg-slate-100 px-2 py-0.5 rounded text-[11px]">

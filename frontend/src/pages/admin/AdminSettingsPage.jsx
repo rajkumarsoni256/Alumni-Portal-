@@ -118,23 +118,19 @@ export const AdminSettingsPage = () => {
       return;
     }
     if (newPassword.length < 6) {
-      showNotification('New password must be at least 6 characters.', 'error');
+      showNotification('Password must be at least 6 characters.', 'error');
       return;
     }
-
     setIsSavingPassword(true);
     try {
-      await adminUserService.updateSettings({
-        currentPassword,
-        newPassword,
-      });
+      await adminUserService.updateSettings({ currentPassword, newPassword });
+      showNotification('Administrator password updated successfully.', 'success');
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
-      showNotification('Administrator password updated successfully.', 'success');
     } catch (err) {
-      console.error('Failed to change password:', err);
-      showNotification(err.message || 'Failed to change password. Verify your current password.', 'error');
+      console.error('Failed to update password:', err);
+      showNotification(err.message || 'Failed to update password.', 'error');
     } finally {
       setIsSavingPassword(false);
     }
@@ -142,10 +138,10 @@ export const AdminSettingsPage = () => {
 
   return (
     <AdminLayout>
-      <div className="space-y-6 max-w-4xl">
+      <div className="space-y-5 max-w-4xl">
         
         {/* Page Header */}
-        <div>
+        <div className="border-b border-slate-200 pb-3.5">
           <h1 className="text-xl font-bold text-slate-900 tracking-tight">
             Admin Settings
           </h1>
@@ -156,11 +152,11 @@ export const AdminSettingsPage = () => {
 
         {/* Error Banner */}
         {error && (
-          <div className="p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <AlertCircle className="w-5 h-5 text-red-600 shrink-0" />
+          <div className="p-3.5 rounded-md bg-red-50 border border-red-200 text-red-700 flex items-center justify-between gap-4 text-xs">
+            <div className="flex items-center gap-2.5">
+              <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
               <div>
-                <p className="text-xs font-bold text-red-900">
+                <p className="font-bold text-red-900">
                   {errorStatus === 401 ? 'Session Expired' : 'Failed to load live settings'}
                 </p>
                 <p className="text-[11px] text-red-700">
@@ -174,7 +170,7 @@ export const AdminSettingsPage = () => {
               <button
                 type="button"
                 onClick={() => navigate('/login')}
-                className="px-3 py-1.5 rounded-lg bg-red-700 hover:bg-red-800 text-white text-xs font-semibold shrink-0 cursor-pointer"
+                className="px-3 py-1 rounded bg-red-700 hover:bg-red-800 text-white text-xs font-semibold shrink-0 cursor-pointer"
               >
                 Log In Again
               </button>
@@ -182,7 +178,7 @@ export const AdminSettingsPage = () => {
               <button
                 type="button"
                 onClick={fetchSettings}
-                className="px-3 py-1.5 rounded-lg bg-red-700 hover:bg-red-800 text-white text-xs font-semibold shrink-0 cursor-pointer"
+                className="px-3 py-1 rounded bg-red-700 hover:bg-red-800 text-white text-xs font-semibold shrink-0 cursor-pointer"
               >
                 Retry
               </button>
@@ -191,22 +187,22 @@ export const AdminSettingsPage = () => {
         )}
 
         {isLoading ? (
-          <div className="p-12 text-center text-xs text-slate-500 bg-white rounded-xl border border-slate-200 space-y-2">
+          <div className="p-12 text-center text-xs text-slate-500 bg-white rounded-md border border-slate-200 space-y-2">
             <RefreshCw className="w-5 h-5 animate-spin mx-auto text-red-700" />
             <p>Loading settings from PostgreSQL database...</p>
           </div>
         ) : (
-          <div className="space-y-6">
+          <div className="space-y-5">
             
             {/* 1. Global Platform Controls & Configuration */}
-            <div className="bg-white rounded-xl border border-slate-200/90 p-6 shadow-2xs space-y-4">
-              <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
+            <div className="bg-white rounded-md border border-slate-200 p-5 space-y-4">
+              <div className="flex items-center gap-2 border-b border-slate-100 pb-2.5">
                 <Sliders className="w-4 h-4 text-red-700" />
-                <h2 className="text-sm font-bold text-slate-900">Platform Controls & Configuration</h2>
+                <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wider">Platform Controls &amp; Configuration</h2>
               </div>
 
               <form onSubmit={handleSavePlatform} className="space-y-4 max-w-xl">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <label className="text-xs font-semibold text-slate-700 block">
                       Platform Display Name
@@ -216,7 +212,7 @@ export const AdminSettingsPage = () => {
                       required
                       value={platformName}
                       onChange={(e) => setPlatformName(e.target.value)}
-                      className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900 focus:outline-none focus:border-red-600"
+                      className="w-full p-2 bg-slate-50 border border-slate-200 rounded text-xs text-slate-900 focus:outline-none focus:border-red-600"
                     />
                   </div>
 
@@ -229,61 +225,61 @@ export const AdminSettingsPage = () => {
                       required
                       value={supportEmail}
                       onChange={(e) => setSupportEmail(e.target.value)}
-                      className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900 focus:outline-none focus:border-red-600"
+                      className="w-full p-2 bg-slate-50 border border-slate-200 rounded text-xs text-slate-900 focus:outline-none focus:border-red-600"
                     />
                   </div>
                 </div>
 
                 {/* Toggles */}
-                <div className="pt-2 space-y-3 border-t border-slate-100">
-                  <div className="flex items-center justify-between p-3 rounded-lg bg-slate-50 border border-slate-200/80">
+                <div className="pt-2 space-y-2.5 border-t border-slate-100 text-xs">
+                  <div className="flex items-center justify-between p-2.5 rounded bg-slate-50 border border-slate-200/80">
                     <div>
-                      <span className="text-xs font-bold text-slate-900 block">User Registration</span>
+                      <span className="font-bold text-slate-900 block">User Registration</span>
                       <span className="text-[11px] text-slate-500">Allow new students and alumni to create accounts</span>
                     </div>
                     <button
                       type="button"
                       onClick={() => setRegistrationEnabled(!registrationEnabled)}
-                      className={`px-3 py-1 rounded-md text-xs font-bold transition-colors cursor-pointer ${
+                      className={`px-3 py-1 rounded text-xs font-semibold transition-colors cursor-pointer ${
                         registrationEnabled
-                          ? 'bg-emerald-600 text-white'
-                          : 'bg-slate-300 text-slate-700'
+                          ? 'bg-emerald-700 text-white'
+                          : 'bg-slate-200 text-slate-700 border border-slate-300'
                       }`}
                     >
                       {registrationEnabled ? 'Enabled' : 'Disabled'}
                     </button>
                   </div>
 
-                  <div className="flex items-center justify-between p-3 rounded-lg bg-slate-50 border border-slate-200/80">
+                  <div className="flex items-center justify-between p-2.5 rounded bg-slate-50 border border-slate-200/80">
                     <div>
-                      <span className="text-xs font-bold text-slate-900 block">Alumni Verification Workflow</span>
+                      <span className="font-bold text-slate-900 block">Alumni Verification Workflow</span>
                       <span className="text-[11px] text-slate-500">Accept and process alumni degree verification submissions</span>
                     </div>
                     <button
                       type="button"
                       onClick={() => setAlumniVerificationEnabled(!alumniVerificationEnabled)}
-                      className={`px-3 py-1 rounded-md text-xs font-bold transition-colors cursor-pointer ${
+                      className={`px-3 py-1 rounded text-xs font-semibold transition-colors cursor-pointer ${
                         alumniVerificationEnabled
-                          ? 'bg-emerald-600 text-white'
-                          : 'bg-slate-300 text-slate-700'
+                          ? 'bg-emerald-700 text-white'
+                          : 'bg-slate-200 text-slate-700 border border-slate-300'
                       }`}
                     >
                       {alumniVerificationEnabled ? 'Enabled' : 'Disabled'}
                     </button>
                   </div>
 
-                  <div className="flex items-center justify-between p-3 rounded-lg bg-slate-50 border border-slate-200/80">
+                  <div className="flex items-center justify-between p-2.5 rounded bg-slate-50 border border-slate-200/80">
                     <div>
-                      <span className="text-xs font-bold text-slate-900 block">Maintenance Mode</span>
+                      <span className="font-bold text-slate-900 block">Maintenance Mode</span>
                       <span className="text-[11px] text-slate-500">Display maintenance advisory banner across platform</span>
                     </div>
                     <button
                       type="button"
                       onClick={() => setMaintenanceMode(!maintenanceMode)}
-                      className={`px-3 py-1 rounded-md text-xs font-bold transition-colors cursor-pointer ${
+                      className={`px-3 py-1 rounded text-xs font-semibold transition-colors cursor-pointer ${
                         maintenanceMode
-                          ? 'bg-amber-600 text-white'
-                          : 'bg-slate-300 text-slate-700'
+                          ? 'bg-amber-700 text-white'
+                          : 'bg-slate-200 text-slate-700 border border-slate-300'
                       }`}
                     >
                       {maintenanceMode ? 'Active' : 'Off'}
@@ -295,7 +291,7 @@ export const AdminSettingsPage = () => {
                   <button
                     type="submit"
                     disabled={isSavingPlatform}
-                    className="px-4 py-2 rounded-lg text-xs font-bold text-white bg-red-700 hover:bg-red-800 transition-colors inline-flex items-center gap-1.5 shadow-2xs cursor-pointer disabled:opacity-50"
+                    className="px-3.5 py-1.5 rounded text-xs font-semibold text-white bg-red-700 hover:bg-red-800 transition-colors inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                   >
                     <Save className="w-3.5 h-3.5" />
                     <span>{isSavingPlatform ? 'Saving...' : 'Save Platform Controls'}</span>
@@ -305,13 +301,13 @@ export const AdminSettingsPage = () => {
             </div>
 
             {/* 2. Admin Profile Information */}
-            <div className="bg-white rounded-xl border border-slate-200/90 p-6 shadow-2xs space-y-4">
-              <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
+            <div className="bg-white rounded-md border border-slate-200 p-5 space-y-4">
+              <div className="flex items-center gap-2 border-b border-slate-100 pb-2.5">
                 <User className="w-4 h-4 text-slate-700" />
-                <h2 className="text-sm font-bold text-slate-900">Administrator Profile</h2>
+                <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wider">Administrator Profile</h2>
               </div>
 
-              <form onSubmit={handleSaveProfile} className="space-y-4 max-w-md">
+              <form onSubmit={handleSaveProfile} className="space-y-3 max-w-md">
                 <div className="space-y-1">
                   <label className="text-xs font-semibold text-slate-700 block">
                     Administrator Name
@@ -321,7 +317,7 @@ export const AdminSettingsPage = () => {
                     required
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900 focus:outline-none focus:border-red-600"
+                    className="w-full p-2 bg-slate-50 border border-slate-200 rounded text-xs text-slate-900 focus:outline-none focus:border-red-600"
                   />
                 </div>
 
@@ -334,7 +330,7 @@ export const AdminSettingsPage = () => {
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900 focus:outline-none focus:border-red-600"
+                    className="w-full p-2 bg-slate-50 border border-slate-200 rounded text-xs text-slate-900 focus:outline-none focus:border-red-600"
                   />
                 </div>
 
@@ -342,7 +338,7 @@ export const AdminSettingsPage = () => {
                   <button
                     type="submit"
                     disabled={isSavingProfile}
-                    className="px-4 py-2 rounded-lg text-xs font-bold text-white bg-slate-900 hover:bg-slate-800 transition-colors inline-flex items-center gap-1.5 shadow-2xs cursor-pointer disabled:opacity-50"
+                    className="px-3.5 py-1.5 rounded text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 transition-colors inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                   >
                     <Save className="w-3.5 h-3.5" />
                     <span>{isSavingProfile ? 'Saving...' : 'Save Profile Info'}</span>
@@ -352,13 +348,13 @@ export const AdminSettingsPage = () => {
             </div>
 
             {/* 3. Security / Password Change */}
-            <div className="bg-white rounded-xl border border-slate-200/90 p-6 shadow-2xs space-y-4">
-              <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
+            <div className="bg-white rounded-md border border-slate-200 p-5 space-y-4">
+              <div className="flex items-center gap-2 border-b border-slate-100 pb-2.5">
                 <Lock className="w-4 h-4 text-slate-700" />
-                <h2 className="text-sm font-bold text-slate-900">Security & Password</h2>
+                <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wider">Security &amp; Password</h2>
               </div>
 
-              <form onSubmit={handleChangePassword} className="space-y-4 max-w-md">
+              <form onSubmit={handleChangePassword} className="space-y-3 max-w-md">
                 <div className="space-y-1">
                   <label className="text-xs font-semibold text-slate-700 block">
                     Current Password
@@ -369,7 +365,7 @@ export const AdminSettingsPage = () => {
                     value={currentPassword}
                     onChange={(e) => setCurrentPassword(e.target.value)}
                     placeholder="••••••••"
-                    className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900 focus:outline-none focus:border-red-600"
+                    className="w-full p-2 bg-slate-50 border border-slate-200 rounded text-xs text-slate-900 focus:outline-none focus:border-red-600"
                   />
                 </div>
 
@@ -383,7 +379,7 @@ export const AdminSettingsPage = () => {
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
                     placeholder="••••••••"
-                    className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900 focus:outline-none focus:border-red-600"
+                    className="w-full p-2 bg-slate-50 border border-slate-200 rounded text-xs text-slate-900 focus:outline-none focus:border-red-600"
                   />
                 </div>
 
@@ -397,7 +393,7 @@ export const AdminSettingsPage = () => {
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     placeholder="••••••••"
-                    className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900 focus:outline-none focus:border-red-600"
+                    className="w-full p-2 bg-slate-50 border border-slate-200 rounded text-xs text-slate-900 focus:outline-none focus:border-red-600"
                   />
                 </div>
 
@@ -405,7 +401,7 @@ export const AdminSettingsPage = () => {
                   <button
                     type="submit"
                     disabled={isSavingPassword}
-                    className="px-4 py-2 rounded-lg text-xs font-bold text-white bg-slate-900 hover:bg-slate-800 transition-colors inline-flex items-center gap-1.5 shadow-2xs cursor-pointer disabled:opacity-50"
+                    className="px-3.5 py-1.5 rounded text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 transition-colors inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                   >
                     <ShieldCheck className="w-3.5 h-3.5" />
                     <span>{isSavingPassword ? 'Updating...' : 'Update Password'}</span>

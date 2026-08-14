@@ -12,6 +12,8 @@ import {
 } from 'lucide-react';
 import { GoogleAuthButton } from '../../components/auth/GoogleAuthButton';
 
+import { getPortalHomePath } from '../../utils/navigation';
+
 export const LoginPage = () => {
   const navigate = useNavigate();
   const { loginUser, loginWithGoogle } = useApp();
@@ -33,11 +35,11 @@ export const LoginPage = () => {
       const userRole = (user && user.role) ? user.role.toLowerCase() : 'student';
       const isComplete = user && user.profileComplete !== false;
       if (userRole === 'admin') {
-        navigate('/admin');
+        navigate('/admin/dashboard');
       } else if (!isComplete) {
         navigate('/onboarding');
       } else {
-        navigate('/');
+        navigate(getPortalHomePath(userRole));
       }
     } catch (err) {
       setErrorMessage(err.message || 'Google authentication failed.');
@@ -74,15 +76,19 @@ export const LoginPage = () => {
       const userRole = (user && user.role) ? user.role.toLowerCase() : 'student';
       const isComplete = user && user.profileComplete !== false;
       if (userRole === 'admin') {
-        navigate('/admin');
+        navigate('/admin/dashboard');
       } else if (!isComplete) {
         navigate('/onboarding');
       } else {
-        navigate('/');
+        navigate(getPortalHomePath(userRole));
       }
     } catch (err) {
       if (err.errorCode === 'EMAIL_NOT_VERIFIED') {
         setErrorMessage('Your email address is not verified yet. Please check your inbox or complete verification.');
+      } else if (err.errorCode === 'ALUMNI_APPROVAL_PENDING') {
+        setErrorMessage('Your alumni account is awaiting approval from JECRC administration. You will receive an email and notification once your account has been reviewed.');
+      } else if (err.errorCode === 'ALUMNI_APPROVAL_REJECTED') {
+        setErrorMessage('Your alumni registration request was not approved by university administration.');
       } else {
         setErrorMessage(err.message || 'Invalid email or password. Please check your credentials.');
       }
@@ -293,8 +299,53 @@ export const LoginPage = () => {
             </div>
           </div>
 
+          {/* Quick Demo Login Fill Buttons */}
+          <div className="pt-3 border-t border-slate-100 space-y-2">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block text-center">
+              Quick Portal Demo Accounts
+            </span>
+            <div className="flex items-center justify-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setEmail('admin@jecrc.ac.in');
+                  setPassword('AdminPassword@123');
+                  setErrors({});
+                  setErrorMessage('');
+                }}
+                className="px-2.5 py-1 rounded text-[11px] font-semibold text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 transition-colors cursor-pointer"
+              >
+                Fill Demo Admin
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setEmail('student@jecrc.ac.in');
+                  setPassword('StudentPassword@123');
+                  setErrors({});
+                  setErrorMessage('');
+                }}
+                className="px-2.5 py-1 rounded text-[11px] font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-200 transition-colors cursor-pointer"
+              >
+                Fill Demo Student
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setEmail('alumni@jecrc.ac.in');
+                  setPassword('AlumniPassword@123');
+                  setErrors({});
+                  setErrorMessage('');
+                }}
+                className="px-2.5 py-1 rounded text-[11px] font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-200 transition-colors cursor-pointer"
+              >
+                Fill Demo Alumni
+              </button>
+            </div>
+          </div>
+
           {/* Footer Register Link */}
-          <div className="pt-3 border-t border-slate-100 text-center text-xs text-slate-500">
+          <div className="pt-2 text-center text-xs text-slate-500">
             Don't have an account?{' '}
             <Link to="/register" className="text-red-700 font-semibold hover:underline">
               Join the Community

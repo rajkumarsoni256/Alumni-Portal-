@@ -13,14 +13,10 @@ import {
   ChevronRight, 
   ArrowUpDown, 
   Eye, 
-  Building2, 
-  MapPin, 
-  GraduationCap, 
-  UserCheck, 
-  Clock, 
-  AlertCircle,
   CheckSquare,
-  Square
+  Square,
+  AlertCircle,
+  ChevronDown
 } from 'lucide-react';
 
 export const AdminUsersPage = () => {
@@ -28,23 +24,16 @@ export const AdminUsersPage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const { showNotification } = useApp();
 
-  // Search & Filter State
+  // Search State
   const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || '');
-  const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
 
   // Filters State
   const [filters, setFilters] = useState({
     role: searchParams.get('role') || 'all',
+    status: searchParams.get('status') || 'all',
     branch: searchParams.get('branch') || 'all',
     batch: searchParams.get('batch') || 'all',
-    batchFrom: '',
-    batchTo: '',
-    city: searchParams.get('city') || 'all',
-    company: searchParams.get('company') || '',
-    profileStatus: searchParams.get('status') || 'all',
-    missingFields: searchParams.get('missing') ? [searchParams.get('missing')] : [],
-    lastUpdated: searchParams.get('lastUpdated') || 'all',
   });
 
   // Table State
@@ -54,7 +43,7 @@ export const AdminUsersPage = () => {
   const [pageSize, setPageSize] = useState(20);
   const [selectedUserIds, setSelectedUserIds] = useState([]);
 
-  // Data State
+  // Data & Summary Stats State
   const [dataResult, setDataResult] = useState({
     users: [],
     totalCount: 0,
@@ -62,9 +51,15 @@ export const AdminUsersPage = () => {
     pageSize: 20,
     totalPages: 1,
   });
+  const [userStats, setUserStats] = useState({
+    totalUsers: 0,
+    students: 0,
+    alumni: 0,
+    pendingApprovals: 0,
+    administrators: 0,
+  });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [errorStatus, setErrorStatus] = useState(null);
 
   // Debounce search query
   const [debouncedQuery, setDebouncedQuery] = useState(searchQuery);
@@ -75,15 +70,31 @@ export const AdminUsersPage = () => {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  // Fetch Users from real API
+  // Fetch summary stats from backend
+  const fetchStats = async () => {
+    try {
+      const stats = await adminUserService.getUserStats();
+      if (stats) {
+        setUserStats(stats);
+      }
+    } catch (err) {
+      console.error('Failed to load user stats:', err);
+    }
+  };
+
+  // Fetch users from real PostgreSQL backend API
   const fetchUsers = async () => {
     setIsLoading(true);
     setError(null);
-    setErrorStatus(null);
     try {
       const res = await adminUserService.getAdminUsers({
         searchQuery: debouncedQuery,
-        filters,
+        filters: {
+          role: filters.role,
+          profileStatus: filters.status,
+          branch: filters.branch,
+          batch: filters.batch,
+        },
         sortField,
         sortOrder,
         page,
@@ -92,8 +103,7 @@ export const AdminUsersPage = () => {
       setDataResult(res || { users: [], totalCount: 0, page: 1, pageSize: 20, totalPages: 1 });
     } catch (err) {
       console.error('Failed to load admin users:', err);
-      setError(err.message || 'Failed to fetch users from database. Please check your backend connection.');
-      setErrorStatus(err.status || null);
+      setError(err.message || 'Failed to fetch users from database. Please ensure backend is running.');
       setDataResult({ users: [], totalCount: 0, page: 1, pageSize: 20, totalPages: 1 });
     } finally {
       setIsLoading(false);
@@ -101,29 +111,20 @@ export const AdminUsersPage = () => {
   };
 
   useEffect(() => {
+    fetchStats();
+  }, []);
+
+  useEffect(() => {
     fetchUsers();
   }, [debouncedQuery, filters, sortField, sortOrder, page, pageSize]);
 
-  // Handle URL query sync
+  // Sync state with URL search params
   useEffect(() => {
     const q = searchParams.get('q');
     if (q !== null && q !== searchQuery) setSearchQuery(q);
-
-    const statusParam = searchParams.get('status');
-    const updatedParam = searchParams.get('lastUpdated');
-    const missingParam = searchParams.get('missing');
-
-    if (statusParam || updatedParam || missingParam) {
-      setFilters((prev) => ({
-        ...prev,
-        profileStatus: statusParam || prev.profileStatus,
-        lastUpdated: updatedParam || prev.lastUpdated,
-        missingFields: missingParam ? [missingParam] : prev.missingFields,
-      }));
-    }
   }, [searchParams]);
 
-  // Handle Select All on current page
+  // Select all handler
   const isAllCurrentPageSelected = 
     dataResult.users.length > 0 &&
     dataResult.users.every((u) => selectedUserIds.includes(u.id));
@@ -154,44 +155,16 @@ export const AdminUsersPage = () => {
     }
   };
 
-  const activeFilterPills = useMemo(() => {
-    const pills = [];
-    if (filters.role !== 'all') pills.push({ key: 'role', label: `Role: ${filters.role}` });
-    if (filters.branch !== 'all') pills.push({ key: 'branch', label: `Branch: ${filters.branch}` });
-    if (filters.batch !== 'all') pills.push({ key: 'batch', label: `Batch: ${filters.batch}` });
-    if (filters.city !== 'all') pills.push({ key: 'city', label: `City: ${filters.city}` });
-    if (filters.company) pills.push({ key: 'company', label: `Company: ${filters.company}` });
-    if (filters.profileStatus !== 'all') pills.push({ key: 'profileStatus', label: `Status: ${filters.profileStatus}` });
-    if (filters.lastUpdated !== 'all') pills.push({ key: 'lastUpdated', label: `Updated: ${filters.lastUpdated}` });
-    if (filters.missingFields.length > 0) pills.push({ key: 'missingFields', label: `Missing: ${filters.missingFields.join(', ')}` });
-    return pills;
-  }, [filters]);
-
-  const removeFilterPill = (key) => {
-    if (key === 'missingFields') {
-      setFilters((prev) => ({ ...prev, missingFields: [] }));
-    } else if (key === 'company') {
-      setFilters((prev) => ({ ...prev, company: '' }));
-    } else {
-      setFilters((prev) => ({ ...prev, [key]: 'all' }));
-    }
-  };
-
   const clearAllFilters = () => {
     setSearchQuery('');
     setFilters({
       role: 'all',
+      status: 'all',
       branch: 'all',
       batch: 'all',
-      batchFrom: '',
-      batchTo: '',
-      city: 'all',
-      company: '',
-      profileStatus: 'all',
-      missingFields: [],
-      lastUpdated: 'all',
     });
     setSearchParams({});
+    setPage(1);
   };
 
   const selectedUsersList = useMemo(() => {
@@ -201,18 +174,25 @@ export const AdminUsersPage = () => {
     });
   }, [dataResult.users, selectedUserIds]);
 
+  // Computed display stats with fallbacks
+  const displayTotal = userStats.totalUsers || dataResult.totalCount || 0;
+  const displayStudents = userStats.students || dataResult.users.filter(u => u.role === 'Student').length || 0;
+  const displayAlumni = userStats.alumni || dataResult.users.filter(u => u.role === 'Alumni').length || 0;
+  const displayPending = userStats.pendingApprovals || 0;
+  const displayAdmins = userStats.administrators || dataResult.users.filter(u => u.role === 'Admin').length || 0;
+
   return (
-    <AdminLayout>
-      <div className="space-y-4">
+    <AdminLayout onSearch={(q) => setSearchQuery(q)}>
+      <div className="space-y-5 selection:bg-red-700 selection:text-white">
         
         {/* Page Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-xl font-bold text-slate-900 tracking-tight">
-              Users Management
+            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
+              Users
             </h1>
-            <p className="text-xs text-slate-500">
-              Complete student and alumni database records directory.
+            <p className="text-xs text-slate-500 mt-0.5">
+              Manage student, alumni and administrator accounts.
             </p>
           </div>
 
@@ -220,37 +200,68 @@ export const AdminUsersPage = () => {
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => setIsFilterPanelOpen(!isFilterPanelOpen)}
-              className={`px-3.5 py-2 rounded-lg text-xs font-semibold border transition-colors inline-flex items-center gap-1.5 cursor-pointer ${
-                isFilterPanelOpen || activeFilterPills.length > 0
-                  ? 'bg-red-50 text-red-700 border-red-200'
-                  : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
-              }`}
-            >
-              <Filter className="w-4 h-4" />
-              <span>Filters</span>
-              {activeFilterPills.length > 0 && (
-                <span className="w-4 h-4 rounded-full bg-red-700 text-white text-[10px] font-bold inline-flex items-center justify-center">
-                  {activeFilterPills.length}
-                </span>
-              )}
-            </button>
-
-            <button
-              type="button"
               onClick={() => setIsExportModalOpen(true)}
-              className="px-3.5 py-2 rounded-lg text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 transition-colors inline-flex items-center gap-1.5 shadow-2xs cursor-pointer"
+              className="px-3.5 py-2 rounded border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 text-xs font-semibold transition-colors inline-flex items-center gap-1.5 cursor-pointer shadow-2xs"
             >
-              <FileSpreadsheet className="w-4 h-4" />
+              <FileSpreadsheet className="w-4 h-4 text-slate-600" />
               <span>Export CSV</span>
             </button>
           </div>
         </div>
 
-        {/* Search Input Bar */}
-        <div className="bg-white p-3 rounded-xl border border-slate-200/90 shadow-2xs flex items-center gap-3">
-          <div className="relative flex-1">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+        {/* User Summary Section */}
+        <div className="bg-white rounded-md border border-slate-200 p-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 divide-y sm:divide-y-0 sm:divide-x divide-slate-100 shadow-2xs">
+          {/* ALL USERS */}
+          <div className="p-2 sm:p-0 sm:px-3 first:px-0">
+            <span className="text-[10px] font-bold text-slate-500 tracking-wider uppercase block">ALL USERS</span>
+            <span className="text-2xl font-black text-slate-900 mt-1 block tracking-tight">
+              {displayTotal}
+            </span>
+            <span className="text-[11px] text-slate-500 font-medium block mt-0.5">Total Registered</span>
+          </div>
+
+          {/* STUDENTS */}
+          <div className="p-2 sm:p-0 sm:px-3 pt-3 sm:pt-0">
+            <span className="text-[10px] font-bold text-slate-500 tracking-wider uppercase block">STUDENTS</span>
+            <span className="text-2xl font-black text-slate-900 mt-1 block tracking-tight">
+              {displayStudents}
+            </span>
+            <span className="text-[11px] text-slate-500 font-medium block mt-0.5">Enrolled Students</span>
+          </div>
+
+          {/* ALUMNI */}
+          <div className="p-2 sm:p-0 sm:px-3 pt-3 sm:pt-0">
+            <span className="text-[10px] font-bold text-slate-500 tracking-wider uppercase block">ALUMNI</span>
+            <span className="text-2xl font-black text-slate-900 mt-1 block tracking-tight">
+              {displayAlumni}
+            </span>
+            <span className="text-[11px] text-slate-500 font-medium block mt-0.5">Registered Alumni</span>
+          </div>
+
+          {/* PENDING APPROVAL */}
+          <div className="p-2 sm:p-0 sm:px-3 pt-3 sm:pt-0">
+            <span className="text-[10px] font-bold text-red-700 tracking-wider uppercase block">PENDING APPROVAL</span>
+            <span className="text-2xl font-black text-red-700 mt-1 block tracking-tight">
+              {displayPending}
+            </span>
+            <span className="text-[11px] text-red-700 font-bold block mt-0.5">Awaiting Review</span>
+          </div>
+
+          {/* ADMINISTRATORS */}
+          <div className="p-2 sm:p-0 sm:px-3 pt-3 sm:pt-0">
+            <span className="text-[10px] font-bold text-slate-500 tracking-wider uppercase block">ADMINISTRATORS</span>
+            <span className="text-2xl font-black text-slate-900 mt-1 block tracking-tight">
+              {displayAdmins}
+            </span>
+            <span className="text-[11px] text-slate-500 font-medium block mt-0.5">System Administrators</span>
+          </div>
+        </div>
+
+        {/* Search + Filter Toolbar */}
+        <div className="bg-white rounded-md border border-slate-200 p-3.5 flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 shadow-2xs">
+          {/* Search Field */}
+          <div className="relative flex-1 min-w-[260px]">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
               type="text"
               value={searchQuery}
@@ -258,269 +269,125 @@ export const AdminUsersPage = () => {
                 setSearchQuery(e.target.value);
                 setPage(1);
               }}
-              placeholder="Search name, email, phone, company, designation..."
-              className="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-red-600/20 focus:border-red-600 transition-all"
+              placeholder="Search by name, email, roll number or company..."
+              className="w-full pl-9 pr-8 py-1.5 bg-slate-50 border border-slate-200 rounded text-xs text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:border-red-700 transition-colors"
             />
             {searchQuery && (
               <button
                 type="button"
                 onClick={() => setSearchQuery('')}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
               >
                 <X className="w-3.5 h-3.5" />
               </button>
             )}
           </div>
-        </div>
 
-        {/* Filter Panel (Collapsible Drawer) */}
-        {isFilterPanelOpen && (
-          <div className="bg-white p-5 rounded-xl border border-slate-200/90 shadow-sm space-y-4 animate-in fade-in duration-100">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-                Filter User Records
-              </h3>
-              <button
-                type="button"
-                onClick={clearAllFilters}
-                className="text-xs font-semibold text-red-700 hover:underline"
+          {/* Dropdowns Group */}
+          <div className="flex flex-wrap items-center gap-2.5 text-xs">
+            {/* Role Select */}
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] font-bold text-slate-500 uppercase">Role</span>
+              <select
+                value={filters.role}
+                onChange={(e) => {
+                  setFilters(prev => ({ ...prev, role: e.target.value }));
+                  setPage(1);
+                }}
+                className="bg-slate-50 border border-slate-200 rounded px-2.5 py-1.5 text-xs text-slate-800 font-semibold focus:bg-white focus:outline-none focus:border-red-700"
               >
-                Clear All
-              </button>
+                <option value="all">All Roles</option>
+                <option value="Student">Student</option>
+                <option value="Alumni">Alumni</option>
+                <option value="Admin">Admin</option>
+              </select>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-              
-              {/* Role */}
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-700 block">Role</label>
-                <select
-                  value={filters.role}
-                  onChange={(e) => setFilters({ ...filters, role: e.target.value })}
-                  className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800 focus:outline-none focus:border-red-600"
-                >
-                  <option value="all">All Roles</option>
-                  <option value="student">Student</option>
-                  <option value="alumni">Alumni</option>
-                </select>
-              </div>
-
-              {/* Branch */}
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-700 block">Branch</label>
-                <select
-                  value={filters.branch}
-                  onChange={(e) => setFilters({ ...filters, branch: e.target.value })}
-                  className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800 focus:outline-none focus:border-red-600"
-                >
-                  <option value="all">All Branches</option>
-                  <option value="CSE">CSE</option>
-                  <option value="AI/ML">AI/ML</option>
-                  <option value="IT">IT</option>
-                  <option value="ECE">ECE</option>
-                  <option value="Mechanical">Mechanical</option>
-                  <option value="Civil">Civil</option>
-                </select>
-              </div>
-
-              {/* Batch */}
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-700 block">Batch</label>
-                <select
-                  value={filters.batch}
-                  onChange={(e) => setFilters({ ...filters, batch: e.target.value })}
-                  className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800 focus:outline-none focus:border-red-600"
-                >
-                  <option value="all">All Batches</option>
-                  {[2027, 2026, 2025, 2021, 2020, 2019, 2018, 2017, 2016, 2015, 2014].map((b) => (
-                    <option key={b} value={b}>{b}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* City / Location */}
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-700 block">City</label>
-                <select
-                  value={filters.city}
-                  onChange={(e) => setFilters({ ...filters, city: e.target.value })}
-                  className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800 focus:outline-none focus:border-red-600"
-                >
-                  <option value="all">All Locations</option>
-                  <option value="Bangalore">Bangalore</option>
-                  <option value="Jaipur">Jaipur</option>
-                  <option value="Delhi NCR">Delhi NCR</option>
-                  <option value="Hyderabad">Hyderabad</option>
-                  <option value="Mumbai">Mumbai</option>
-                  <option value="San Francisco">San Francisco</option>
-                  <option value="Austin">Austin</option>
-                </select>
-              </div>
-
-              {/* Company Input */}
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-700 block">Company</label>
-                <input
-                  type="text"
-                  value={filters.company}
-                  onChange={(e) => setFilters({ ...filters, company: e.target.value })}
-                  placeholder="e.g. Amazon, Google"
-                  className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-red-600"
-                />
-              </div>
-
-              {/* Profile Status */}
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-700 block">Profile Status</label>
-                <select
-                  value={filters.profileStatus}
-                  onChange={(e) => setFilters({ ...filters, profileStatus: e.target.value })}
-                  className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800 focus:outline-none focus:border-red-600"
-                >
-                  <option value="all">All Statuses</option>
-                  <option value="complete">Complete</option>
-                  <option value="incomplete">Incomplete</option>
-                  <option value="needs update">Needs Update</option>
-                </select>
-              </div>
-
-              {/* Last Updated */}
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-700 block">Last Updated</label>
-                <select
-                  value={filters.lastUpdated}
-                  onChange={(e) => setFilters({ ...filters, lastUpdated: e.target.value })}
-                  className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800 focus:outline-none focus:border-red-600"
-                >
-                  <option value="all">Any time</option>
-                  <option value="30days">Last 30 days</option>
-                  <option value="3months">Last 3 months</option>
-                  <option value="6months">Last 6 months</option>
-                  <option value="1year">Last 1 year</option>
-                  <option value="more1year">More than 1 year ago</option>
-                </select>
-              </div>
-
-              {/* Missing Data Flags */}
-              <div className="space-y-1 sm:col-span-2">
-                <label className="text-xs font-semibold text-slate-700 block">Missing Data</label>
-                <div className="flex flex-wrap gap-2 pt-1">
-                  {['email', 'phone', 'company', 'location'].map((f) => {
-                    const isChecked = filters.missingFields.includes(f);
-                    return (
-                      <button
-                        key={f}
-                        type="button"
-                        onClick={() => {
-                          const updated = isChecked
-                            ? filters.missingFields.filter((i) => i !== f)
-                            : [...filters.missingFields, f];
-                          setFilters({ ...filters, missingFields: updated });
-                        }}
-                        className={`px-2.5 py-1 rounded-md text-xs font-medium border transition-colors cursor-pointer capitalize ${
-                          isChecked
-                            ? 'bg-red-50 text-red-700 border-red-200'
-                            : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
-                        }`}
-                      >
-                        Missing {f}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-            </div>
-          </div>
-        )}
-
-        {/* Active Filter Pills Bar */}
-        {activeFilterPills.length > 0 && (
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs font-semibold text-slate-500">Active filters:</span>
-            {activeFilterPills.map((pill) => (
-              <span
-                key={pill.key}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-200/80 text-slate-800 text-xs font-semibold"
+            {/* Status Select */}
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] font-bold text-slate-500 uppercase">Status</span>
+              <select
+                value={filters.status}
+                onChange={(e) => {
+                  setFilters(prev => ({ ...prev, status: e.target.value }));
+                  setPage(1);
+                }}
+                className="bg-slate-50 border border-slate-200 rounded px-2.5 py-1.5 text-xs text-slate-800 font-semibold focus:bg-white focus:outline-none focus:border-red-700"
               >
-                <span>{pill.label}</span>
-                <button
-                  type="button"
-                  onClick={() => removeFilterPill(pill.key)}
-                  className="hover:text-red-700 cursor-pointer"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              </span>
-            ))}
+                <option value="all">All Status</option>
+                <option value="ACTIVE">Active</option>
+                <option value="PENDING_APPROVAL">Pending Approval</option>
+                <option value="REJECTED">Rejected</option>
+                <option value="DISABLED">Disabled</option>
+              </select>
+            </div>
+
+            {/* Branch Select */}
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] font-bold text-slate-500 uppercase">Branch</span>
+              <select
+                value={filters.branch}
+                onChange={(e) => {
+                  setFilters(prev => ({ ...prev, branch: e.target.value }));
+                  setPage(1);
+                }}
+                className="bg-slate-50 border border-slate-200 rounded px-2.5 py-1.5 text-xs text-slate-800 font-semibold focus:bg-white focus:outline-none focus:border-red-700"
+              >
+                <option value="all">All Branches</option>
+                <option value="B.Tech CSE">B.Tech CSE</option>
+                <option value="B.Tech ECE">B.Tech ECE</option>
+                <option value="B.Tech ME">B.Tech ME</option>
+                <option value="B.Tech EE">B.Tech EE</option>
+                <option value="B.Tech Civil">B.Tech Civil</option>
+                <option value="BCA">BCA</option>
+                <option value="MCA">MCA</option>
+                <option value="BBA">BBA</option>
+                <option value="MBA">MBA</option>
+              </select>
+            </div>
+
+            {/* Batch Select */}
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] font-bold text-slate-500 uppercase">Batch</span>
+              <select
+                value={filters.batch}
+                onChange={(e) => {
+                  setFilters(prev => ({ ...prev, batch: e.target.value }));
+                  setPage(1);
+                }}
+                className="bg-slate-50 border border-slate-200 rounded px-2.5 py-1.5 text-xs text-slate-800 font-semibold focus:bg-white focus:outline-none focus:border-red-700"
+              >
+                <option value="all">All Batches</option>
+                <option value="2027">2027</option>
+                <option value="2026">2026</option>
+                <option value="2025">2025</option>
+                <option value="2024">2024</option>
+                <option value="2023">2023</option>
+                <option value="2022">2022</option>
+                <option value="2021">2021</option>
+                <option value="2020">2020</option>
+              </select>
+            </div>
+
+            {/* Clear Filters */}
             <button
               type="button"
               onClick={clearAllFilters}
-              className="text-xs font-semibold text-red-700 hover:underline ml-1 cursor-pointer"
+              className="px-3 py-1.5 rounded border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 text-xs font-semibold inline-flex items-center gap-1 cursor-pointer transition-colors"
             >
-              Clear all
+              <X className="w-3.5 h-3.5" />
+              <span>Clear Filters</span>
             </button>
-          </div>
-        )}
-
-        {/* Selection Action Banner */}
-        {selectedUserIds.length > 0 && (
-          <div className="bg-slate-900 text-white px-4 py-2.5 rounded-xl flex items-center justify-between shadow-md">
-            <span className="text-xs font-bold">
-              {selectedUserIds.length} record{selectedUserIds.length > 1 ? 's' : ''} explicitly selected
-            </span>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setSelectedUserIds([])}
-                className="text-xs text-slate-300 hover:text-white underline cursor-pointer"
-              >
-                Deselect all
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsExportModalOpen(true)}
-                className="px-3 py-1 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition-colors cursor-pointer inline-flex items-center gap-1"
-              >
-                <FileSpreadsheet className="w-3.5 h-3.5" />
-                <span>Export Selected</span>
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Result Counter & Controls Header */}
-        <div className="flex items-center justify-between text-xs text-slate-600 font-medium pt-1">
-          <div>
-            Showing <span className="font-bold text-slate-900">{dataResult.users.length}</span> of{' '}
-            <span className="font-bold text-slate-900">{dataResult.totalCount.toLocaleString()}</span> records
-          </div>
-
-          <div className="flex items-center gap-2">
-            <span>Per page:</span>
-            <select
-              value={pageSize}
-              onChange={(e) => {
-                setPageSize(Number(e.target.value));
-                setPage(1);
-              }}
-              className="bg-white border border-slate-200 rounded px-2 py-1 text-xs font-semibold text-slate-800 focus:outline-none"
-            >
-              <option value={20}>20</option>
-              <option value={50}>50</option>
-              <option value={100}>100</option>
-            </select>
           </div>
         </div>
 
-        {/* Main Users Table */}
-        <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs overflow-hidden">
+        {/* Primary Data Table */}
+        <div className="bg-white rounded-md border border-slate-200 overflow-hidden shadow-2xs">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs text-slate-700">
-              
               <thead className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider select-none">
                 <tr>
-                  <th className="p-3 w-10 text-center">
+                  <th className="p-3.5 w-10 text-center">
                     <button
                       type="button"
                       onClick={toggleSelectAllPage}
@@ -535,107 +402,112 @@ export const AdminUsersPage = () => {
                     </button>
                   </th>
 
-                  <th className="p-3 cursor-pointer hover:bg-slate-100" onClick={() => handleSort('name')}>
-                    <div className="flex items-center gap-1">
-                      <span>Name & Email</span>
+                  <th className="p-3.5 cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('name')}>
+                    <div className="flex items-center gap-1.5">
+                      <span>USER</span>
                       <ArrowUpDown className="w-3 h-3 text-slate-400" />
                     </div>
                   </th>
 
-                  <th className="p-3">Role</th>
-
-                  <th className="p-3 cursor-pointer hover:bg-slate-100" onClick={() => handleSort('batch')}>
-                    <div className="flex items-center gap-1">
-                      <span>Batch & Branch</span>
+                  <th className="p-3.5 cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('role')}>
+                    <div className="flex items-center gap-1.5">
+                      <span>ROLE</span>
                       <ArrowUpDown className="w-3 h-3 text-slate-400" />
                     </div>
                   </th>
 
-                  <th className="p-3">Company & Role</th>
-
-                  <th className="p-3">Location</th>
-
-                  <th className="p-3 cursor-pointer hover:bg-slate-100" onClick={() => handleSort('lastUpdated')}>
-                    <div className="flex items-center gap-1">
-                      <span>Last Updated</span>
+                  <th className="p-3.5 cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('batch')}>
+                    <div className="flex items-center gap-1.5">
+                      <span>ACADEMIC</span>
                       <ArrowUpDown className="w-3 h-3 text-slate-400" />
                     </div>
                   </th>
 
-                  <th className="p-3 text-right">Actions</th>
+                  <th className="p-3.5">
+                    <span>PROFESSIONAL</span>
+                  </th>
+
+                  <th className="p-3.5 cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('status')}>
+                    <div className="flex items-center gap-1.5">
+                      <span>STATUS</span>
+                      <ArrowUpDown className="w-3 h-3 text-slate-400" />
+                    </div>
+                  </th>
+
+                  <th className="p-3.5 cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('lastUpdated')}>
+                    <div className="flex items-center gap-1.5">
+                      <span>LAST UPDATED</span>
+                      <ArrowUpDown className="w-3 h-3 text-slate-400" />
+                    </div>
+                  </th>
+
+                  <th className="p-3.5 text-right">
+                    <span>ACTIONS</span>
+                  </th>
                 </tr>
               </thead>
 
-              <tbody className="divide-y divide-slate-100">
-                {error ? (
+              <tbody className="divide-y divide-slate-100 font-medium">
+                {isLoading ? (
+                  Array.from({ length: 5 }).map((_, idx) => (
+                    <tr key={idx} className="animate-pulse">
+                      <td className="p-3.5 text-center"><div className="w-4 h-4 bg-slate-200 rounded mx-auto" /></td>
+                      <td className="p-3.5"><div className="w-36 h-4 bg-slate-200 rounded" /></td>
+                      <td className="p-3.5"><div className="w-16 h-4 bg-slate-200 rounded" /></td>
+                      <td className="p-3.5"><div className="w-24 h-4 bg-slate-200 rounded" /></td>
+                      <td className="p-3.5"><div className="w-28 h-4 bg-slate-200 rounded" /></td>
+                      <td className="p-3.5"><div className="w-20 h-4 bg-slate-200 rounded" /></td>
+                      <td className="p-3.5"><div className="w-16 h-4 bg-slate-200 rounded" /></td>
+                      <td className="p-3.5 text-right"><div className="w-14 h-4 bg-slate-200 rounded ml-auto" /></td>
+                    </tr>
+                  ))
+                ) : error ? (
                   <tr>
-                    <td colSpan={8} className="py-12 text-center text-red-600 space-y-2 bg-red-50/40">
-                      <AlertCircle className="w-8 h-8 mx-auto text-red-500" />
-                      <p className="font-bold text-slate-800">
-                        {errorStatus === 401 ? 'Session Expired' : 'Failed to Load Users'}
-                      </p>
-                      <p className="text-xs text-slate-500 max-w-md mx-auto">
-                        {errorStatus === 401
-                          ? 'Your administrator session has expired. Please log in again.'
-                          : error}
-                      </p>
-                      {errorStatus === 401 ? (
-                        <button
-                          type="button"
-                          onClick={() => navigate('/login')}
-                          className="mt-2 px-3 py-1.5 rounded-lg bg-red-700 hover:bg-red-800 text-white text-xs font-semibold cursor-pointer"
-                        >
-                          Log In Again
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={fetchUsers}
-                          className="mt-2 px-3 py-1.5 rounded-lg bg-red-700 hover:bg-red-800 text-white text-xs font-semibold cursor-pointer"
-                        >
-                          Retry Loading
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ) : isLoading ? (
-                  <tr>
-                    <td colSpan={8} className="py-16 text-center text-slate-400">
-                      <div className="flex flex-col items-center justify-center space-y-2">
-                        <div className="w-6 h-6 border-2 border-red-700 border-t-transparent rounded-full animate-spin"></div>
-                        <p className="text-xs font-semibold text-slate-500">Loading records from PostgreSQL...</p>
-                      </div>
+                    <td colSpan={8} className="p-12 text-center text-slate-500 space-y-2">
+                      <AlertCircle className="w-8 h-8 text-amber-500 mx-auto" />
+                      <p className="font-bold text-slate-800 text-xs">Unable to load users</p>
+                      <p className="text-xs text-slate-500">{error}</p>
+                      <button
+                        type="button"
+                        onClick={fetchUsers}
+                        className="px-3.5 py-1.5 rounded bg-red-700 text-white text-xs font-semibold hover:bg-red-800 transition-colors cursor-pointer"
+                      >
+                        Retry
+                      </button>
                     </td>
                   </tr>
                 ) : dataResult.users.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="py-12 text-center text-slate-400 space-y-2">
-                      <Search className="w-8 h-8 mx-auto text-slate-300" />
-                      <p className="font-bold text-slate-700">No user records found</p>
-                      <p className="text-xs text-slate-500">Try clearing filters or search query.</p>
+                    <td colSpan={8} className="p-12 text-center text-slate-400 space-y-2">
+                      <AlertCircle className="w-8 h-8 text-slate-300 mx-auto" />
+                      <p className="font-bold text-slate-700 text-xs">No users found</p>
+                      <p className="text-xs text-slate-500">Try broadening your search query or clearing active filters.</p>
                       <button
                         type="button"
                         onClick={clearAllFilters}
-                        className="mt-2 px-3 py-1.5 rounded-lg bg-red-50 text-red-700 text-xs font-semibold cursor-pointer"
+                        className="px-3.5 py-1.5 rounded border border-slate-300 bg-white text-slate-700 text-xs font-semibold hover:bg-slate-50 transition-colors cursor-pointer"
                       >
-                        Reset All Filters
+                        Clear Filters
                       </button>
                     </td>
                   </tr>
                 ) : (
                   dataResult.users.map((user) => {
                     const isSelected = selectedUserIds.includes(user.id);
-                    const isOutdated = user.lastUpdatedDaysAgo > 365;
+                    const rawStatus = user.accountStatus || user.account_status || (user.missingFields ? 'ACTIVE' : 'ACTIVE');
+                    const isPending = rawStatus === 'PENDING_APPROVAL' || user.status === 'PENDING';
+                    const isRejected = rawStatus === 'REJECTED';
+                    const isDisabled = rawStatus === 'DISABLED';
 
                     return (
                       <tr
                         key={user.id}
                         className={`hover:bg-slate-50/80 transition-colors ${
-                          isSelected ? 'bg-red-50/30' : ''
+                          isSelected ? 'bg-red-50/20' : ''
                         }`}
                       >
                         {/* Checkbox */}
-                        <td className="p-3 text-center">
+                        <td className="p-3.5 text-center">
                           <button
                             type="button"
                             onClick={() => toggleSelectUser(user.id)}
@@ -649,11 +521,15 @@ export const AdminUsersPage = () => {
                           </button>
                         </td>
 
-                        {/* Name & Email */}
-                        <td className="p-3 font-semibold text-slate-900">
-                          <div className="flex items-center gap-2.5">
-                            <div className="w-8 h-8 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center font-bold text-slate-600 text-xs shrink-0">
-                              {user.name.charAt(0)}
+                        {/* USER */}
+                        <td className="p-3.5 font-semibold text-slate-900">
+                          <div className="flex items-center gap-3">
+                            <div className="w-9 h-9 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center font-bold text-slate-700 text-xs shrink-0 overflow-hidden">
+                              {user.avatar ? (
+                                <img src={user.avatar} alt={user.name} className="w-full h-full object-cover" />
+                              ) : (
+                                <span>{user.name ? user.name.charAt(0).toUpperCase() : 'U'}</span>
+                              )}
                             </div>
                             <div className="min-w-0">
                               <Link
@@ -662,124 +538,195 @@ export const AdminUsersPage = () => {
                               >
                                 {user.name}
                               </Link>
-                              <span className="text-[11px] text-slate-400 font-normal block truncate">
-                                {user.email || '— (No Email)'}
+                              <span className="text-[11px] text-slate-500 font-normal block truncate">
+                                {user.email || '—'}
                               </span>
+                              {user.rollNumber || user.universityRollNumber ? (
+                                <span className="text-[10px] text-slate-400 font-normal block truncate">
+                                  Roll No: {user.rollNumber || user.universityRollNumber}
+                                </span>
+                              ) : null}
                             </div>
                           </div>
                         </td>
 
-                        {/* Role Badge */}
-                        <td className="p-3">
+                        {/* ROLE */}
+                        <td className="p-3.5">
                           <span
-                            className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${
+                            className={`inline-block px-2.5 py-0.5 rounded text-[10px] font-bold ${
                               user.role === 'Alumni'
                                 ? 'bg-red-50 text-red-700 border border-red-200'
-                                : 'bg-blue-50 text-blue-700 border border-blue-200'
+                                : user.role === 'Student'
+                                ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                                : 'bg-slate-100 text-slate-700 border border-slate-200'
                             }`}
                           >
                             {user.role}
                           </span>
                         </td>
 
-                        {/* Batch & Branch */}
-                        <td className="p-3">
+                        {/* ACADEMIC */}
+                        <td className="p-3.5">
                           <span className="font-bold text-slate-800 block">
-                            {user.branch}
+                            {user.degree || 'B.Tech'} {user.branch ? `${user.branch}` : ''}
                           </span>
-                          <span className="text-[11px] text-slate-400">
-                            Batch of {user.batch}
-                          </span>
-                        </td>
-
-                        {/* Company & Designation */}
-                        <td className="p-3">
-                          <span className="font-semibold text-slate-800 block truncate max-w-[160px]">
-                            {user.company || '—'}
-                          </span>
-                          <span className="text-[11px] text-slate-400 block truncate max-w-[160px]">
-                            {user.designation || '—'}
+                          <span className="text-[11px] text-slate-500">
+                            {user.batch || user.graduationYear || '—'}
                           </span>
                         </td>
 
-                        {/* Location */}
-                        <td className="p-3">
-                          <span className="text-slate-700 font-medium truncate block max-w-[120px]">
-                            {user.city || '—'}
-                          </span>
-                        </td>
-
-                        {/* Last Updated */}
-                        <td className="p-3">
-                          <div className="space-y-0.5">
-                            <span
-                              className={`text-xs font-semibold block ${
-                                isOutdated ? 'text-amber-700 font-bold' : 'text-slate-600'
-                              }`}
-                            >
-                              {user.lastUpdatedDaysAgo === 1
-                                ? 'Yesterday'
-                                : `${user.lastUpdatedDaysAgo} days ago`}
-                            </span>
-                            {isOutdated && (
-                              <span className="inline-flex items-center gap-1 text-[10px] text-red-600 font-bold">
-                                <AlertCircle className="w-3 h-3" />
-                                <span>Needs Update</span>
+                        {/* PROFESSIONAL */}
+                        <td className="p-3.5">
+                          {user.role === 'Alumni' && user.company ? (
+                            <>
+                              <span className="font-bold text-slate-800 block truncate max-w-[160px]">
+                                {user.company}
                               </span>
-                            )}
-                          </div>
+                              <span className="text-[11px] text-slate-500 block truncate max-w-[160px]">
+                                {user.designation || 'Alumni'}
+                              </span>
+                            </>
+                          ) : (
+                            <span className="text-slate-400 font-normal">—</span>
+                          )}
                         </td>
 
-                        {/* Actions */}
-                        <td className="p-3 text-right">
-                          <Link
-                            to={`/admin/users/${user.id}`}
-                            className="px-2.5 py-1 rounded text-xs font-semibold text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 transition-colors inline-flex items-center gap-1"
-                          >
-                            <Eye className="w-3.5 h-3.5" />
-                            <span>View</span>
-                          </Link>
+                        {/* STATUS */}
+                        <td className="p-3.5">
+                          {isPending ? (
+                            <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-amber-700">
+                              <span className="w-2 h-2 rounded-full bg-amber-500" />
+                              <span>Pending Approval</span>
+                            </span>
+                          ) : isRejected ? (
+                            <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-red-700">
+                              <span className="w-2 h-2 rounded-full bg-red-600" />
+                              <span>Rejected</span>
+                            </span>
+                          ) : isDisabled ? (
+                            <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-slate-500">
+                              <span className="w-2 h-2 rounded-full bg-slate-400" />
+                              <span>Disabled</span>
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-emerald-700">
+                              <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                              <span>Active</span>
+                            </span>
+                          )}
+                        </td>
+
+                        {/* LAST UPDATED */}
+                        <td className="p-3.5">
+                          <span className="text-xs text-slate-600 font-medium">
+                            {user.lastUpdatedDaysAgo === 0
+                              ? '0 days ago'
+                              : user.lastUpdatedDaysAgo === 1
+                              ? '1 day ago'
+                              : `${user.lastUpdatedDaysAgo || 0} days ago`}
+                          </span>
+                        </td>
+
+                        {/* ACTIONS */}
+                        <td className="p-3.5 text-right">
+                          {isPending ? (
+                            <Link
+                              to="/admin/approvals"
+                              className="px-3 py-1 rounded text-xs font-bold text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 transition-colors inline-flex items-center gap-1 cursor-pointer"
+                            >
+                              <Eye className="w-3.5 h-3.5" />
+                              <span>Review</span>
+                              <ChevronDown className="w-3 h-3 text-red-700 opacity-60" />
+                            </Link>
+                          ) : (
+                            <Link
+                              to={`/admin/users/${user.id}`}
+                              className="px-3 py-1 rounded text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-300 transition-colors inline-flex items-center gap-1 cursor-pointer shadow-2xs"
+                            >
+                              <Eye className="w-3.5 h-3.5 text-slate-500" />
+                              <span>View</span>
+                              <ChevronDown className="w-3 h-3 text-slate-400" />
+                            </Link>
+                          )}
                         </td>
                       </tr>
                     );
                   })
                 )}
               </tbody>
-
             </table>
           </div>
 
           {/* Pagination Footer */}
           <div className="p-4 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-600">
             <div>
-              Page <span className="font-bold text-slate-900">{dataResult.page}</span> of{' '}
-              <span className="font-bold text-slate-900">{dataResult.totalPages}</span>
+              Showing{' '}
+              <span className="font-bold text-slate-900">
+                {dataResult.users.length > 0 ? (dataResult.page - 1) * pageSize + 1 : 0}
+              </span>{' '}
+              to{' '}
+              <span className="font-bold text-slate-900">
+                {Math.min(dataResult.page * pageSize, dataResult.totalCount)}
+              </span>{' '}
+              of <span className="font-bold text-slate-900">{dataResult.totalCount}</span> users
             </div>
 
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                disabled={dataResult.page <= 1}
-                onClick={() => setPage(page - 1)}
-                className="px-3 py-1.5 rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed font-semibold inline-flex items-center gap-1 cursor-pointer"
-              >
-                <ChevronLeft className="w-4 h-4" />
-                <span>Previous</span>
-              </button>
-
-              <div className="px-2 font-semibold text-slate-700">
-                {dataResult.page} / {dataResult.totalPages}
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-1.5">
+                <select
+                  value={pageSize}
+                  onChange={(e) => {
+                    setPageSize(Number(e.target.value));
+                    setPage(1);
+                  }}
+                  className="bg-white border border-slate-300 rounded px-2 py-1 text-xs font-semibold text-slate-800 focus:outline-none"
+                >
+                  <option value={20}>20 / page</option>
+                  <option value={50}>50 / page</option>
+                  <option value={100}>100 / page</option>
+                </select>
               </div>
 
-              <button
-                type="button"
-                disabled={dataResult.page >= dataResult.totalPages}
-                onClick={() => setPage(page + 1)}
-                className="px-3 py-1.5 rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed font-semibold inline-flex items-center gap-1 cursor-pointer"
-              >
-                <span>Next</span>
-                <ChevronRight className="w-4 h-4" />
-              </button>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  disabled={dataResult.page <= 1}
+                  onClick={() => setPage(page - 1)}
+                  className="p-1.5 rounded border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                  title="Previous Page"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+
+                {Array.from({ length: Math.min(dataResult.totalPages || 1, 5) }).map((_, idx) => {
+                  const pNum = idx + 1;
+                  const isActive = pNum === dataResult.page;
+                  return (
+                    <button
+                      key={pNum}
+                      type="button"
+                      onClick={() => setPage(pNum)}
+                      className={`w-7 h-7 rounded text-xs font-bold transition-colors cursor-pointer ${
+                        isActive
+                          ? 'bg-red-700 text-white'
+                          : 'bg-white border border-slate-300 text-slate-700 hover:bg-slate-50'
+                      }`}
+                    >
+                      {pNum}
+                    </button>
+                  );
+                })}
+
+                <button
+                  type="button"
+                  disabled={dataResult.page >= dataResult.totalPages}
+                  onClick={() => setPage(page + 1)}
+                  className="p-1.5 rounded border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                  title="Next Page"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
             </div>
           </div>
         </div>
