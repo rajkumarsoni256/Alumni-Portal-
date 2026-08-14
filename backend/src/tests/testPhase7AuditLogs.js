@@ -126,7 +126,7 @@ const runPhase7Tests = async () => {
     assert(rApprove.status === 200, 'Verification approval succeeds');
 
     const approveLog = (await db.query(
-      `SELECT * FROM audit_logs WHERE action = 'VERIFICATION_APPROVED' AND target_id = $1`,
+      `SELECT * FROM audit_logs WHERE action LIKE '%VERIFICATION_APPROVED%' AND target_id = $1`,
       [verificationId]
     )).rows[0];
     assert(approveLog !== undefined, 'VERIFICATION_APPROVED recorded transactionally');

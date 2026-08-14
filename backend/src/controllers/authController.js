@@ -3,8 +3,7 @@ const { successResponse } = require('../utils/response');
 
 const register = async (req, res, next) => {
   try {
-    const { name, email, password, role } = req.body;
-    const userResponse = await authService.register({ name, email, password, role });
+    const userResponse = await authService.register(req.body || {});
     return successResponse(res, userResponse, 'Registration successful. Please check your email for the verification code.', 201);
   } catch (err) {
     next(err);
