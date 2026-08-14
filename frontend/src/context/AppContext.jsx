@@ -45,10 +45,15 @@ export const AppProvider = ({ children }) => {
   const [notifications, setNotifications] = useState([]);
   const [unreadNotifsCount, setUnreadNotifsCount] = useState(0);
 
-  const [unreadMessagesCount, setUnreadMessagesCount] = useState(() => messageService.getUnreadCount('st_101'));
+  const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
 
-  const refreshUnreadMessagesCount = (userId = 'st_101') => {
-    setUnreadMessagesCount(messageService.getUnreadCount(userId));
+  const refreshUnreadMessagesCount = async (userId = 'st_101') => {
+    try {
+      const count = await messageService.getUnreadCount(userId);
+      setUnreadMessagesCount(typeof count === 'number' ? count : 0);
+    } catch {
+      setUnreadMessagesCount(0);
+    }
   };
 
   const [savedPostIds, setSavedPostIds] = useState([]);
@@ -882,8 +887,10 @@ export const AppProvider = ({ children }) => {
 
   const handleSetActiveRole = (newRole) => {
     setActiveRole(newRole);
-    const userId = newRole === 'alumni' ? 'alm_1' : 'st_101';
-    setUnreadMessagesCount(messageService.getUnreadCount(userId));
+    if (authService.getToken()) {
+      const userId = newRole === 'alumni' ? 'alm_1' : 'st_101';
+      refreshUnreadMessagesCount(userId);
+    }
   };
 
   return (
