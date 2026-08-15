@@ -121,6 +121,7 @@ const runPhase13Tests = async () => {
       course: 'BCON',
       joiningYear: 2024,
       graduationYear: 2027,
+      phone: '9876543210',
     });
     assert(rValidReg.status === 201 && rValidReg.body?.data?.universityRollNumber === '24BCON0332', 'Valid Student roll number registration succeeds (201 Created)');
 
@@ -134,6 +135,7 @@ const runPhase13Tests = async () => {
       course: 'BCON',
       joiningYear: 2024,
       graduationYear: 2027,
+      phone: '9876543210',
     });
     assert(rInvalidRoll.status === 400 && rInvalidRoll.body?.errorCode === 'INVALID_ROLL_NUMBER_FORMAT', 'Invalid roll number format rejected with 400 INVALID_ROLL_NUMBER_FORMAT');
 
@@ -147,6 +149,7 @@ const runPhase13Tests = async () => {
       course: 'BCON',
       joiningYear: 2024,
       graduationYear: 2027,
+      phone: '9876543210',
     });
     assert(rDupRoll.status === 409 && rDupRoll.body?.errorCode === 'DUPLICATE_ROLL_NUMBER', 'Duplicate roll number rejected with 409 DUPLICATE_ROLL_NUMBER');
 
@@ -160,6 +163,7 @@ const runPhase13Tests = async () => {
       course: 'UNSUPPORTED',
       joiningYear: 2024,
       graduationYear: 2027,
+      phone: '9876543210',
     });
     assert(rBadCourse.status === 400 && rBadCourse.body?.errorCode === 'UNSUPPORTED_COURSE', 'Unsupported course rejected with 400 UNSUPPORTED_COURSE');
 
@@ -173,6 +177,7 @@ const runPhase13Tests = async () => {
       course: 'BCON',
       joiningYear: 2025, // Mismatches '24' prefix
       graduationYear: 2028,
+      phone: '9876543210',
     });
     assert(rYearMismatch.status === 400 && rYearMismatch.body?.errorCode === 'JOINING_YEAR_MISMATCH', 'Roll number joining year mismatch rejected with 400 JOINING_YEAR_MISMATCH');
 
@@ -186,6 +191,7 @@ const runPhase13Tests = async () => {
       course: 'BCON',
       joiningYear: 2024,
       graduationYear: 2024, // Equal to joining year
+      phone: '9876543210',
     });
     assert(rBadGradYear.status === 400 && rBadGradYear.body?.errorCode === 'INVALID_ACADEMIC_YEARS', 'Graduation year <= joining year rejected with 400 INVALID_ACADEMIC_YEARS');
 
@@ -200,6 +206,7 @@ const runPhase13Tests = async () => {
       email: alumniEmail,
       password: 'Password123!',
       role: 'ALUMNI',
+      phone: '9876543210',
     });
     assert(rAlumniReg.status === 201 && rAlumniReg.body?.data?.alumniVerificationStatus === 'PENDING', 'Alumni registration created in PENDING approval status (201 Created)');
 
@@ -282,6 +289,7 @@ const runPhase13Tests = async () => {
       email: alumniEmail2,
       password: 'Password123!',
       role: 'ALUMNI',
+      phone: '9876543210',
     });
     const candidate2Id = rReg2.body?.data?.id;
 

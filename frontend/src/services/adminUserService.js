@@ -327,11 +327,17 @@ export const adminUserService = {
   markNotificationAsRead: async (id) => {
     return await apiClient.patch(`/api/v1/admin/notifications/${id}/read`);
   },
+  markNotificationRead: async (id) => {
+    return await apiClient.patch(`/api/v1/admin/notifications/${id}/read`);
+  },
 
   /**
    * Phase 13: Mark all notifications as read
    */
   markAllNotificationsAsRead: async () => {
+    return await apiClient.patch('/api/v1/admin/notifications/read-all');
+  },
+  markAllNotificationsRead: async () => {
     return await apiClient.patch('/api/v1/admin/notifications/read-all');
   }
 };

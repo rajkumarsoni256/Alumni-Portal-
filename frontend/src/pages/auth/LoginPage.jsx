@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { 
   Eye, 
@@ -17,6 +17,7 @@ import { getPortalHomePath } from '../../utils/navigation';
 
 export const LoginPage = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { loginUser, loginWithGoogle } = useApp();
 
   const [email, setEmail] = useState('');
@@ -27,6 +28,26 @@ export const LoginPage = () => {
 
   const [errors, setErrors] = useState({});
 
+  const fromPath = location.state?.from;
+
+  const getTargetRoute = (userRole, isComplete) => {
+    if (
+      fromPath &&
+      typeof fromPath === 'string' &&
+      fromPath.startsWith('/') &&
+      !fromPath.startsWith('//') &&
+      !fromPath.toLowerCase().includes('http')
+    ) {
+      if (fromPath.startsWith('/admin') && userRole !== 'admin') {
+        return getPortalHomePath(userRole);
+      }
+      return fromPath;
+    }
+    if (userRole === 'admin') return '/admin/dashboard';
+    if (!isComplete) return '/onboarding';
+    return getPortalHomePath(userRole);
+  };
+
   const handleGoogleSuccess = async (idToken) => {
     if (!idToken) return;
     setIsLoading(true);
@@ -35,13 +56,7 @@ export const LoginPage = () => {
       const user = await loginWithGoogle(idToken);
       const userRole = (user && user.role) ? user.role.toLowerCase() : 'student';
       const isComplete = user && user.profileComplete !== false;
-      if (userRole === 'admin') {
-        navigate('/admin/dashboard');
-      } else if (!isComplete) {
-        navigate('/onboarding');
-      } else {
-        navigate(getPortalHomePath(userRole));
-      }
+      navigate(getTargetRoute(userRole, isComplete));
     } catch (err) {
       setErrorMessage(err.message || 'Google authentication failed.');
     } finally {
@@ -76,13 +91,7 @@ export const LoginPage = () => {
       const user = await loginUser({ email, password });
       const userRole = (user && user.role) ? user.role.toLowerCase() : 'student';
       const isComplete = user && user.profileComplete !== false;
-      if (userRole === 'admin') {
-        navigate('/admin/dashboard');
-      } else if (!isComplete) {
-        navigate('/onboarding');
-      } else {
-        navigate(getPortalHomePath(userRole));
-      }
+      navigate(getTargetRoute(userRole, isComplete));
     } catch (err) {
       if (err.errorCode === 'EMAIL_NOT_VERIFIED') {
         setErrorMessage('Your email address is not verified yet. Please check your inbox or complete verification.');

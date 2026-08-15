@@ -6,14 +6,16 @@
   "scripts": {
     "start": "node src/app.js",
     "dev": "node src/app.js",
-    "test": "node src/tests/testAdminUserDirectory.js && node src/tests/testHttpAdminRoutes.js && node src/tests/testPhase3Verification.js && node src/tests/testPhase4DataQuality.js && node src/tests/testPhase5Export.js && node src/tests/testPhase6Verification.js && node src/tests/testFrontendIntegration.js && node src/tests/testPhase7AuditLogs.js && node src/tests/testPhase8DashboardAnalytics.js && node src/tests/testPhase9Settings.js && node src/tests/testPhase10Notifications.js && node src/tests/testPhase12Integration.js && node src/tests/testPhase13UniversityIdentity.js && node src/tests/testPhase14ProductionEmail.js && node src/tests/testPhase14AdminManagement.js && node src/tests/testPhase14RealAlumniApproval.js"
+    "test": "node src/tests/testAdminUserDirectory.js && node src/tests/testHttpAdminRoutes.js && node src/tests/testPhase3Verification.js && node src/tests/testPhase4DataQuality.js && node src/tests/testPhase5Export.js && node src/tests/testPhase6Verification.js && node src/tests/testFrontendIntegration.js && node src/tests/testPhase7AuditLogs.js && node src/tests/testPhase8DashboardAnalytics.js && node src/tests/testPhase9Settings.js && node src/tests/testPhase10Notifications.js && node src/tests/testPhase12Integration.js && node src/tests/testPhase13UniversityIdentity.js && node src/tests/testPhase14ProductionEmail.js && node src/tests/testPhase14AdminManagement.js && node src/tests/testPhase14RealAlumniApproval.js && node src/tests/testSessionSecurity.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
+    "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.21.0",
     "google-auth-library": "^9.14.2",
+    "helmet": "^8.3.0",
     "jsonwebtoken": "^9.0.2",
     "multer": "^2.2.0",
     "nodemailer": "^9.0.5",

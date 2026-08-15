@@ -20,7 +20,7 @@ import {
 
 export const AdminSidebar = ({ className = '' }) => {
   const location = useLocation();
-  const { currentUser, logout } = useApp();
+  const { currentUser, logout, logoutUser } = useApp();
   const [pendingCount, setPendingCount] = useState(0);
 
   useEffect(() => {
@@ -158,12 +158,25 @@ export const AdminSidebar = ({ className = '' }) => {
             </div>
           </div>
 
-          <Link
-            to="/admin/profile"
-            className="w-full py-1.5 rounded border border-red-700 text-red-700 hover:bg-red-50 text-xs font-semibold transition-colors flex items-center justify-center gap-1 cursor-pointer text-center block"
-          >
-            <span>View Profile</span>
-          </Link>
+          <div className="flex gap-2">
+            <Link
+              to="/admin/profile"
+              className="flex-1 py-1.5 rounded border border-red-700 text-red-700 hover:bg-red-50 text-xs font-semibold transition-colors flex items-center justify-center gap-1 cursor-pointer text-center"
+            >
+              <span>View Profile</span>
+            </Link>
+            <button
+              type="button"
+              onClick={() => {
+                const logoutFn = logout || logoutUser;
+                if (logoutFn) logoutFn();
+              }}
+              className="py-1.5 px-2.5 rounded bg-red-700 text-white hover:bg-red-800 text-xs font-semibold transition-colors flex items-center justify-center gap-1 cursor-pointer"
+              title="Sign Out"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </div>
 
       </div>
