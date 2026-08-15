@@ -189,6 +189,7 @@ class EmailService {
     const rawCode = await this.createAndStoreOTP({ userId, email, purpose: 'EMAIL_VERIFICATION' });
     const { subject, html, text } = getVerificationCodeTemplate({ code: rawCode, name, expiresMinutes: this.OTP_EXPIRY_MINUTES });
 
+    console.log(`[OTP DISPATCH] Verification OTP for ${email}: ${rawCode}`);
     const result = await this.provider.sendEmail({ to: email, subject, html, text });
     await this.logDelivery({ userId, recipientEmail: email, emailType: 'EMAIL_VERIFICATION', templateName: 'verificationCode', subject, result });
     return result;
@@ -199,8 +200,9 @@ class EmailService {
    */
   async sendPasswordResetCode(email, userId, name, resetToken = null) {
     const rawCode = await this.createAndStoreOTP({ userId, email, purpose: 'PASSWORD_RESET' });
-    const { subject, html, text } = getPasswordResetCodeTemplate({ code: rawCode, resetToken, name, expiresMinutes: this.OTP_EXPIRY_MINUTES });
+    const { subject, html, text } = getPasswordResetCodeTemplate({ code: rawCode, name, resetToken, expiresMinutes: this.OTP_EXPIRY_MINUTES });
 
+    console.log(`[OTP DISPATCH] Password Reset OTP for ${email}: ${rawCode}`);
     const result = await this.provider.sendEmail({ to: email, subject, html, text });
     await this.logDelivery({ userId, recipientEmail: email, emailType: 'PASSWORD_RESET', templateName: 'passwordResetCode', subject, result });
     return result;

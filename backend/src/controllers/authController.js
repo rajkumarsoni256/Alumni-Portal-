@@ -4,13 +4,16 @@ const { successResponse, errorResponse } = require('../utils/response');
 
 const COOKIE_NAME = process.env.REFRESH_TOKEN_COOKIE_NAME || 'ju_connect_refresh';
 
-const getCookieOptions = () => ({
-  httpOnly: true,
-  secure: process.env.NODE_ENV === 'production',
-  sameSite: 'lax',
-  path: '/api/v1/auth',
-  maxAge: 10 * 24 * 60 * 60 * 1000, // 10 days
-});
+const getCookieOptions = () => {
+  const isProduction = process.env.NODE_ENV === 'production';
+  return {
+    httpOnly: true,
+    secure: isProduction || true, // Must be true for SameSite=None on cross-origin Vercel -> Render requests
+    sameSite: isProduction ? 'none' : 'lax',
+    path: '/',
+    maxAge: 10 * 24 * 60 * 60 * 1000, // 10 days
+  };
+};
 
 const setRefreshCookie = (res, refreshToken) => {
   if (!refreshToken) return;
