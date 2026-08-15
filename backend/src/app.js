@@ -47,7 +47,11 @@ app.use(
       // Allow requests with no origin (e.g. mobile apps, curl, server-to-server)
       if (!origin) return callback(null, true);
 
-      if (allowedOrigins.includes(origin) || allowedOrigins.includes('*')) {
+      const normOrigin = origin.trim().replace(/\/+$/, '').toLowerCase();
+      const isAllowed = allowedOrigins.some((o) => o.trim().replace(/\/+$/, '').toLowerCase() === normOrigin);
+
+      // Allow registered origins, wildcard, or any Vercel deployment domain
+      if (isAllowed || allowedOrigins.includes('*') || normOrigin.endsWith('.vercel.app')) {
         return callback(null, true);
       }
 
@@ -67,6 +71,14 @@ app.use(
 );
 app.options('*', cors());
 
+// Normalize double slashes in request URLs (e.g. //api/v1 -> /api/v1)
+app.use((req, res, next) => {
+  if (req.url && req.url.startsWith('//')) {
+    req.url = req.url.replace(/^\/+/, '/');
+  }
+  next();
+});
+
 // Body parsers with 50MB payload limit for profile photos and banner uploads
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
@@ -74,8 +86,23 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 // Serve static upload directory
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
+// Root Welcome Route
+app.get('/', (req, res) => {
+  res.json({
+    success: true,
+    message: 'JU Connect / JECRC Community API Backend Service',
+    environment: process.env.NODE_ENV || 'development',
+    version: '1.0.0',
+    endpoints: {
+      health: '/api/v1/health',
+      auth: '/api/v1/auth',
+      admin: '/api/v1/admin'
+    }
+  });
+});
+
 // Health Check Endpoints
-app.get(['/actuator/health', '/api/v1/health'], (req, res) => {
+app.get(['/actuator/health', '/api/v1/health', '/healthz', '/heath'], (req, res) => {
   res.json({
     status: 'UP',
     service: 'jecrc-community-backend',

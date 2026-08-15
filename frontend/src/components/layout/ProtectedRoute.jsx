@@ -5,10 +5,11 @@ import { AppShell } from './AppShell';
 
 /**
  * ProtectedRoute Wrapper
- * Enforces authentication & completed onboarding before rendering the authenticated shell.
+ * Enforces authentication & completed onboarding for Student & Alumni community routes.
+ * Strictly prevents ADMIN users from entering community interfaces, redirecting them to /admin/dashboard.
  */
 export const ProtectedRoute = ({ children, hideSidebar = false }) => {
-  const { isLoading, isAuthenticated, authStatus, authUser } = useApp();
+  const { isLoading, isAuthenticated, authStatus, authUser, activeRole } = useApp();
   const location = useLocation();
 
   if (isLoading) {
@@ -24,14 +25,20 @@ export const ProtectedRoute = ({ children, hideSidebar = false }) => {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
+  // Strict Portal Isolation Guard:
+  // Admin users must NEVER be rendered inside the Student/Alumni Community AppShell.
+  const isAdmin = authUser?.role?.toUpperCase() === 'ADMIN' || activeRole === 'admin';
+  if (isAdmin) {
+    return <Navigate to="/admin/dashboard" replace />;
+  }
+
   if (authStatus === 'EMAIL_UNVERIFIED') {
     return <Navigate to="/verify-email" replace />;
   }
 
   const isProfileComplete = authUser?.profileComplete !== false;
-  const isAdmin = authUser?.role?.toUpperCase() === 'ADMIN';
 
-  if (!isAdmin && (!isProfileComplete || authStatus === 'ONBOARDING')) {
+  if (!isProfileComplete || authStatus === 'ONBOARDING') {
     if (!location.pathname.startsWith('/onboarding')) {
       return <Navigate to="/onboarding" replace />;
     }

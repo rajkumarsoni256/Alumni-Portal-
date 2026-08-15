@@ -48,6 +48,13 @@ export const adminUserService = {
   },
 
   /**
+   * Fetch aggregate user statistics summary from backend API
+   */
+  getUserStats: async () => {
+    return await apiClient.get('/api/v1/admin/users/stats');
+  },
+
+  /**
    * Fetch Data Management quality cards from backend API
    */
   getDataQualityStats: async () => {

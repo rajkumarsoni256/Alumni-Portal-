@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { UserAvatar } from '../common/UserAvatar';
+import { getPortalHomePath, getProfilePath as resolveProfilePath, getSettingsPath } from '../../utils/navigation';
 import {
   GraduationCap,
   Search,
@@ -54,12 +55,12 @@ export const Navbar = () => {
     ]
     : activeRole === 'admin'
       ? [
-        { name: 'Admin Dashboard', path: '/admin-dashboard' },
-        { name: 'Feed Preview', path: '/' },
-        { name: 'My Connections', path: '/my-connections' },
-        { name: 'Directory', path: '/explore' },
-        { name: 'Jobs', path: '/jobs' },
-        { name: 'Events', path: '/events' },
+        { name: 'Dashboard', path: '/admin/dashboard' },
+        { name: 'Users', path: '/admin/users' },
+        { name: 'Communications', path: '/admin/communications' },
+        { name: 'Content', path: '/admin/content' },
+        { name: 'Data', path: '/admin/data' },
+        { name: 'Administration', path: '/admin/settings' },
       ]
       : [
         { name: 'Feed', path: '/' },
@@ -116,9 +117,7 @@ export const Navbar = () => {
   };
 
   const getProfilePath = () => {
-    if (activeRole === 'student') return '/student-dashboard';
-    if (activeRole === 'alumni') return `/alumni/${currentUser?.id || 'alm_1'}`;
-    return '/admin-dashboard';
+    return resolveProfilePath(activeRole, currentUser?.id);
   };
 
   return (
@@ -128,7 +127,7 @@ export const Navbar = () => {
 
           {/* Logo & Brand Identity */}
           <div className="flex items-center gap-3 shrink-0">
-            <Link to="/" className="flex items-center gap-2.5 group">
+            <Link to={getPortalHomePath(activeRole)} className="flex items-center gap-2.5 group">
               <div className="w-8 h-8 rounded-lg bg-red-700 text-white flex items-center justify-center font-bold text-sm shadow-2xs group-hover:bg-red-800 transition-colors">
                 JU
               </div>
@@ -137,7 +136,7 @@ export const Navbar = () => {
                   JU <span className="text-red-700">Connect</span>
                 </span>
                 <span className="text-[10px] text-slate-500 font-medium leading-none">
-                  Alumni Network
+                  {activeRole === 'admin' ? 'Administration Portal' : 'Alumni Network'}
                 </span>
               </div>
             </Link>
@@ -299,7 +298,7 @@ export const Navbar = () => {
                       </Link>
 
                       <Link
-                        to="/settings"
+                        to={getSettingsPath(activeRole)}
                         onClick={() => setShowProfileMenu(false)}
                         className="flex items-center gap-2 px-3 py-2 text-xs text-slate-700 hover:bg-slate-50 transition-colors"
                       >

@@ -21,7 +21,13 @@ export const RegisterPage = () => {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [role, setRole] = useState('student'); // 'student' | 'alumni'
-  
+
+  // Student Identity Fields
+  const [rollNumber, setRollNumber] = useState('');
+  const [course, setCourse] = useState('BCON');
+  const [joiningYear, setJoiningYear] = useState('2024');
+  const [graduationYear, setGraduationYear] = useState('2027');
+
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState({});
@@ -61,6 +67,24 @@ export const RegisterPage = () => {
       newErrors.email = 'Please enter a valid email address.';
     }
 
+    if (role === 'student') {
+      if (!rollNumber.trim()) {
+        newErrors.rollNumber = 'University Roll Number is required for students.';
+      } else if (!/^\d{2}[A-Z]{2,6}\d{3,6}$/i.test(rollNumber.trim())) {
+        newErrors.rollNumber = 'Format: YYCOURSECODENNNN (e.g. 24BCON0332).';
+      }
+
+      if (!joiningYear) {
+        newErrors.joiningYear = 'Joining year is required.';
+      }
+
+      if (!graduationYear) {
+        newErrors.graduationYear = 'Graduation year is required.';
+      } else if (parseInt(graduationYear, 10) <= parseInt(joiningYear, 10)) {
+        newErrors.graduationYear = 'Graduation year must be after joining year.';
+      }
+    }
+
     if (!password) {
       newErrors.password = 'Please enter a password.';
     } else if (password.length < 8) {
@@ -85,7 +109,16 @@ export const RegisterPage = () => {
 
     setIsLoading(true);
     try {
-      await registerUser({ name, email, password, role });
+      await registerUser({
+        name,
+        email,
+        password,
+        role,
+        rollNumber: role === 'student' ? rollNumber.trim().toUpperCase() : undefined,
+        course: role === 'student' ? course : undefined,
+        joiningYear: role === 'student' ? joiningYear : undefined,
+        graduationYear: role === 'student' ? graduationYear : undefined,
+      });
       navigate('/verify-email');
     } catch (err) {
       if (err.errors && typeof err.errors === 'object') {
@@ -269,6 +302,104 @@ export const RegisterPage = () => {
                   <p className="text-[11px] text-rose-600 font-medium">{errors.email}</p>
                 )}
               </div>
+
+              {/* Student Identity Fields */}
+              {role === 'student' && (
+                <>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    {/* Roll Number */}
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-slate-700 block">
+                        University Roll Number *
+                      </label>
+                      <input
+                        type="text"
+                        value={rollNumber}
+                        onChange={(e) => {
+                          setRollNumber(e.target.value.toUpperCase());
+                          if (errors.rollNumber) setErrors((prev) => ({ ...prev, rollNumber: null }));
+                        }}
+                        placeholder="e.g. 24BCON0332"
+                        className={`w-full bg-slate-50 border ${
+                          errors.rollNumber ? 'border-rose-400 bg-rose-50/30' : 'border-slate-300 focus:border-slate-600 focus:bg-white'
+                        } rounded-md px-3 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none transition-colors uppercase`}
+                      />
+                      {errors.rollNumber && (
+                        <p className="text-[10px] text-rose-600 font-medium">{errors.rollNumber}</p>
+                      )}
+                    </div>
+
+                    {/* Course */}
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-slate-700 block">
+                        Course *
+                      </label>
+                      <select
+                        value={course}
+                        onChange={(e) => setCourse(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-300 focus:border-slate-600 focus:bg-white rounded-md px-3 py-2 text-xs text-slate-900 focus:outline-none transition-colors cursor-pointer"
+                      >
+                        <option value="BCON">BCON (B.Commerce / Construction)</option>
+                        <option value="BCS">BCS (B.Computer Science)</option>
+                        <option value="BTECH">BTECH (B.Technology)</option>
+                        <option value="MCA">MCA (Master of Computer App)</option>
+                        <option value="MBA">MBA (Master of Business Admin)</option>
+                        <option value="BCA">BCA (B.Computer Applications)</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    {/* Joining Year */}
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-slate-700 block">
+                        Joining Year *
+                      </label>
+                      <input
+                        type="number"
+                        min="2010"
+                        max="2030"
+                        value={joiningYear}
+                        onChange={(e) => {
+                          setJoiningYear(e.target.value);
+                          if (errors.joiningYear) setErrors((prev) => ({ ...prev, joiningYear: null }));
+                        }}
+                        placeholder="e.g. 2024"
+                        className={`w-full bg-slate-50 border ${
+                          errors.joiningYear ? 'border-rose-400 bg-rose-50/30' : 'border-slate-300 focus:border-slate-600 focus:bg-white'
+                        } rounded-md px-3 py-2 text-xs text-slate-900 focus:outline-none transition-colors`}
+                      />
+                      {errors.joiningYear && (
+                        <p className="text-[10px] text-rose-600 font-medium">{errors.joiningYear}</p>
+                      )}
+                    </div>
+
+                    {/* Graduation Year */}
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-slate-700 block">
+                        Graduation Year *
+                      </label>
+                      <input
+                        type="number"
+                        min="2010"
+                        max="2035"
+                        value={graduationYear}
+                        onChange={(e) => {
+                          setGraduationYear(e.target.value);
+                          if (errors.graduationYear) setErrors((prev) => ({ ...prev, graduationYear: null }));
+                        }}
+                        placeholder="e.g. 2027"
+                        className={`w-full bg-slate-50 border ${
+                          errors.graduationYear ? 'border-rose-400 bg-rose-50/30' : 'border-slate-300 focus:border-slate-600 focus:bg-white'
+                        } rounded-md px-3 py-2 text-xs text-slate-900 focus:outline-none transition-colors`}
+                      />
+                      {errors.graduationYear && (
+                        <p className="text-[10px] text-rose-600 font-medium">{errors.graduationYear}</p>
+                      )}
+                    </div>
+                  </div>
+                </>
+              )}
 
               {/* Passwords (Grid) */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">

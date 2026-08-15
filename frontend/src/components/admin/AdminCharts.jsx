@@ -1,7 +1,7 @@
 import React from 'react';
 import { PieChart, BarChart3, TrendingUp, MapPin, Users, Building2, GraduationCap } from 'lucide-react';
 
-const BRANCH_COLORS = ['#b91c1c', '#1d4ed8', '#047857', '#d97706', '#7c3aed', '#db2777', '#475569'];
+const BRANCH_COLORS = ['#b91c1c', '#dc2626', '#ef4444', '#334155', '#475569', '#64748b', '#94a3b8'];
 
 export const AdminCharts = ({ branches = [], batches = [] }) => {
   const totalBranchUsers = branches.reduce((acc, b) => acc + (b.count || 0), 0) || 1;

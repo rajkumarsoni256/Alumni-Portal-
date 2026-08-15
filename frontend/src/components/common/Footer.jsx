@@ -1,8 +1,12 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Mail, Phone, MapPin } from 'lucide-react';
+import { useApp } from '../../context/AppContext';
+import { getPortalHomePath } from '../../utils/navigation';
 
 export const Footer = () => {
+  const { activeRole } = useApp();
+
   return (
     <footer className="bg-white text-slate-600 border-t border-slate-200 pt-12 pb-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -10,7 +14,7 @@ export const Footer = () => {
           
           {/* Brand Col */}
           <div className="lg:col-span-2 space-y-3">
-            <Link to="/" className="flex items-center gap-2.5">
+            <Link to={getPortalHomePath(activeRole)} className="flex items-center gap-2.5">
               <img
                 src="/ju-alumni-logo.jpg"
                 alt="JU Connect Logo"

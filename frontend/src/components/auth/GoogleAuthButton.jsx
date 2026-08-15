@@ -102,7 +102,7 @@ export const GoogleAuthButton = ({
       if (onError) {
         onError(
           new Error(
-            'Google Client ID is not configured. Please set VITE_GOOGLE_CLIENT_ID in your frontend .env file and add http://localhost:5173 to Authorized JavaScript Origins in Google Cloud Console.'
+            'Google Sign-In is currently disabled because VITE_GOOGLE_CLIENT_ID is not configured. Please sign in using your email and password.'
           )
         );
       }

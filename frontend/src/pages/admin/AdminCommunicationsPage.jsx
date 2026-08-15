@@ -321,13 +321,13 @@ export const AdminCommunicationsPage = () => {
   const getTypeBadge = (type) => {
     switch (type) {
       case 'URGENT':
-        return <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-red-100 text-red-700 border border-red-200">Urgent</span>;
+        return <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-red-50 text-red-700 border border-red-200">Urgent</span>;
       case 'EVENT':
-        return <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-purple-100 text-purple-700 border border-purple-200">Event</span>;
+        return <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">Event</span>;
       case 'OPPORTUNITY':
-        return <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-100 text-blue-700 border border-blue-200">Opportunity</span>;
+        return <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">Opportunity</span>;
       case 'MAINTENANCE':
-        return <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-100 text-amber-700 border border-amber-200">Maintenance</span>;
+        return <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">Maintenance</span>;
       default:
         return <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">General</span>;
     }
@@ -380,7 +380,7 @@ export const AdminCommunicationsPage = () => {
           <button
             type="button"
             onClick={() => handleOpenCompose()}
-            className="px-3.5 py-2 rounded-lg bg-red-700 hover:bg-red-800 text-white text-xs font-bold transition-colors inline-flex items-center gap-1.5 shadow-2xs cursor-pointer shrink-0"
+            className="px-3.5 py-1.5 rounded bg-red-700 hover:bg-red-800 text-white text-xs font-semibold transition-colors inline-flex items-center gap-1.5 cursor-pointer shrink-0"
           >
             <Plus className="w-4 h-4" />
             <span>Compose Announcement</span>
@@ -388,47 +388,47 @@ export const AdminCommunicationsPage = () => {
         </div>
 
         {/* 1. Summary Metrics Cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs space-y-1">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="bg-white p-3.5 rounded-md border border-slate-200 space-y-1">
             <div className="flex items-center justify-between text-slate-500">
-              <span className="text-[11px] font-semibold">Total Created</span>
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Created</span>
               <FileText className="w-4 h-4 text-slate-400" />
             </div>
             <p className="text-xl font-bold text-slate-900">{summary.totalAnnouncements}</p>
-            <span className="text-[10px] text-slate-400">All announcements in PostgreSQL</span>
+            <span className="text-[11px] text-slate-500">All announcements in PostgreSQL</span>
           </div>
 
-          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs space-y-1">
+          <div className="bg-white p-3.5 rounded-md border border-slate-200 space-y-1">
             <div className="flex items-center justify-between text-slate-500">
-              <span className="text-[11px] font-semibold">Active / Published</span>
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Active / Published</span>
               <CheckCircle2 className="w-4 h-4 text-emerald-600" />
             </div>
             <p className="text-xl font-bold text-emerald-700">{summary.publishedCount}</p>
-            <span className="text-[10px] text-emerald-600">Delivered to resolved audiences</span>
+            <span className="text-[11px] text-emerald-600">Delivered to resolved audiences</span>
           </div>
 
-          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs space-y-1">
+          <div className="bg-white p-3.5 rounded-md border border-slate-200 space-y-1">
             <div className="flex items-center justify-between text-slate-500">
-              <span className="text-[11px] font-semibold">Pending Drafts</span>
+              <span className="text-[10px] font-bold text-amber-700 uppercase tracking-wider">Pending Drafts</span>
               <Clock className="w-4 h-4 text-amber-600" />
             </div>
             <p className="text-xl font-bold text-amber-700">{summary.draftCount}</p>
-            <span className="text-[10px] text-amber-600">Editable before transmission</span>
+            <span className="text-[11px] text-amber-600">Editable before transmission</span>
           </div>
 
-          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs space-y-1">
+          <div className="bg-white p-3.5 rounded-md border border-slate-200 space-y-1">
             <div className="flex items-center justify-between text-slate-500">
-              <span className="text-[11px] font-semibold">Cancelled</span>
-              <XCircle className="w-4 h-4 text-rose-500" />
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Cancelled</span>
+              <XCircle className="w-4 h-4 text-slate-400" />
             </div>
             <p className="text-xl font-bold text-slate-700">{summary.cancelledCount}</p>
-            <span className="text-[10px] text-slate-400">Archived drafts</span>
+            <span className="text-[11px] text-slate-500">Archived drafts</span>
           </div>
         </div>
 
         {/* Error Banner */}
         {error && (
-          <div className="p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 flex items-center justify-between gap-4">
+          <div className="p-3.5 rounded-md bg-red-50 border border-red-200 text-red-700 flex items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <AlertCircle className="w-5 h-5 text-red-600 shrink-0" />
               <div>
