@@ -267,6 +267,28 @@ const getUserStats = async (req, res, next) => {
   }
 };
 
+/**
+ * Controller to permanently delete a user account
+ */
+const deleteUser = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    if (!id || !UUID_REGEX.test(id.trim())) {
+      return errorResponse(res, 'Invalid user ID format. Must be a valid UUID.', 'INVALID_ID_FORMAT', 400);
+    }
+
+    const adminUserId = req.user.id;
+    const result = await adminUserService.deleteUser(adminUserId, id.trim());
+    return successResponse(res, result, result.message, 200);
+  } catch (err) {
+    if (err.statusCode) {
+      return errorResponse(res, err.message, err.errorCode || 'BAD_REQUEST', err.statusCode);
+    }
+    console.error('Error deleting user:', err);
+    return errorResponse(res, 'Failed to delete user account', 'INTERNAL_SERVER_ERROR', 500);
+  }
+};
+
 module.exports = {
   getUsers,
   getUserById,
@@ -276,4 +298,5 @@ module.exports = {
   rejectUser,
   getPendingAlumni,
   getUserStats,
+  deleteUser,
 };

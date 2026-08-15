@@ -160,14 +160,8 @@ const initiateStudentRegistration = async ({
     throw error;
   }
 
-  // Store OTP for student verification in emailService (purpose: 'STUDENT_VERIFICATION')
-  const rawCode = await emailService.createAndStoreOTP({
-    email: normInstitutionalEmail,
-    purpose: 'STUDENT_VERIFICATION',
-  });
-
-  // Send OTP email to JECRC Institutional Email (non-blocking log warning)
-  emailService.sendVerificationCode(normInstitutionalEmail, null, name || 'Student', rawCode)
+  // Send OTP email to JECRC Institutional Email with STUDENT_VERIFICATION purpose
+  await emailService.sendStudentVerificationCode(normInstitutionalEmail, name || 'Student')
     .catch((err) => console.warn('[OTP Email Send Warning]', err.message));
 
   return {
@@ -194,95 +188,134 @@ const verifyStudentRegistrationOTP = async ({
   joiningYear,
   graduationYear,
   code,
+  req,
 }) => {
   const normInstitutionalEmail = validateJECRCEmail(institutionalEmail);
   const normPersonalEmail = normalizeEmail(personalEmail);
   const normPhone = validateMobileNumber(mobileNumber || phone);
   const normRollNumber = validateAndNormalizeRollNumber(rollNumber);
   const years = validateAcademicYears(joiningYear, graduationYear);
+  const client = await db.getClient();
+  try {
+    await client.query('BEGIN');
 
-  // Verify OTP
-  await emailService.verifyOTPCode({
-    email: normInstitutionalEmail,
-    code,
-    purpose: 'STUDENT_VERIFICATION',
-  });
+    // Re-verify uniqueness BEFORE burning/verifying OTP code
+    const existingPersonal = await client.query('SELECT id FROM users WHERE email = $1', [normPersonalEmail]);
+    if (existingPersonal.rows.length > 0) {
+      const error = new Error(`An account with personal email '${normPersonalEmail}' already exists. Please log in.`);
+      error.statusCode = 409;
+      error.errorCode = 'EMAIL_ALREADY_EXISTS';
+      throw error;
+    }
 
-  // Re-verify uniqueness
-  const existingPersonal = await db.query('SELECT id FROM users WHERE email = $1', [normPersonalEmail]);
-  if (existingPersonal.rows.length > 0) {
-    const error = new Error(`An account with email '${normPersonalEmail}' already exists`);
-    error.statusCode = 409;
-    error.errorCode = 'EMAIL_ALREADY_EXISTS';
-    throw error;
+    const rollCheck = await client.query(
+      `SELECT user_id FROM user_profiles WHERE university_roll_number = $1 LIMIT 1`,
+      [normRollNumber]
+    );
+    if (rollCheck.rows.length > 0) {
+      const error = new Error(`University Roll Number '${normRollNumber}' is already registered. Please log in.`);
+      error.statusCode = 409;
+      error.errorCode = 'DUPLICATE_ROLL_NUMBER';
+      throw error;
+    }
+
+    // Verify OTP (marks code as used)
+    await emailService.verifyOTPCode({
+      email: normInstitutionalEmail,
+      code,
+      purpose: 'STUDENT_VERIFICATION',
+    });
+
+    const userId = crypto.randomUUID();
+    const passwordHash = await bcrypt.hash(password, 10);
+    const profileName = name ? name.trim() : normPersonalEmail.split('@')[0];
+
+    // Insert Student User with personalEmail as login email
+    const userResult = await client.query(
+      `INSERT INTO users (id, email, password_hash, role, email_verified, account_status, institutional_email, institutional_email_verified, email_verification_status)
+       VALUES ($1, $2, $3, 'STUDENT', true, 'ACTIVE', $4, true, 'VERIFIED')
+       RETURNING id, email, role, email_verified, account_status, institutional_email`,
+      [userId, normPersonalEmail, passwordHash, normInstitutionalEmail]
+    );
+    const user = userResult.rows[0];
+
+    // Insert Profile with phone and verified roll number
+    await client.query(
+      `INSERT INTO user_profiles (id, user_id, full_name, university_roll_number, phone, course, joining_year, graduation_year, is_profile_complete)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, true)`,
+      [
+        crypto.randomUUID(),
+        user.id,
+        profileName,
+        normRollNumber,
+        normPhone,
+        course ? String(course).trim().toUpperCase() : 'BTECH',
+        years.joiningYear,
+        years.graduationYear,
+      ]
+    );
+
+    await client.query('COMMIT');
+
+    // Dispatch Welcome Email to personal and institutional emails
+    emailService.sendWelcomeEmail(normPersonalEmail, profileName, user.id)
+      .catch((err) => console.warn('[Welcome Email Dispatch Warning]', err.message));
+
+    if (normInstitutionalEmail && normInstitutionalEmail !== normPersonalEmail) {
+      emailService.sendWelcomeEmail(normInstitutionalEmail, profileName, user.id)
+        .catch(() => {});
+    }
+
+    // Create in-app Welcome Notification
+    await db.query(
+      `INSERT INTO notifications (id, user_id, title, message, type, is_read, created_at)
+       VALUES ($1, $2, $3, $4, 'WELCOME', false, CURRENT_TIMESTAMP)`,
+      [
+        crypto.randomUUID(),
+        user.id,
+        'Welcome to JU Connect!',
+        `Welcome to JU Connect Alumni Network, ${profileName}! Your account has been verified successfully. Connect with fellow students, explore alumni opportunities, and build your professional network.`,
+      ]
+    ).catch((err) => console.warn('Failed to insert in-app welcome notification:', err.message));
+
+    const sessionData = await sessionService.createSession({
+      userId: user.id,
+      ipAddress: req?.ip || req?.headers?.['x-forwarded-for'] || null,
+      userAgent: req?.headers ? req.headers['user-agent'] : null,
+    });
+
+    const token = generateToken(user.id, user.role);
+
+    return {
+      user: {
+        id: user.id,
+        email: user.email,
+        institutionalEmail: user.institutional_email,
+        role: user.role,
+        fullName: profileName,
+        profileComplete: true,
+        universityRollNumber: normRollNumber,
+        phone: normPhone,
+        course: course ? String(course).trim().toUpperCase() : 'BTECH',
+        joiningYear: years.joiningYear,
+        graduationYear: years.graduationYear,
+      },
+      token,
+      accessToken: token,
+      refreshToken: sessionData.rawRefreshToken,
+    };
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    if (err.code === '23505') {
+      const error = new Error('An account with this email, phone, or roll number already exists. Please log in.');
+      error.statusCode = 409;
+      error.errorCode = 'DUPLICATE_ACCOUNT';
+      throw error;
+    }
+    throw err;
+  } finally {
+    client.release();
   }
-
-  const rollCheck = await db.query(
-    `SELECT user_id FROM user_profiles WHERE university_roll_number = $1 LIMIT 1`,
-    [normRollNumber]
-  );
-  if (rollCheck.rows.length > 0) {
-    const error = new Error(`University Roll Number '${normRollNumber}' is already registered.`);
-    error.statusCode = 409;
-    error.errorCode = 'DUPLICATE_ROLL_NUMBER';
-    throw error;
-  }
-
-  const userId = crypto.randomUUID();
-  const passwordHash = await bcrypt.hash(password, 10);
-  const profileName = name ? name.trim() : normPersonalEmail.split('@')[0];
-
-  // Insert Student User with personalEmail as login email!
-  const userResult = await db.query(
-    `INSERT INTO users (id, email, password_hash, role, email_verified, account_status, institutional_email, institutional_email_verified, email_verification_status)
-     VALUES ($1, $2, $3, 'STUDENT', true, 'ACTIVE', $4, true, 'VERIFIED')
-     RETURNING id, email, role, email_verified, account_status, institutional_email`,
-    [userId, normPersonalEmail, passwordHash, normInstitutionalEmail]
-  );
-  const user = userResult.rows[0];
-
-  // Insert Profile with phone and verified roll number
-  await db.query(
-    `INSERT INTO user_profiles (id, user_id, full_name, university_roll_number, phone, course, joining_year, graduation_year, is_profile_complete)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, true)`,
-    [
-      crypto.randomUUID(),
-      user.id,
-      profileName,
-      normRollNumber,
-      normPhone,
-      course ? String(course).trim().toUpperCase() : 'BTECH',
-      years.joiningYear,
-      years.graduationYear,
-    ]
-  );
-
-  const sessionData = await sessionService.createSession({
-    userId: user.id,
-    ipAddress: req?.ip || req?.headers?.['x-forwarded-for'] || null,
-    userAgent: req?.headers ? req.headers['user-agent'] : null,
-  });
-
-  const token = generateToken(user.id, user.role);
-
-  return {
-    user: {
-      id: user.id,
-      email: user.email,
-      institutionalEmail: user.institutional_email,
-      role: user.role,
-      fullName: profileName,
-      profileComplete: true,
-      universityRollNumber: normRollNumber,
-      phone: normPhone,
-      course: course ? String(course).trim().toUpperCase() : 'BTECH',
-      joiningYear: years.joiningYear,
-      graduationYear: years.graduationYear,
-    },
-    token,
-    accessToken: token,
-    refreshToken: sessionData.rawRefreshToken,
-  };
 };
 
 const register = async ({
@@ -374,14 +407,16 @@ const register = async ({
     }
   }
 
-  const initialAccountStatus = upperRole === 'ALUMNI' ? 'PENDING_APPROVAL' : 'ACTIVE';
+  const isAlumniRole = upperRole === 'ALUMNI';
+  const initialAccountStatus = isAlumniRole ? 'PENDING_APPROVAL' : 'ACTIVE';
+  const initialEmailVerified = isAlumniRole ? true : false;
   const userId = crypto.randomUUID();
   const passwordHash = await bcrypt.hash(password, 10);
   const userResult = await db.query(
     `INSERT INTO users (id, email, password_hash, role, email_verified, account_status)
-     VALUES ($1, $2, $3, $4, false, $5)
+     VALUES ($1, $2, $3, $4, $5, $6)
      RETURNING id, email, role, email_verified, account_status`,
-    [userId, normalizedEmail, passwordHash, upperRole, initialAccountStatus]
+    [userId, normalizedEmail, passwordHash, upperRole, initialEmailVerified, initialAccountStatus]
   );
   const user = userResult.rows[0];
 
@@ -432,9 +467,15 @@ const register = async ({
     }
   }
 
-  // Send 6-digit OTP verification email (non-blocking)
-  emailService.sendVerificationCode(user.email, user.id, profileName)
-    .catch((err) => console.warn('[Email Verification Dispatch Warning]', err.message));
+  if (upperRole === 'ALUMNI') {
+    // Send Alumni Receipt Confirmation Email to applicant (NO OTP)
+    emailService.sendAlumniRegistrationReceivedEmail(user.email, profileName, user.id)
+      .catch((err) => console.warn('[Alumni Receipt Email Dispatch Warning]', err.message));
+  } else {
+    // Send 6-digit OTP verification email ONLY for Students
+    emailService.sendVerificationCode(user.email, user.id, profileName)
+      .catch((err) => console.warn('[Email Verification Dispatch Warning]', err.message));
+  }
 
   return {
     id: user.id,
@@ -518,6 +559,13 @@ const resendVerificationCode = async ({ email }) => {
   }
 
   const user = userResult.rows[0];
+  if (user.role === 'ALUMNI') {
+    const error = new Error('Alumni accounts do not require email OTP verification. Your account is pending administrator approval.');
+    error.statusCode = 400;
+    error.errorCode = 'ALUMNI_OTP_NOT_REQUIRED';
+    throw error;
+  }
+
   if (user.email_verified) {
     const error = new Error('This email address has already been verified.');
     error.statusCode = 400;
@@ -559,14 +607,14 @@ const login = async ({ email, password, req }) => {
   }
 
   if (user.account_status === 'PENDING_APPROVAL') {
-    const error = new Error('Your alumni account is awaiting administrator approval.');
+    const error = new Error('Your account is currently under review and pending approval by the Admin.');
     error.statusCode = 403;
-    error.errorCode = 'ALUMNI_APPROVAL_PENDING';
+    error.errorCode = 'ACCOUNT_PENDING_APPROVAL';
     throw error;
   }
 
   if (user.account_status === 'REJECTED') {
-    const error = new Error('Your alumni registration request was not approved.');
+    const error = new Error('Your alumni registration request was not approved by administrator.');
     error.statusCode = 403;
     error.errorCode = 'ALUMNI_APPROVAL_REJECTED';
     throw error;
@@ -612,7 +660,7 @@ const login = async ({ email, password, req }) => {
   };
 };
 
-const authenticateWithGoogle = async ({ idToken, req }) => {
+const authenticateWithGoogle = async ({ idToken, requestedRole, req }) => {
   const payload = await googleAuthService.verifyIdToken(idToken);
   const googleSub = payload.subjectId;
   const normalizedEmail = normalizeEmail(payload.email);
@@ -630,6 +678,12 @@ const authenticateWithGoogle = async ({ idToken, req }) => {
   let user;
   if (oauthResult.rows.length > 0) {
     user = oauthResult.rows[0];
+    if (user.account_status === 'PENDING_APPROVAL') {
+      const error = new Error('Your account is currently under review and pending approval by the Admin.');
+      error.statusCode = 403;
+      error.errorCode = 'ACCOUNT_PENDING_APPROVAL';
+      throw error;
+    }
     if (user.account_status !== 'ACTIVE') {
       const error = new Error('Account is disabled. Please contact support.');
       error.statusCode = 401;
@@ -648,6 +702,12 @@ const authenticateWithGoogle = async ({ idToken, req }) => {
 
     if (existingUserResult.rows.length > 0) {
       const existingUser = existingUserResult.rows[0];
+      if (existingUser.account_status === 'PENDING_APPROVAL') {
+        const error = new Error('Your account is currently under review and pending approval by the Admin.');
+        error.statusCode = 403;
+        error.errorCode = 'ACCOUNT_PENDING_APPROVAL';
+        throw error;
+      }
       if (existingUser.account_status !== 'ACTIVE') {
         const error = new Error('Account is disabled. Please contact support.');
         error.statusCode = 401;
@@ -668,14 +728,22 @@ const authenticateWithGoogle = async ({ idToken, req }) => {
 
       user = existingUser;
     } else {
-      // 3. Register new Google user (Role: STUDENT, email_verified: true)
+      // 3. Register new Google user
+      // Respect requestedRole from frontend tab if passed, otherwise check email domain
+      const isInstitutional = normalizedEmail.endsWith('@jecrcu.edu.in');
+      const upperRequested = requestedRole ? String(requestedRole).toUpperCase() : null;
+      const assignedRole = (upperRequested === 'ALUMNI' || upperRequested === 'STUDENT')
+        ? upperRequested
+        : (isInstitutional ? 'STUDENT' : 'ALUMNI');
+      const assignedStatus = assignedRole === 'STUDENT' ? 'ACTIVE' : 'PENDING_APPROVAL';
+
       const newUserId = crypto.randomUUID();
       const randomHash = await bcrypt.hash(crypto.randomUUID(), 10);
       const newUserResult = await db.query(
         `INSERT INTO users (id, email, password_hash, role, email_verified, account_status)
-         VALUES ($1, $2, $3, 'STUDENT', true, 'ACTIVE')
-         RETURNING id, email, role`,
-        [newUserId, normalizedEmail, randomHash]
+         VALUES ($1, $2, $3, $4, true, $5)
+         RETURNING id, email, role, account_status`,
+        [newUserId, normalizedEmail, randomHash, assignedRole, assignedStatus]
       );
       const newUser = newUserResult.rows[0];
 
@@ -685,12 +753,44 @@ const authenticateWithGoogle = async ({ idToken, req }) => {
         [crypto.randomUUID(), newUser.id, googleSub]
       );
 
+      const profileName = payload.name || normalizedEmail.split('@')[0];
+
       const newProfileResult = await db.query(
         `INSERT INTO user_profiles (id, user_id, full_name, avatar_url, is_profile_complete)
          VALUES ($1, $2, $3, $4, false)
          RETURNING full_name, is_profile_complete`,
-        [crypto.randomUUID(), newUser.id, payload.name, payload.pictureUrl]
+        [crypto.randomUUID(), newUser.id, profileName, payload.pictureUrl]
       );
+
+      if (assignedRole === 'ALUMNI') {
+        // Insert into alumni_verifications for Admin review
+        await db.query(
+          `INSERT INTO alumni_verifications (id, user_id, status, created_at, updated_at)
+           VALUES (gen_random_uuid(), $1, 'PENDING', NOW(), NOW());`,
+          [newUser.id]
+        );
+
+        // Notify active Admins
+        const adminUsersRes = await db.query(
+          `SELECT id FROM users WHERE role = 'ADMIN' AND account_status = 'ACTIVE'`
+        );
+        for (const adminRow of adminUsersRes.rows) {
+          await db.query(
+            `INSERT INTO notifications (id, recipient_id, user_id, type, title, message, actor_name, created_at)
+             VALUES (gen_random_uuid(), $1, $2, 'ALUMNI_VERIFICATION_REQUEST', 'New Alumni Verification Request', $3, $4, NOW());`,
+            [adminRow.id, newUser.id, `New Alumni registration submitted via Google by ${profileName} (${newUser.email}).`, profileName]
+          );
+        }
+
+        // Send receipt email to alumni
+        emailService.sendAlumniRegistrationReceivedEmail(newUser.email, profileName, newUser.id)
+          .catch(() => {});
+
+        const error = new Error('Your account is currently under review and pending approval by the Admin.');
+        error.statusCode = 403;
+        error.errorCode = 'ACCOUNT_PENDING_APPROVAL';
+        throw error;
+      }
 
       const profile = newProfileResult.rows[0];
       user = {
@@ -893,6 +993,7 @@ module.exports = {
   resendVerificationCode,
   login,
   authenticateWithGoogle,
+  loginWithGoogle: authenticateWithGoogle,
   forgotPassword,
   resetPassword,
   getCurrentUser,

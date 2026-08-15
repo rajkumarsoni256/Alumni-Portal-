@@ -820,25 +820,7 @@ const migrate = async () => {
       adminId = adminCheck.rows[0].id;
     }
 
-    // Default Admin user initialized cleanly. Seed initial real upcoming events if events table is empty
-    const eventsCountRes = await db.query(`SELECT COUNT(*) AS count FROM events`);
-    if (parseInt(eventsCountRes.rows[0].count, 10) === 0 && adminId) {
-      const now = new Date();
-      const event1Date = new Date(now.getTime() + 14 * 24 * 3600 * 1000); // 14 days later
-      const event2Date = new Date(now.getTime() + 30 * 24 * 3600 * 1000); // 30 days later
 
-      await db.query(
-        `INSERT INTO events (id, created_by, title, description, event_type, category, speaker, location, is_online, meeting_url, start_at, end_at, registration_deadline, capacity, status)
-         VALUES 
-         ($1, $2, 'Alumni Leadership Summit 2026', 'Annual JECRC Alumni Networking and Keynote Leadership Summit', 'ALUMNI_MEETUP', 'Networking', 'JECRC Leadership', 'Jaipur, Rajasthan', false, null, $3, $4, $5, 200, 'PUBLISHED'),
-         ($6, $2, 'AI & Cloud Innovations Workshop', 'Technical interactive workshop hosted by Senior Alumni Engineers', 'WORKSHOP', 'Workshops', 'Senior Alumni Engineers', 'Online / Virtual', true, 'https://meet.google.com/jecrc-tech', $7, $8, $9, 150, 'PUBLISHED')`,
-        [
-          crypto.randomUUID(), adminId, event1Date, new Date(event1Date.getTime() + 4 * 3600 * 1000), new Date(event1Date.getTime() - 24 * 3600 * 1000),
-          crypto.randomUUID(), event2Date, new Date(event2Date.getTime() + 3 * 3600 * 1000), new Date(event2Date.getTime() - 24 * 3600 * 1000)
-        ]
-      );
-      console.log(`[MIGRATION SEED] Seeded initial published upcoming events in PostgreSQL`);
-    }
 
     // Clean up duplicate conversation pairs and merge messages into single conversation
     await db.query(`

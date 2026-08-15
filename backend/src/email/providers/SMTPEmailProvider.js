@@ -13,7 +13,7 @@ class SMTPEmailProvider extends EmailProvider {
     const user = config.user || process.env.SMTP_USER;
     const pass = config.password || process.env.SMTP_PASSWORD;
 
-    this.fromAddress = process.env.EMAIL_FROM || 'no-reply@jecrc.ac.in';
+    this.fromAddress = (user && user.includes('@gmail.com')) ? user : (process.env.EMAIL_FROM || 'no-reply@jecrc.ac.in');
     this.fromName = process.env.EMAIL_FROM_NAME || 'JU Connect Alumni Network';
     this.replyTo = process.env.EMAIL_REPLY_TO || this.fromAddress;
 
@@ -37,12 +37,13 @@ class SMTPEmailProvider extends EmailProvider {
       this.transporter = nodemailer.createTransport({
         host,
         port,
-        secure, // false for 587 (STARTTLS), true for 465
+        secure: secure || port === 465 || process.env.SMTP_SECURE === 'true', // true for 465 (SSL), false for 587 (STARTTLS)
         auth: { user, pass },
-        connectionTimeout: 3000,
-        socketTimeout: 3000,
+        connectionTimeout: 15000,
+        socketTimeout: 15000,
+        greetingTimeout: 15000,
         tls: {
-          rejectUnauthorized: process.env.NODE_ENV === 'production',
+          rejectUnauthorized: false,
         },
       });
     } else {
@@ -88,6 +89,7 @@ class SMTPEmailProvider extends EmailProvider {
         .replace(new RegExp(process.env.SMTP_USER || 'SecretUserPlaceholder', 'g'), '***REDACTED***');
 
       console.error('[SMTPEmailProvider Error]', sanitizedError);
+      console.log(`[EMAIL DISPATCH FALLBACK] Message to ${options.to}: Subject "${options.subject}"`);
       return {
         success: false,
         error: sanitizedError,

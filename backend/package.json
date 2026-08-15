@@ -6,6 +6,7 @@
   "scripts": {
     "start": "node src/app.js",
     "dev": "node src/app.js",
+    "db:reset": "node src/db/resetDb.js",
     "test": "node src/tests/testAdminUserDirectory.js && node src/tests/testHttpAdminRoutes.js && node src/tests/testPhase3Verification.js && node src/tests/testPhase4DataQuality.js && node src/tests/testPhase5Export.js && node src/tests/testPhase6Verification.js && node src/tests/testFrontendIntegration.js && node src/tests/testPhase7AuditLogs.js && node src/tests/testPhase8DashboardAnalytics.js && node src/tests/testPhase9Settings.js && node src/tests/testPhase10Notifications.js && node src/tests/testPhase12Integration.js && node src/tests/testPhase13UniversityIdentity.js && node src/tests/testPhase14ProductionEmail.js && node src/tests/testPhase14AdminManagement.js && node src/tests/testPhase14RealAlumniApproval.js && node src/tests/testSessionSecurity.js"
   },
   "dependencies": {

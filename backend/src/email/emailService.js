@@ -15,6 +15,7 @@ const {
   getAlumniVerificationRequestTemplate,
   getAlumniApprovedTemplate,
   getAlumniRejectedTemplate,
+  getAlumniRegistrationReceivedTemplate,
   getConnectionEventTemplate,
   getNewMessageTemplate,
   getJobApplicationTemplate,
@@ -189,8 +190,22 @@ class EmailService {
     const rawCode = await this.createAndStoreOTP({ userId, email, purpose: 'EMAIL_VERIFICATION' });
     const { subject, html, text } = getVerificationCodeTemplate({ code: rawCode, name, expiresMinutes: this.OTP_EXPIRY_MINUTES });
 
+    console.log(`[OTP DISPATCH] Verification OTP for ${email}: ${rawCode}`);
     const result = await this.provider.sendEmail({ to: email, subject, html, text });
     await this.logDelivery({ userId, recipientEmail: email, emailType: 'EMAIL_VERIFICATION', templateName: 'verificationCode', subject, result });
+    return result;
+  }
+
+  /**
+   * 1b. Send Student Institutional Email Verification OTP Code
+   */
+  async sendStudentVerificationCode(email, name) {
+    const rawCode = await this.createAndStoreOTP({ email, purpose: 'STUDENT_VERIFICATION' });
+    const { subject, html, text } = getVerificationCodeTemplate({ code: rawCode, name, expiresMinutes: this.OTP_EXPIRY_MINUTES });
+
+    console.log(`[OTP DISPATCH] Student Verification OTP for ${email}: ${rawCode}`);
+    const result = await this.provider.sendEmail({ to: email, subject, html, text });
+    await this.logDelivery({ userId: null, recipientEmail: email, emailType: 'STUDENT_VERIFICATION', templateName: 'verificationCode', subject, result });
     return result;
   }
 
@@ -199,8 +214,9 @@ class EmailService {
    */
   async sendPasswordResetCode(email, userId, name, resetToken = null) {
     const rawCode = await this.createAndStoreOTP({ userId, email, purpose: 'PASSWORD_RESET' });
-    const { subject, html, text } = getPasswordResetCodeTemplate({ code: rawCode, resetToken, name, expiresMinutes: this.OTP_EXPIRY_MINUTES });
+    const { subject, html, text } = getPasswordResetCodeTemplate({ code: rawCode, name, resetToken, expiresMinutes: this.OTP_EXPIRY_MINUTES });
 
+    console.log(`[OTP DISPATCH] Password Reset OTP for ${email}: ${rawCode}`);
     const result = await this.provider.sendEmail({ to: email, subject, html, text });
     await this.logDelivery({ userId, recipientEmail: email, emailType: 'PASSWORD_RESET', templateName: 'passwordResetCode', subject, result });
     return result;
@@ -311,6 +327,16 @@ class EmailService {
     const { subject, html, text } = getAlumniRejectedTemplate({ name, rejectionReason });
     const result = await this.provider.sendEmail({ to: email, subject, html, text });
     await this.logDelivery({ userId, recipientEmail: email, emailType: 'ALUMNI_VERIFICATION_REJECTED', templateName: 'alumniRejected', subject, result });
+    return result;
+  }
+
+  /**
+   * 12. Send Alumni Registration Request Received Confirmation Email to Applicant
+   */
+  async sendAlumniRegistrationReceivedEmail(email, name, userId = null) {
+    const { subject, html, text } = getAlumniRegistrationReceivedTemplate({ name });
+    const result = await this.provider.sendEmail({ to: email, subject, html, text });
+    await this.logDelivery({ userId, recipientEmail: email, emailType: 'ALUMNI_REGISTRATION_RECEIVED', templateName: 'alumniRegistrationReceived', subject, result });
     return result;
   }
 

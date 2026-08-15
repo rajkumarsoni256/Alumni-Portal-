@@ -11,6 +11,7 @@ import {
   Check, 
   AlertCircle,
   ShieldCheck,
+  CheckCircle2,
   Info,
   KeyRound,
   RefreshCw
@@ -23,6 +24,7 @@ export const RegisterPage = () => {
 
   const [name, setName] = useState('');
   const [role, setRole] = useState('student'); // 'student' | 'alumni'
+  const [isAlumniSubmitted, setIsAlumniSubmitted] = useState(false);
 
   // Student 2-Step Registration State
   const [studentStep, setStudentStep] = useState(1); // 1: Input Form, 2: OTP Verification
@@ -53,8 +55,8 @@ export const RegisterPage = () => {
     setIsLoading(true);
     setErrorMessage('');
     try {
-      const user = await loginWithGoogle(idToken);
-      const userRole = (user && user.role) ? user.role.toLowerCase() : 'student';
+      const user = await loginWithGoogle(idToken, role);
+      const userRole = (user && user.role) ? user.role.toLowerCase() : role;
       const isComplete = user && user.profileComplete !== false;
       if (userRole === 'admin') {
         navigate('/admin');
@@ -64,7 +66,11 @@ export const RegisterPage = () => {
         navigate('/');
       }
     } catch (err) {
-      setErrorMessage(err.message || 'Google signup failed.');
+      if (err.errorCode === 'ACCOUNT_PENDING_APPROVAL' || err.errorCode === 'ALUMNI_APPROVAL_PENDING') {
+        setErrorMessage(err.message || 'Your account is currently under review and pending approval by the Admin.');
+      } else {
+        setErrorMessage(err.message || 'Google registration failed.');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -157,7 +163,14 @@ export const RegisterPage = () => {
     }
 
     setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    const hasErrors = Object.keys(newErrors).length > 0;
+    if (hasErrors) {
+      const firstError = Object.values(newErrors)[0];
+      setErrorMessage(firstError);
+    } else {
+      setErrorMessage('');
+    }
+    return !hasErrors;
   };
 
   const handleStudentInit = async (e) => {
@@ -221,7 +234,7 @@ export const RegisterPage = () => {
         setAuthUser(res.user);
       }
 
-      navigate('/');
+      navigate('/onboarding/student');
     } catch (err) {
       setErrorMessage(err.message || 'Unable to verify student details. Please check your information and try again.');
     } finally {
@@ -243,13 +256,13 @@ export const RegisterPage = () => {
         mobileNumber: mobileNumber.trim(),
         phone: mobileNumber.trim(),
         password,
-        role: 'alumni',
+        role: 'ALUMNI',
         graduationYear,
         company: company.trim(),
         designation: designation.trim(),
         linkedinUrl: linkedinUrl.trim(),
       });
-      navigate('/verify-email');
+      setIsAlumniSubmitted(true);
     } catch (err) {
       if (err.errors && typeof err.errors === 'object') {
         setErrors(err.errors);
@@ -338,8 +351,43 @@ export const RegisterPage = () => {
               </div>
             )}
 
-            {/* Form */}
-            {role === 'student' ? (
+            {/* Form or Alumni Success View */}
+            {isAlumniSubmitted ? (
+              <div className="space-y-5 text-center py-4">
+                <div className="w-14 h-14 bg-emerald-100 border-2 border-emerald-500 text-emerald-700 rounded-full flex items-center justify-center mx-auto shadow-sm">
+                  <ShieldCheck className="w-8 h-8" />
+                </div>
+
+                <div className="space-y-1.5">
+                  <h2 className="text-lg font-bold text-slate-900">
+                    Registration Application Submitted!
+                  </h2>
+                  <p className="text-xs text-slate-600 leading-relaxed max-w-md mx-auto">
+                    Your alumni registration application has been sent to the <strong>JU Connect administration team</strong> for verification.
+                  </p>
+                </div>
+
+                <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-lg text-left space-y-2 text-xs text-slate-700">
+                  <div className="flex items-center gap-2 font-bold text-slate-900">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                    <span>Application Status: Pending Admin Approval</span>
+                  </div>
+                  <ul className="list-disc list-inside space-y-1 text-slate-600 pl-1 text-[11px]">
+                    <li>A confirmation email has been sent to <strong>{personalEmail}</strong>.</li>
+                    <li>Our alumni relations team will verify your graduation details.</li>
+                    <li>You will receive an email notification once your account is approved.</li>
+                  </ul>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => navigate('/login')}
+                  className="w-full py-2.5 rounded-md text-xs font-bold text-white bg-red-700 hover:bg-red-800 transition-colors cursor-pointer shadow-2xs"
+                >
+                  Return to Sign In
+                </button>
+              </div>
+            ) : role === 'student' ? (
               studentStep === 1 ? (
                 /* STUDENT STEP 1: Form Inputs */
                 <form onSubmit={handleStudentInit} className="space-y-3.5">
@@ -709,6 +757,7 @@ export const RegisterPage = () => {
                     placeholder="e.g. Priya Sharma"
                     className="w-full bg-slate-50 border border-slate-300 rounded-md px-3 py-2 text-xs text-slate-900 focus:outline-none"
                   />
+                  {errors.name && <p className="text-[11px] text-rose-600 font-medium">{errors.name}</p>}
                 </div>
 
                 {/* Personal Email & Phone */}
@@ -722,6 +771,7 @@ export const RegisterPage = () => {
                       placeholder="alumni@gmail.com"
                       className="w-full bg-slate-50 border border-slate-300 rounded-md px-3 py-2 text-xs text-slate-900 focus:outline-none"
                     />
+                    {errors.personalEmail && <p className="text-[11px] text-rose-600 font-medium">{errors.personalEmail}</p>}
                   </div>
 
                   <div className="space-y-1">
@@ -733,6 +783,7 @@ export const RegisterPage = () => {
                       placeholder="10-digit mobile number"
                       className="w-full bg-slate-50 border border-slate-300 rounded-md px-3 py-2 text-xs text-slate-900 focus:outline-none"
                     />
+                    {errors.mobileNumber && <p className="text-[11px] text-rose-600 font-medium">{errors.mobileNumber}</p>}
                   </div>
                 </div>
 
@@ -747,6 +798,7 @@ export const RegisterPage = () => {
                       placeholder="2020"
                       className="w-full bg-slate-50 border border-slate-300 rounded-md px-3 py-2 text-xs text-slate-900 focus:outline-none"
                     />
+                    {errors.graduationYear && <p className="text-[11px] text-rose-600 font-medium">{errors.graduationYear}</p>}
                   </div>
 
                   <div className="space-y-1">
@@ -772,6 +824,7 @@ export const RegisterPage = () => {
                       placeholder="At least 8 chars"
                       className="w-full bg-slate-50 border border-slate-300 rounded-md px-3 py-2 text-xs text-slate-900 focus:outline-none"
                     />
+                    {errors.password && <p className="text-[11px] text-rose-600 font-medium">{errors.password}</p>}
                   </div>
 
                   <div className="space-y-1">
@@ -783,6 +836,7 @@ export const RegisterPage = () => {
                       placeholder="Repeat password"
                       className="w-full bg-slate-50 border border-slate-300 rounded-md px-3 py-2 text-xs text-slate-900 focus:outline-none"
                     />
+                    {errors.confirmPassword && <p className="text-[11px] text-rose-600 font-medium">{errors.confirmPassword}</p>}
                   </div>
                 </div>
 
@@ -796,25 +850,28 @@ export const RegisterPage = () => {
               </form>
             )}
 
-            {/* Centered OR Divider */}
-            <div className="relative flex items-center justify-center my-4">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-slate-200" />
-              </div>
-              <span className="relative bg-white px-3 text-[11px] text-slate-400 uppercase tracking-wider font-semibold">
-                OR
-              </span>
-            </div>
+            {/* Centered OR Divider & Google Signup Button for Student Tab Only */}
+            {role === 'student' && (
+              <>
+                <div className="relative flex items-center justify-center my-4">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-slate-200" />
+                  </div>
+                  <span className="relative bg-white px-3 text-[11px] text-slate-400 uppercase tracking-wider font-semibold">
+                    OR
+                  </span>
+                </div>
 
-            {/* Google Signup Button */}
-            <div className="w-full flex flex-col items-center justify-center gap-2">
-              <GoogleAuthButton
-                onSuccess={handleGoogleSuccess}
-                onError={(err) => setErrorMessage(err.message || 'Google signup failed.')}
-                text="signup_with"
-                disabled={isLoading}
-              />
-            </div>
+                <div className="w-full flex flex-col items-center justify-center gap-2">
+                  <GoogleAuthButton
+                    onSuccess={handleGoogleSuccess}
+                    onError={(err) => setErrorMessage(err.message || 'Google signup failed.')}
+                    text="signup_with"
+                    disabled={isLoading}
+                  />
+                </div>
+              </>
+            )}
           </div>
 
           {/* Footer Sign In Link */}

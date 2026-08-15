@@ -9,15 +9,13 @@ export const authService = {
   /**
    * Register new user (STUDENT or ALUMNI)
    */
-  register: async ({ name, email, password, role = 'student' }) => {
-    const formattedRole = role.toUpperCase(); // 'STUDENT' | 'ALUMNI'
+  register: async (payload) => {
+    const formattedRole = payload && payload.role ? String(payload.role).toUpperCase() : 'ALUMNI';
     const response = await apiClient.post('/api/v1/auth/register', {
-      name,
-      email: email.trim().toLowerCase(),
-      password,
+      ...payload,
+      email: payload && payload.email ? payload.email.trim().toLowerCase() : '',
       role: formattedRole,
     });
-    // Returns { user: UserAuthResponse, message: string }
     return response;
   },
 
@@ -39,9 +37,10 @@ export const authService = {
   /**
    * User login with verified Google OAuth ID Token
    */
-  loginWithGoogle: async (idToken) => {
+  loginWithGoogle: async (idToken, role = null) => {
     const response = await apiClient.post('/api/v1/auth/google', {
       idToken,
+      role: role ? String(role).toUpperCase() : undefined,
     });
     if (response && response.token) {
       setAuthToken(response.token);
@@ -132,3 +131,5 @@ export const authService = {
   setToken: setAuthToken,
   clearToken: clearAuthToken,
 };
+
+export default authService;

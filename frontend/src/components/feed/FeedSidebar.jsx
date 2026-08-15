@@ -66,17 +66,11 @@ export const FeedSidebar = () => {
     fetchEvents();
   }, []);
 
-  const defaultPeople = [
-    { id: 'usr_101', name: 'Raj Kumar Soni', role: 'Student • B.Tech CSE \'26', mutualCount: 12, avatar: null },
-    { id: 'usr_102', name: 'Rehan Khan', role: 'Student • B.Tech IT \'26', mutualCount: 8, avatar: null },
-    { id: 'usr_103', name: 'Sneha Iyer', role: 'Alumni • B.Tech ECE \'22', mutualCount: 15, avatar: null },
-  ];
-
-  const peopleList = (suggestedPeople && suggestedPeople.length > 0) ? suggestedPeople.slice(0, 3) : defaultPeople;
+  const peopleList = (suggestedPeople && Array.isArray(suggestedPeople)) ? suggestedPeople.slice(0, 3) : [];
 
   return (
     <aside className="space-y-3.5">
-      {/* 1. People You May Know */}
+      {/* 1. People You May Know (Real PostgreSQL Data) */}
       <div className="bg-white rounded-xl border border-slate-200/90 p-4 shadow-2xs space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1.5">
@@ -91,44 +85,52 @@ export const FeedSidebar = () => {
           </Link>
         </div>
 
-        <div className="space-y-3">
-          {peopleList.map((person) => (
-            <div key={person.id} className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2.5 min-w-0">
-                <div className="relative shrink-0">
-                  <UserAvatar
-                    src={person.avatar || person.avatarUrl}
-                    name={person.name}
-                    className="w-9 h-9"
-                  />
-                  <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 rounded-full border border-white" />
+        {peopleList.length === 0 ? (
+          <p className="text-xs text-slate-400 py-3 text-center">
+            No suggested connections yet.
+          </p>
+        ) : (
+          <div className="space-y-3">
+            {peopleList.map((person) => (
+              <div key={person.id} className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="relative shrink-0">
+                    <UserAvatar
+                      src={person.avatar || person.avatarUrl}
+                      name={person.name}
+                      className="w-9 h-9"
+                    />
+                    <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 rounded-full border border-white" />
+                  </div>
+                  <div className="min-w-0">
+                    <Link
+                      to={`/profile/${person.id}`}
+                      className="text-xs font-bold text-slate-900 hover:text-red-700 hover:underline block truncate"
+                    >
+                      {person.name}
+                    </Link>
+                    <p className="text-[10px] text-slate-500 truncate leading-tight">
+                      {person.role || person.designation || 'JECRC Member'}
+                    </p>
+                    {person.mutualCount ? (
+                      <span className="text-[10px] text-slate-400 block truncate">
+                        {person.mutualCount} mutual connections
+                      </span>
+                    ) : null}
+                  </div>
                 </div>
-                <div className="min-w-0">
-                  <Link
-                    to={`/profile/${person.id}`}
-                    className="text-xs font-bold text-slate-900 hover:text-red-700 hover:underline block truncate"
-                  >
-                    {person.name}
-                  </Link>
-                  <p className="text-[10px] text-slate-500 truncate leading-tight">
-                    {person.role || person.designation || 'JECRC Member'}
-                  </p>
-                  <span className="text-[10px] text-slate-400 block truncate">
-                    {person.mutualCount || 12} mutual connections
-                  </span>
-                </div>
-              </div>
 
-              <button
-                type="button"
-                onClick={() => toggleConnectUser(person.id)}
-                className="px-3 py-1 rounded-md text-xs font-semibold border border-slate-300 text-slate-700 hover:bg-slate-50 transition-colors shrink-0 cursor-pointer shadow-2xs"
-              >
-                Connect
-              </button>
-            </div>
-          ))}
-        </div>
+                <button
+                  type="button"
+                  onClick={() => toggleConnectUser(person.id)}
+                  className="px-3 py-1 rounded-md text-xs font-semibold border border-slate-300 text-slate-700 hover:bg-slate-50 transition-colors shrink-0 cursor-pointer shadow-2xs"
+                >
+                  Connect
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* 2. Trending in JECRC (Real PostgreSQL Data) */}

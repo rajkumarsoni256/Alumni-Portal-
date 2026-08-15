@@ -31,19 +31,21 @@ export const LoginPage = () => {
   const fromPath = location.state?.from;
 
   const getTargetRoute = (userRole, isComplete) => {
+    // Admin users MUST ALWAYS route to the Admin Portal
+    if (userRole === 'admin') {
+      return '/admin/dashboard';
+    }
+
     if (
       fromPath &&
       typeof fromPath === 'string' &&
       fromPath.startsWith('/') &&
       !fromPath.startsWith('//') &&
-      !fromPath.toLowerCase().includes('http')
+      !fromPath.toLowerCase().includes('http') &&
+      !fromPath.startsWith('/onboarding')
     ) {
-      if (fromPath.startsWith('/admin') && userRole !== 'admin') {
-        return getPortalHomePath(userRole);
-      }
       return fromPath;
     }
-    if (userRole === 'admin') return '/admin/dashboard';
     if (!isComplete) return '/onboarding';
     return getPortalHomePath(userRole);
   };
@@ -95,8 +97,8 @@ export const LoginPage = () => {
     } catch (err) {
       if (err.errorCode === 'EMAIL_NOT_VERIFIED') {
         setErrorMessage('Your email address is not verified yet. Please check your inbox or complete verification.');
-      } else if (err.errorCode === 'ALUMNI_APPROVAL_PENDING') {
-        setErrorMessage('Your alumni account is awaiting approval from JECRC administration. You will receive an email and notification once your account has been reviewed.');
+      } else if (err.errorCode === 'ACCOUNT_PENDING_APPROVAL' || err.errorCode === 'ALUMNI_APPROVAL_PENDING') {
+        setErrorMessage(err.message || 'Your account is currently under review and pending approval by the Admin.');
       } else if (err.errorCode === 'ALUMNI_APPROVAL_REJECTED') {
         setErrorMessage('Your alumni registration request was not approved by university administration.');
       } else {

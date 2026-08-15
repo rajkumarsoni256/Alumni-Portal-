@@ -440,8 +440,8 @@ export const AppProvider = ({ children }) => {
         name: userProfile?.fullName || authUser?.email?.split('@')[0] || (activeRole === 'alumni' ? 'Alumni User' : 'Student User'),
         fullName: userProfile?.fullName || '',
         email: authUser?.email || (activeRole === 'alumni' ? 'alumni@jecrc.ac.in' : 'student@jecrc.ac.in'),
-        role: activeRole,
-        roleUpper: activeRole.toUpperCase(),
+        role: (authUser?.role || activeRole || 'student').toLowerCase(),
+        roleUpper: (authUser?.role || activeRole || 'STUDENT').toUpperCase(),
         degree: userProfile?.degree || null,
         branch: userProfile?.branch || null,
         company: userProfile?.company || null,
@@ -493,9 +493,9 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  const loginWithGoogle = async (idToken) => {
+  const loginWithGoogle = async (idToken, requestedRole = null) => {
     try {
-      const response = await authService.loginWithGoogle(idToken);
+      const response = await authService.loginWithGoogle(idToken, requestedRole);
       const user = response.user || response;
       const normalizedRole = (user.role || 'STUDENT').toLowerCase();
       const isComplete = user.profileComplete !== false;
@@ -525,13 +525,13 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  const registerUser = async ({ name, email, password, role }) => {
+  const registerUser = async (registrationData) => {
     try {
-      const response = await authService.register({ name, email, password, role });
+      const response = await authService.register(registrationData);
       setPendingRegistration({
-        name,
-        email,
-        role: role.toLowerCase(),
+        name: registrationData.name,
+        email: registrationData.email,
+        role: (registrationData.role || 'alumni').toLowerCase(),
         emailVerified: false,
         profileCompleted: false,
       });
