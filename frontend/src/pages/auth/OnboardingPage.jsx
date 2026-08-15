@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Navigate } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { 
   GraduationCap, 
@@ -15,7 +15,12 @@ import {
 
 export const OnboardingPage = ({ defaultRole }) => {
   const navigate = useNavigate();
-  const { user: currentUser, pendingRegistration, completeUserOnboarding } = useApp();
+  const { user: currentUser, activeRole, pendingRegistration, completeUserOnboarding } = useApp();
+
+  const isAdmin = currentUser?.role?.toUpperCase() === 'ADMIN' || activeRole === 'admin';
+  if (isAdmin) {
+    return <Navigate to="/admin/dashboard" replace />;
+  }
 
   const pathRole = window.location.pathname.includes('/alumni') ? 'alumni' : (window.location.pathname.includes('/student') ? 'student' : null);
   const rawRole = currentUser?.role || pendingRegistration?.role || pathRole || defaultRole || 'student';

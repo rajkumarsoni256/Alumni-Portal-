@@ -31,19 +31,21 @@ export const LoginPage = () => {
   const fromPath = location.state?.from;
 
   const getTargetRoute = (userRole, isComplete) => {
+    // Admin users MUST ALWAYS route to the Admin Portal
+    if (userRole === 'admin') {
+      return '/admin/dashboard';
+    }
+
     if (
       fromPath &&
       typeof fromPath === 'string' &&
       fromPath.startsWith('/') &&
       !fromPath.startsWith('//') &&
-      !fromPath.toLowerCase().includes('http')
+      !fromPath.toLowerCase().includes('http') &&
+      !fromPath.startsWith('/onboarding')
     ) {
-      if (fromPath.startsWith('/admin') && userRole !== 'admin') {
-        return getPortalHomePath(userRole);
-      }
       return fromPath;
     }
-    if (userRole === 'admin') return '/admin/dashboard';
     if (!isComplete) return '/onboarding';
     return getPortalHomePath(userRole);
   };
