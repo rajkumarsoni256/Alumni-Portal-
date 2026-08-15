@@ -634,20 +634,51 @@ export const OnboardingPage = ({ defaultRole }) => {
           {/* ============================================================ */}
           {/* STEP 3: Complete Screen */}
           {/* ============================================================ */}
+          {/* STEP 3: Complete Screen */}
+          {/* ============================================================ */}
           {step === 3 && (
             <div className="text-center space-y-4 py-4 max-w-md mx-auto">
-              <div className="w-12 h-12 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center justify-center mx-auto">
-                <CheckCircle2 className="w-6 h-6" />
-              </div>
+              {isStudent ? (
+                <>
+                  <div className="w-12 h-12 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center justify-center mx-auto">
+                    <CheckCircle2 className="w-6 h-6" />
+                  </div>
 
-              <div className="space-y-1">
-                <h2 className="text-xl font-bold text-slate-900">
-                  Welcome to JECRC Community!
-                </h2>
-                <p className="text-xs text-slate-500 leading-relaxed">
-                  Your profile has been verified and completed. You now have full access to the JECRC platform.
-                </p>
-              </div>
+                  <div className="space-y-1">
+                    <h2 className="text-xl font-bold text-slate-900">
+                      Welcome to JU Connect!
+                    </h2>
+                    <p className="text-xs text-slate-500 leading-relaxed">
+                      Your JECRC institutional email (@jecrcu.edu.in) has been verified. Your profile is complete and ready.
+                    </p>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="w-12 h-12 rounded-full bg-amber-50 text-amber-700 border border-amber-200 flex items-center justify-center mx-auto">
+                    <AlertCircle className="w-6 h-6 text-amber-600" />
+                  </div>
+
+                  <div className="space-y-1">
+                    <h2 className="text-xl font-bold text-slate-900">
+                      Alumni Application Submitted!
+                    </h2>
+                    <p className="text-xs text-slate-600 leading-relaxed font-medium">
+                      Your Alumni account request has been sent to JECRC Administration for approval.
+                    </p>
+                  </div>
+
+                  <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl text-left space-y-2 text-xs text-amber-900">
+                    <div className="flex items-center gap-2 font-bold text-amber-800">
+                      <AlertCircle className="w-4 h-4 text-amber-700 shrink-0" />
+                      <span>Pending Admin Verification</span>
+                    </div>
+                    <p className="text-[11px] text-amber-700 leading-relaxed">
+                      JECRC Administration will review your graduation batch ({graduationYear}) and company details. You will receive an email notification once your alumni account is verified!
+                    </p>
+                  </div>
+                </>
+              )}
 
               {/* Summary Card */}
               <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-lg text-left flex items-center gap-3">
@@ -661,11 +692,11 @@ export const OnboardingPage = ({ defaultRole }) => {
                   <p className="text-[11px] text-slate-500 truncate">
                     {isStudent 
                       ? `${degree} ${branch} • Class of ${graduationYear}`
-                      : `${designation} @ ${company}`
+                      : `${designation || 'Alumni Member'} @ ${company || 'JECRC Graduate'}`
                     }
                   </p>
                   <span className="text-[10px] font-semibold text-red-700 bg-red-50 px-1.5 py-0.2 rounded inline-block">
-                    {isStudent ? 'JECRC Student' : 'JECRC Alumni'}
+                    {isStudent ? 'JECRC Student' : 'JECRC Alumni (Pending Review)'}
                   </span>
                 </div>
               </div>
@@ -676,7 +707,7 @@ export const OnboardingPage = ({ defaultRole }) => {
                   onClick={handleFinish}
                   className="w-full py-2.5 rounded-md text-xs font-semibold text-white bg-red-700 hover:bg-red-800 transition-colors cursor-pointer shadow-2xs"
                 >
-                  Enter Main Dashboard
+                  {isStudent ? 'Enter Portal Dashboard' : 'Explore Community & View Status'}
                 </button>
               </div>
             </div>
