@@ -221,7 +221,7 @@ export const RegisterPage = () => {
         setAuthUser(res.user);
       }
 
-      navigate('/');
+      navigate('/onboarding/student');
     } catch (err) {
       setErrorMessage(err.message || 'Unable to verify student details. Please check your information and try again.');
     } finally {
