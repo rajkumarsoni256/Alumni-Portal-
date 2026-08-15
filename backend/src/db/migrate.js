@@ -501,6 +501,7 @@ const migrate = async () => {
     await db.query(`ALTER TABLE notifications ADD COLUMN IF NOT EXISTS actor_avatar VARCHAR(512);`).catch(() => {});
     await db.query(`UPDATE notifications SET recipient_id = user_id WHERE recipient_id IS NULL AND user_id IS NOT NULL;`).catch(() => {});
     await db.query(`UPDATE notifications SET user_id = recipient_id WHERE user_id IS NULL AND recipient_id IS NOT NULL;`).catch(() => {});
+    await db.query(`UPDATE users SET email_verified = true WHERE role = 'ALUMNI' AND email_verified = false;`).catch(() => {});
 
     // 22. events table (Phase 9)
     await db.query(`

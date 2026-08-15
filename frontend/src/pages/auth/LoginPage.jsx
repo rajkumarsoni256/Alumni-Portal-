@@ -109,21 +109,6 @@ export const LoginPage = () => {
     }
   };
 
-  const handleFillDemo = (role) => {
-    if (role === 'admin') {
-      setEmail('admin@jecrc.ac.in');
-      setPassword('AdminPassword@123');
-    } else if (role === 'alumni') {
-      setEmail('priya.sharma@alumni.jecrc.ac.in');
-      setPassword('Password123!');
-    } else {
-      setEmail('rahul.verma@student.jecrc.ac.in');
-      setPassword('Password123!');
-    }
-    setErrors({});
-    setErrorMessage('');
-  };
-
   return (
     <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center p-4 sm:p-6 lg:p-8 bg-slate-100/75">
       <div className="w-full max-w-4xl bg-white rounded-2xl border border-slate-200/80 shadow-xl overflow-hidden grid grid-cols-1 md:grid-cols-12 animate-in fade-in duration-200">
