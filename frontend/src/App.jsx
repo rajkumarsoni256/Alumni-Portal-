@@ -102,8 +102,8 @@ const RootIndex = () => {
 
 export function App() {
   return (
-    <AppProvider>
-      <Router>
+    <Router>
+      <AppProvider>
         <ScrollToTop />
         <Routes>
           {/* ======================================================= */}
@@ -455,8 +455,8 @@ export function App() {
             }
           />
         </Routes>
-      </Router>
-    </AppProvider>
+      </AppProvider>
+    </Router>
   );
 }
 

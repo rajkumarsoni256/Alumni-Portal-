@@ -1,25 +1,30 @@
 /**
  * Centralized API Client for JECRC Community Platform
- * Communicates with Spring Boot backend under /api/v1
+ * Communicates with Express backend under /api/v1
  */
 
 const rawBaseUrl = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080').trim().replace(/\/+$/, '');
 const API_BASE_URL = rawBaseUrl;
 const JWT_STORAGE_KEY = 'jecrc_community_jwt';
 
+let inMemoryToken = null;
+
 export const getAuthToken = () => {
-  return localStorage.getItem(JWT_STORAGE_KEY);
+  return inMemoryToken || localStorage.getItem(JWT_STORAGE_KEY);
 };
 
 export const setAuthToken = (token) => {
   if (token) {
+    inMemoryToken = token;
     localStorage.setItem(JWT_STORAGE_KEY, token);
   } else {
+    inMemoryToken = null;
     localStorage.removeItem(JWT_STORAGE_KEY);
   }
 };
 
 export const clearAuthToken = () => {
+  inMemoryToken = null;
   localStorage.removeItem(JWT_STORAGE_KEY);
 };
 
@@ -36,8 +41,54 @@ export class ApiError extends Error {
   }
 }
 
+// Single-refresh lock & promise queue to handle multiple concurrent 401s cleanly
+let isRefreshing = false;
+let refreshPromise = null;
+
+const refreshAccessToken = async () => {
+  if (isRefreshing && refreshPromise) {
+    return refreshPromise;
+  }
+
+  isRefreshing = true;
+  refreshPromise = (async () => {
+    try {
+      const url = `${API_BASE_URL}/api/v1/auth/refresh`;
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        throw new Error('Session expired or invalid refresh token');
+      }
+
+      const data = await response.json();
+      const newAccessToken = data?.data?.accessToken || data?.accessToken;
+
+      if (newAccessToken) {
+        setAuthToken(newAccessToken);
+        return newAccessToken;
+      }
+      throw new Error('No access token in refresh response');
+    } catch (err) {
+      clearAuthToken();
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('auth:session-expired'));
+      }
+      throw err;
+    } finally {
+      isRefreshing = false;
+      refreshPromise = null;
+    }
+  })();
+
+  return refreshPromise;
+};
+
 /**
- * Generic request wrapper using native fetch
+ * Generic request wrapper using native fetch with silent token refresh interceptor
  */
 export const request = async (endpoint, options = {}) => {
   const token = getAuthToken();
@@ -75,6 +126,7 @@ export const request = async (endpoint, options = {}) => {
   const config = {
     ...options,
     headers,
+    credentials: 'include', // Ensure HttpOnly cookies are passed with cross-origin & credentials requests
   };
 
   if (config.body && typeof config.body === 'object' && !isFormData) {
@@ -86,6 +138,37 @@ export const request = async (endpoint, options = {}) => {
     response = await fetch(url, config);
   } catch (err) {
     throw new ApiError('Unable to connect to backend service. Please ensure the server is running.', 0, 'NETWORK_ERROR');
+  }
+
+  // Intercept 401 Unauthorized for Access Token Expiration & Silent Refresh
+  if (response.status === 401) {
+    const isAuthEndpoint =
+      cleanEndpoint.includes('/auth/login') ||
+      cleanEndpoint.includes('/auth/refresh') ||
+      cleanEndpoint.includes('/auth/register') ||
+      cleanEndpoint.includes('/auth/google') ||
+      cleanEndpoint.includes('/auth/verify-email') ||
+      cleanEndpoint.includes('/auth/resend-verification') ||
+      cleanEndpoint.includes('/auth/student/verify-otp');
+
+    if (!isAuthEndpoint && !options._isRetry) {
+      try {
+        const newAccessToken = await refreshAccessToken();
+        // Retry the original request once with the new access token
+        return await request(endpoint, {
+          ...options,
+          _isRetry: true,
+          headers: {
+            ...options.headers,
+            Authorization: `Bearer ${newAccessToken}`,
+          },
+        });
+      } catch (refreshErr) {
+        // Refresh failed (e.g. 10-day session expired or session revoked)
+        let message = 'Your session has expired. Please log in again.';
+        throw new ApiError(message, 401, 'SESSION_EXPIRED');
+      }
+    }
   }
 
   let data = null;
@@ -102,18 +185,17 @@ export const request = async (endpoint, options = {}) => {
     let defaultMessage = `HTTP error ${response.status}`;
     if (response.status === 401) {
       const isAuthEndpoint =
-        endpoint.includes('/auth/login') ||
-        endpoint.includes('/auth/register') ||
-        endpoint.includes('/auth/google') ||
-        endpoint.includes('/auth/verify-email') ||
-        endpoint.includes('/auth/resend-verification');
+        cleanEndpoint.includes('/auth/login') ||
+        cleanEndpoint.includes('/auth/register') ||
+        cleanEndpoint.includes('/auth/google') ||
+        cleanEndpoint.includes('/auth/verify-email') ||
+        cleanEndpoint.includes('/auth/resend-verification');
 
       defaultMessage = isAuthEndpoint
         ? 'Invalid email or password.'
         : 'Session expired or unauthorized. Please log in again.';
 
       if (!isAuthEndpoint) {
-        // Clear dead JWT so future requests do not resend it, and notify app.
         clearAuthToken();
         if (typeof window !== 'undefined') {
           window.dispatchEvent(new CustomEvent('auth:session-expired'));
@@ -137,9 +219,6 @@ export const request = async (endpoint, options = {}) => {
   // Handle standard ApiResponse wrapper: { success: true, message: '...', data: T }
   if (data && typeof data === 'object' && 'success' in data) {
     if (data.data !== undefined) {
-      // When the payload is a list, always pass through the full enriched
-      // envelope (summary, pagination, etc.) so callers get metadata even
-      // if only one of those keys is present in a given response.
       if (Array.isArray(data.data)) {
         return {
           notifications: data.data,

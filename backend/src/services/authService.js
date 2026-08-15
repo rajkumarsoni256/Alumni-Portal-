@@ -5,15 +5,17 @@ const db = require('../config/db');
 const googleAuthService = require('./googleAuthService');
 const emailService = require('../email/emailService');
 
+const sessionService = require('./sessionService');
+
 const JWT_SECRET = process.env.JWT_SECRET || '404E635266556A586E3272357538782F413F4428472B4B6250655368566D5970';
-const JWT_EXPIRATION = process.env.JWT_EXPIRATION || '1h';
+const ACCESS_TOKEN_TTL = process.env.ACCESS_TOKEN_TTL || '15m';
 
 const normalizeEmail = (email) => {
   return email ? email.trim().toLowerCase() : '';
 };
 
 const generateToken = (userId, role) => {
-  return jwt.sign({ sub: userId, role }, JWT_SECRET, { expiresIn: JWT_EXPIRATION });
+  return jwt.sign({ sub: userId, role }, JWT_SECRET, { expiresIn: ACCESS_TOKEN_TTL });
 };
 
 const parseUserAgent = (uaString = '') => {
@@ -255,6 +257,12 @@ const verifyStudentRegistrationOTP = async ({
     ]
   );
 
+  const sessionData = await sessionService.createSession({
+    userId: user.id,
+    ipAddress: req?.ip || req?.headers?.['x-forwarded-for'] || null,
+    userAgent: req?.headers ? req.headers['user-agent'] : null,
+  });
+
   const token = generateToken(user.id, user.role);
 
   return {
@@ -272,6 +280,8 @@ const verifyStudentRegistrationOTP = async ({
       graduationYear: years.graduationYear,
     },
     token,
+    accessToken: token,
+    refreshToken: sessionData.rawRefreshToken,
   };
 };
 
@@ -579,6 +589,12 @@ const login = async ({ email, password, req }) => {
   // Device detection and new device alert
   await detectDeviceAndSendAlert(user, req, 'PASSWORD');
 
+  const sessionData = await sessionService.createSession({
+    userId: user.id,
+    ipAddress: req?.ip || req?.headers?.['x-forwarded-for'] || null,
+    userAgent: req?.headers ? req.headers['user-agent'] : null,
+  });
+
   const token = generateToken(user.id, user.role);
 
   return {
@@ -591,6 +607,8 @@ const login = async ({ email, password, req }) => {
       profileComplete: !!user.is_profile_complete,
     },
     token,
+    accessToken: token,
+    refreshToken: sessionData.rawRefreshToken,
   };
 };
 
@@ -688,6 +706,12 @@ const authenticateWithGoogle = async ({ idToken, req }) => {
   // Device detection and new device alert
   await detectDeviceAndSendAlert(user, req, 'GOOGLE_OAUTH');
 
+  const sessionData = await sessionService.createSession({
+    userId: user.id,
+    ipAddress: req?.ip || req?.headers?.['x-forwarded-for'] || null,
+    userAgent: req?.headers ? req.headers['user-agent'] : null,
+  });
+
   const token = generateToken(user.id, user.role);
 
   return {
@@ -699,6 +723,8 @@ const authenticateWithGoogle = async ({ idToken, req }) => {
       profileComplete: !!user.is_profile_complete,
     },
     token,
+    accessToken: token,
+    refreshToken: sessionData.rawRefreshToken,
   };
 };
 
@@ -802,6 +828,9 @@ const resetPassword = async ({ token, code, email, newPassword }) => {
 
   const passwordHash = await bcrypt.hash(newPassword, 10);
   await db.query('UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2', [passwordHash, targetUserId]);
+
+  // Security Hardening: Revoke all active sessions on password change
+  await sessionService.revokeAllUserSessions(targetUserId, 'PASSWORD_CHANGED').catch(() => {});
 
   // Trigger Security Alert Email: Password Changed
   if (targetUserEmail) {

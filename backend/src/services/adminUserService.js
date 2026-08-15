@@ -445,6 +445,12 @@ const updateUserStatus = async (adminUserId, targetUserId, accountStatus) => {
     });
 
     await client.query('COMMIT');
+
+    if (normStatus === 'DISABLED') {
+      const sessionService = require('./sessionService');
+      await sessionService.revokeAllUserSessions(targetUserId, 'ACCOUNT_DEACTIVATED').catch(() => {});
+    }
+
     return updateRes.rows[0];
   } catch (err) {
     await client.query('ROLLBACK');

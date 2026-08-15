@@ -59,6 +59,27 @@ const migrate = async () => {
       );
     `);
 
+    // 4b. auth_sessions table (Server-side Session Security Hardening)
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS auth_sessions (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          refresh_token_hash TEXT NOT NULL,
+          prev_refresh_token_hash TEXT,
+          created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+          last_used_at TIMESTAMP WITH TIME ZONE,
+          revoked_at TIMESTAMP WITH TIME ZONE,
+          rotated_at TIMESTAMP WITH TIME ZONE,
+          ip_address TEXT,
+          user_agent TEXT
+      );
+      ALTER TABLE auth_sessions ADD COLUMN IF NOT EXISTS prev_refresh_token_hash TEXT;
+      CREATE INDEX IF NOT EXISTS idx_auth_sessions_user_active ON auth_sessions (user_id, revoked_at, expires_at);
+      CREATE INDEX IF NOT EXISTS idx_auth_sessions_token_hash ON auth_sessions (refresh_token_hash);
+      CREATE INDEX IF NOT EXISTS idx_auth_sessions_prev_token_hash ON auth_sessions (prev_refresh_token_hash);
+    `);
+
     // 5. user_profiles table
     await db.query(`
       CREATE TABLE IF NOT EXISTS user_profiles (

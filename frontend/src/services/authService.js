@@ -105,8 +105,27 @@ export const authService = {
   /**
    * Logout user and clear local session state
    */
-  logout: () => {
-    clearAuthToken();
+  logout: async () => {
+    try {
+      await apiClient.post('/api/v1/auth/logout');
+    } catch (err) {
+      console.warn('Backend logout notification warning:', err.message);
+    } finally {
+      clearAuthToken();
+    }
+  },
+
+  /**
+   * Logout user from all active devices & revoke all server sessions
+   */
+  logoutAll: async () => {
+    try {
+      await apiClient.post('/api/v1/auth/logout-all');
+    } catch (err) {
+      console.warn('Logout all devices warning:', err.message);
+    } finally {
+      clearAuthToken();
+    }
   },
 
   getToken: getAuthToken,

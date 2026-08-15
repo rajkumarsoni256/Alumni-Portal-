@@ -13,6 +13,7 @@ import { notificationService } from '../services/notificationService';
 import { eventService } from '../services/eventService';
 import { mentorshipService } from '../services/mentorshipService';
 import { settingsService } from '../services/settingsService';
+import SessionExpiredModal from '../components/auth/SessionExpiredModal';
 
 const AppContext = createContext();
 
@@ -361,18 +362,33 @@ export const AppProvider = ({ children }) => {
     initializeAuthSession();
   }, []);
 
+  const [isSessionExpiredModalOpen, setIsSessionExpiredModalOpen] = useState(false);
+  const [intendedReturnPath, setIntendedReturnPath] = useState(null);
+
   // Global session-expiry listener.
   // apiClient dispatches 'auth:session-expired' whenever a 401 is received.
-  // We clear auth state here so that AdminRoute's isAuthenticated guard
-  // triggers and redirects the user to /login without a hard page reload.
+  // Displays SessionExpiredModal and preserves current internal return path.
   useEffect(() => {
     const handleSessionExpired = () => {
+      if (typeof window !== 'undefined') {
+        const currentPath = window.location.pathname;
+        const isInternalPath =
+          currentPath.startsWith('/') &&
+          !currentPath.startsWith('//') &&
+          !currentPath.toLowerCase().includes('http');
+
+        if (isInternalPath && currentPath !== '/login' && currentPath !== '/register') {
+          setIntendedReturnPath(currentPath);
+        }
+      }
+
       authService.clearToken();
       setIsAuthenticated(false);
       setIsLoading(false);
       setAuthUser(null);
       setActiveRole('student');
       setAuthStatus('UNAUTHENTICATED');
+      setIsSessionExpiredModalOpen(true);
     };
 
     window.addEventListener('auth:session-expired', handleSessionExpired);
@@ -605,6 +621,15 @@ export const AppProvider = ({ children }) => {
     setAlumniList([]);
     setSuggestedPeople([]);
     showNotification('Logged out successfully');
+  };
+
+  const logoutAllUserSessions = async () => {
+    try {
+      await authService.logoutAll();
+    } catch (err) {
+      // Silent fallback if backend endpoint already invalidated session
+    }
+    logoutUser();
   };
 
   const toggleSaveAlumni = (alumniId) => {
@@ -943,6 +968,8 @@ export const AppProvider = ({ children }) => {
         resetUserPassword,
         completeUserOnboarding,
         logoutUser,
+        logout: logoutUser,
+        logoutAll: logoutAllUserSessions,
         pendingRegistration,
         student,
         alumniList,
@@ -989,7 +1016,9 @@ export const AppProvider = ({ children }) => {
         acceptConnectionRequest,
         ignoreConnectionRequest,
         markNotificationRead,
+        markNotificationAsRead: markNotificationRead,
         markAllNotificationsRead,
+        markAllNotificationsAsRead: markAllNotificationsRead,
         toggleEventRegistration,
         updateUserProfile,
         updateAdminProfileState,
@@ -1003,6 +1032,11 @@ export const AppProvider = ({ children }) => {
       }}
     >
       {children}
+      <SessionExpiredModal
+        isOpen={isSessionExpiredModalOpen}
+        onClose={() => setIsSessionExpiredModalOpen(false)}
+        intendedReturnPath={intendedReturnPath}
+      />
     </AppContext.Provider>
   );
 };

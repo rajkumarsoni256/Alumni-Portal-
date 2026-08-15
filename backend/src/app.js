@@ -20,8 +20,26 @@ const settingsRoutes = require('./routes/settingsRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const errorHandler = require('./middleware/errorHandler');
 
+const cookieParser = require('cookie-parser');
+const helmet = require('helmet');
+
 const app = express();
 const PORT = process.env.PORT || 8080;
+
+app.use(helmet({
+  contentSecurityPolicy: false, // Disable default CSP header to prevent frontend asset blocking in dev/prod
+  crossOriginResourcePolicy: { policy: 'cross-origin' }, // Allow frontend cross-origin image/upload loading
+}));
+
+app.use(cookieParser());
+
+// Cache-Control security headers for authenticated API routes
+app.use('/api/v1', (req, res, next) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  next();
+});
 
 // Centralized CORS configuration
 const allowedOrigins = [

@@ -15,12 +15,29 @@ import {
 
 export const AdminHeader = ({ onSearch }) => {
   const navigate = useNavigate();
-  const { currentUser, logout, notifications, unreadNotifsCount } = useApp();
+  const { 
+    currentUser, 
+    logout, 
+    logoutUser, 
+    notifications, 
+    unreadNotifsCount, 
+    markNotificationRead, 
+    markAllNotificationsRead 
+  } = useApp();
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
   const [showNotifDropdown, setShowNotifDropdown] = useState(false);
   const [globalQuery, setGlobalQuery] = useState('');
   const dropdownRef = useRef(null);
   const notifRef = useRef(null);
+
+  const handleSignOut = () => {
+    setShowProfileDropdown(false);
+    const logoutFn = logout || logoutUser;
+    if (logoutFn) {
+      logoutFn();
+    }
+    navigate('/login', { replace: true });
+  };
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -111,12 +128,27 @@ export const AdminHeader = ({ onSearch }) => {
             <div className="absolute right-0 mt-2 w-80 bg-white rounded-md border border-slate-200 shadow-lg py-2 z-50 text-xs">
               <div className="px-3 py-2 border-b border-slate-100 flex items-center justify-between">
                 <span className="font-bold text-slate-900">Admin Notifications</span>
-                <span className="text-[10px] text-slate-500 font-semibold">{unreadCount} unread</span>
+                <div className="flex items-center gap-2">
+                  {unreadCount > 0 && markAllNotificationsRead && (
+                    <button
+                      type="button"
+                      onClick={() => markAllNotificationsRead()}
+                      className="text-[10px] text-red-700 hover:text-red-800 font-bold cursor-pointer"
+                    >
+                      Mark all read
+                    </button>
+                  )}
+                  <span className="text-[10px] text-slate-500 font-semibold">{unreadCount} unread</span>
+                </div>
               </div>
               <div className="max-h-64 overflow-y-auto divide-y divide-slate-50">
                 {notifications && notifications.length > 0 ? (
                   notifications.slice(0, 5).map((n) => (
-                    <div key={n.id} className="p-3 hover:bg-slate-50 transition-colors">
+                    <div 
+                      key={n.id} 
+                      onClick={() => markNotificationRead && markNotificationRead(n.id)}
+                      className={`p-3 hover:bg-slate-50 transition-colors cursor-pointer ${n.unread || n.isRead === false ? 'bg-red-50/40 font-medium' : ''}`}
+                    >
                       <p className="font-semibold text-slate-800 text-[11px]">{n.title || n.message}</p>
                       <span className="text-[10px] text-slate-400">{n.createdAt ? new Date(n.createdAt).toLocaleDateString() : 'Just now'}</span>
                     </div>
@@ -187,10 +219,7 @@ export const AdminHeader = ({ onSearch }) => {
               <div className="border-t border-slate-100 my-1" />
               <button
                 type="button"
-                onClick={() => {
-                  setShowProfileDropdown(false);
-                  logout && logout();
-                }}
+                onClick={handleSignOut}
                 className="w-full flex items-center gap-2 px-3 py-2 text-red-700 hover:bg-red-50 transition-colors cursor-pointer text-left font-semibold"
               >
                 <LogOut className="w-4 h-4 text-red-700" />
