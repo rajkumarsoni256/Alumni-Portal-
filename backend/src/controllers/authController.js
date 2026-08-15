@@ -10,6 +10,24 @@ const register = async (req, res, next) => {
   }
 };
 
+const initiateStudentRegistration = async (req, res, next) => {
+  try {
+    const result = await authService.initiateStudentRegistration(req.body || {});
+    return successResponse(res, result, 'Verification OTP sent to your JECRC institutional email address.', 200);
+  } catch (err) {
+    next(err);
+  }
+};
+
+const verifyStudentRegistrationOTP = async (req, res, next) => {
+  try {
+    const result = await authService.verifyStudentRegistrationOTP(req.body || {});
+    return successResponse(res, result, 'Student account verified and created successfully.', 201);
+  } catch (err) {
+    next(err);
+  }
+};
+
 const verifyEmail = async (req, res, next) => {
   try {
     const { email, code } = req.body;
@@ -81,6 +99,8 @@ const getCurrentUser = async (req, res, next) => {
 
 module.exports = {
   register,
+  initiateStudentRegistration,
+  verifyStudentRegistrationOTP,
   verifyEmail,
   resendVerificationCode,
   login,

@@ -44,6 +44,7 @@ import { AdminUserDetailsPage } from './pages/admin/AdminUserDetailsPage';
 import { AdminDataManagementPage } from './pages/admin/AdminDataManagementPage';
 import { AdminSettingsPage } from './pages/admin/AdminSettingsPage';
 import { AdminCommunicationsPage } from './pages/admin/AdminCommunicationsPage';
+import { AdminNotificationsPage } from './pages/admin/AdminNotificationsPage';
 import { AdminContentManagementPage } from './pages/admin/AdminContentManagementPage';
 import { AdminProfilePage } from './pages/admin/AdminProfilePage';
 import { AdminVerificationPage } from './pages/admin/AdminVerificationPage';
@@ -375,7 +376,7 @@ export function App() {
             path="/admin/notifications"
             element={
               <AdminRoute>
-                <AdminCommunicationsPage />
+                <AdminNotificationsPage />
               </AdminRoute>
             }
           />

@@ -8,7 +8,8 @@ import {
   ShieldCheck, 
   Users, 
   GraduationCap, 
-  AlertCircle 
+  AlertCircle,
+  Info 
 } from 'lucide-react';
 import { GoogleAuthButton } from '../../components/auth/GoogleAuthButton';
 
@@ -98,25 +99,34 @@ export const LoginPage = () => {
   };
 
   const handleFillDemo = (role) => {
-    const creds = TEST_ACCOUNTS[role] || TEST_ACCOUNTS.student;
-    setEmail(creds.email);
-    setPassword(creds.password);
+    if (role === 'admin') {
+      setEmail('admin@jecrc.ac.in');
+      setPassword('AdminPassword@123');
+    } else if (role === 'alumni') {
+      setEmail('priya.sharma@alumni.jecrc.ac.in');
+      setPassword('Password123!');
+    } else {
+      setEmail('rahul.verma@student.jecrc.ac.in');
+      setPassword('Password123!');
+    }
     setErrors({});
     setErrorMessage('');
   };
 
   return (
-    <div className="min-h-screen bg-slate-100/75 flex items-center justify-center p-4 sm:p-6">
-      <div className="max-w-4xl w-full bg-white rounded-xl border border-slate-200 shadow-2xs overflow-hidden grid grid-cols-1 md:grid-cols-12">
+    <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center p-4 sm:p-6 lg:p-8 bg-slate-100/75">
+      <div className="w-full max-w-4xl bg-white rounded-2xl border border-slate-200/80 shadow-xl overflow-hidden grid grid-cols-1 md:grid-cols-12 animate-in fade-in duration-200">
         
-        {/* Left: Brand Identity Banner (5 Cols) */}
-        <div className="hidden md:flex md:col-span-5 bg-slate-900 text-white p-8 flex-col justify-between relative overflow-hidden">
-          <div className="space-y-6 relative z-10">
+        {/* Left: Branding & Feature Panel (5 Cols) */}
+        <div className="hidden md:flex col-span-5 bg-slate-900 text-white p-8 flex-col justify-between relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-br from-red-950/40 via-slate-900 to-slate-950 pointer-events-none" />
+          
+          <div className="relative z-10 space-y-6">
             <Link to="/" className="flex items-center gap-2.5">
               <img
                 src="/ju-alumni-logo.jpg"
-                alt="JECRC Alumni Association"
-                className="h-9 w-9 object-contain rounded-md bg-white p-0.5"
+                alt="JECRC Community"
+                className="h-9 w-9 object-contain rounded-lg border border-slate-800 bg-white p-0.5"
               />
               <div>
                 <span className="text-base font-bold text-white tracking-tight">
@@ -159,7 +169,7 @@ export const LoginPage = () => {
             </div>
           </div>
 
-          <div className="pt-6 border-t border-slate-800 text-[11px] text-slate-500">
+          <div className="relative z-10 pt-6 border-t border-slate-800 text-[11px] text-slate-500">
             JECRC University • Jaipur, Rajasthan
           </div>
         </div>
@@ -184,6 +194,14 @@ export const LoginPage = () => {
               </h1>
               <p className="text-xs text-slate-500">
                 Sign in to your JECRC Community account.
+              </p>
+            </div>
+
+            {/* Personal Email Login Notice Banner */}
+            <div className="p-3 bg-blue-50/80 rounded-lg border border-blue-200/80 text-[11px] text-blue-900 flex items-start gap-2">
+              <Info className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+              <p className="leading-snug">
+                <span className="font-bold">Note:</span> Use the personal email you provided during registration to log in. Your JECRC institutional email is used only for student verification.
               </p>
             </div>
 

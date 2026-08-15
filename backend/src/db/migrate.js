@@ -117,6 +117,33 @@ const migrate = async () => {
       console.warn('[MIGRATION] idx_user_profiles_roll_number index warning:', e.message);
     }
 
+    // Phase 14: Student Institutional Email & Verification Migrations
+    try {
+      await db.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS institutional_email VARCHAR(255);`);
+      await db.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS institutional_email_verified BOOLEAN NOT NULL DEFAULT FALSE;`);
+      await db.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verification_status VARCHAR(32) NOT NULL DEFAULT 'UNVERIFIED';`);
+      await db.query(`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS phone VARCHAR(20);`);
+    } catch (e) {
+      console.warn('[MIGRATION] Phase 14 user/profile columns add warning:', e.message);
+    }
+
+    try {
+      await db.query(`
+        DO $$
+        BEGIN
+          IF NOT EXISTS (
+            SELECT 1 FROM pg_constraint WHERE conname = 'chk_user_profiles_academic_years'
+          ) THEN
+            ALTER TABLE user_profiles
+            ADD CONSTRAINT chk_user_profiles_academic_years
+            CHECK (graduation_year IS NULL OR joining_year IS NULL OR graduation_year > joining_year);
+          END IF;
+        END $$;
+      `);
+    } catch (e) {
+      console.warn('[MIGRATION] chk_user_profiles_academic_years constraint warning:', e.message);
+    }
+
     // 6. audit_logs table (Admin Audit Logs)
     await db.query(`
       CREATE TABLE IF NOT EXISTS audit_logs (
@@ -827,3 +854,12 @@ const migrate = async () => {
 };
 
 module.exports = migrate;
+
+if (require.main === module) {
+  migrate()
+    .then(() => process.exit(0))
+    .catch((err) => {
+      console.error(err);
+      process.exit(1);
+    });
+}

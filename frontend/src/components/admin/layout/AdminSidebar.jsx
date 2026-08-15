@@ -56,8 +56,8 @@ export const AdminSidebar = ({ className = '' }) => {
     {
       group: 'COMMUNICATIONS',
       items: [
-        { name: 'System Announcements', path: '/admin/communications', icon: Megaphone },
-        { name: 'Notifications', path: '/admin/communications?tab=notifications', icon: Bell },
+        { name: 'System Announcements', path: '/admin/communications', icon: Megaphone, exact: true },
+        { name: 'Notifications', path: '/admin/notifications', icon: Bell, exact: true },
       ]
     },
     {
