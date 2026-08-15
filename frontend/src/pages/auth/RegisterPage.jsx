@@ -157,7 +157,14 @@ export const RegisterPage = () => {
     }
 
     setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    const hasErrors = Object.keys(newErrors).length > 0;
+    if (hasErrors) {
+      const firstError = Object.values(newErrors)[0];
+      setErrorMessage(firstError);
+    } else {
+      setErrorMessage('');
+    }
+    return !hasErrors;
   };
 
   const handleStudentInit = async (e) => {
@@ -709,6 +716,7 @@ export const RegisterPage = () => {
                     placeholder="e.g. Priya Sharma"
                     className="w-full bg-slate-50 border border-slate-300 rounded-md px-3 py-2 text-xs text-slate-900 focus:outline-none"
                   />
+                  {errors.name && <p className="text-[11px] text-rose-600 font-medium">{errors.name}</p>}
                 </div>
 
                 {/* Personal Email & Phone */}
@@ -722,6 +730,7 @@ export const RegisterPage = () => {
                       placeholder="alumni@gmail.com"
                       className="w-full bg-slate-50 border border-slate-300 rounded-md px-3 py-2 text-xs text-slate-900 focus:outline-none"
                     />
+                    {errors.personalEmail && <p className="text-[11px] text-rose-600 font-medium">{errors.personalEmail}</p>}
                   </div>
 
                   <div className="space-y-1">
@@ -733,6 +742,7 @@ export const RegisterPage = () => {
                       placeholder="10-digit mobile number"
                       className="w-full bg-slate-50 border border-slate-300 rounded-md px-3 py-2 text-xs text-slate-900 focus:outline-none"
                     />
+                    {errors.mobileNumber && <p className="text-[11px] text-rose-600 font-medium">{errors.mobileNumber}</p>}
                   </div>
                 </div>
 
@@ -747,6 +757,7 @@ export const RegisterPage = () => {
                       placeholder="2020"
                       className="w-full bg-slate-50 border border-slate-300 rounded-md px-3 py-2 text-xs text-slate-900 focus:outline-none"
                     />
+                    {errors.graduationYear && <p className="text-[11px] text-rose-600 font-medium">{errors.graduationYear}</p>}
                   </div>
 
                   <div className="space-y-1">
@@ -772,6 +783,7 @@ export const RegisterPage = () => {
                       placeholder="At least 8 chars"
                       className="w-full bg-slate-50 border border-slate-300 rounded-md px-3 py-2 text-xs text-slate-900 focus:outline-none"
                     />
+                    {errors.password && <p className="text-[11px] text-rose-600 font-medium">{errors.password}</p>}
                   </div>
 
                   <div className="space-y-1">
@@ -783,6 +795,7 @@ export const RegisterPage = () => {
                       placeholder="Repeat password"
                       className="w-full bg-slate-50 border border-slate-300 rounded-md px-3 py-2 text-xs text-slate-900 focus:outline-none"
                     />
+                    {errors.confirmPassword && <p className="text-[11px] text-rose-600 font-medium">{errors.confirmPassword}</p>}
                   </div>
                 </div>
 
