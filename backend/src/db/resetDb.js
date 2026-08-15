@@ -4,7 +4,7 @@ const migrate = require('./migrate');
 async function resetDatabase() {
   console.log('[DB RESET] Starting database cleanup...');
   try {
-    const adminEmail = process.env.ADMIN_EMAIL || 'admin@jecrc.ac.in';
+    const adminEmail = (process.env.ADMIN_EMAIL || 'admin@jecrc.ac.in').trim().toLowerCase();
 
     // Delete non-admin users and dependent records
     await db.query(`DELETE FROM auth_sessions WHERE user_id IN (SELECT id FROM users WHERE email != $1)`, [adminEmail]);
@@ -14,6 +14,12 @@ async function resetDatabase() {
     await db.query(`DELETE FROM email_deliveries WHERE recipient_email != $1`, [adminEmail]);
     await db.query(`DELETE FROM notifications WHERE user_id IN (SELECT id FROM users WHERE email != $1)`, [adminEmail]);
     await db.query(`DELETE FROM audit_logs WHERE user_id IN (SELECT id FROM users WHERE email != $1)`, [adminEmail]);
+    await db.query(`DELETE FROM connections WHERE requester_id IN (SELECT id FROM users WHERE email != $1) OR receiver_id IN (SELECT id FROM users WHERE email != $1)`, [adminEmail]);
+    await db.query(`DELETE FROM post_likes WHERE user_id IN (SELECT id FROM users WHERE email != $1)`, [adminEmail]);
+    await db.query(`DELETE FROM comment_likes WHERE user_id IN (SELECT id FROM users WHERE email != $1)`, [adminEmail]);
+    await db.query(`DELETE FROM comments WHERE author_id IN (SELECT id FROM users WHERE email != $1)`, [adminEmail]);
+    await db.query(`DELETE FROM posts WHERE author_id IN (SELECT id FROM users WHERE email != $1)`, [adminEmail]);
+    await db.query(`DELETE FROM events WHERE created_by IN (SELECT id FROM users WHERE email != $1)`, [adminEmail]);
     await db.query(`DELETE FROM users WHERE email != $1`, [adminEmail]);
 
     console.log('[DB RESET] Non-admin test data cleared successfully.');

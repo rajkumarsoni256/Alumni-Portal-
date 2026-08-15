@@ -187,13 +187,41 @@ const calculateCompleteness = (role, data) => {
 };
 
 const completeOnboarding = async (user, data) => {
-  validateRoleOnboarding(user.role, data);
+  // Fetch existing user profile to merge fields already saved during signup (fullName, phone, company, etc.)
+  const existingProfileRes = await db.query('SELECT * FROM user_profiles WHERE user_id = $1', [user.id]);
+  const current = existingProfileRes.rows[0] || {};
 
-  const skillsStr = formatSkillsInterests(data.skills);
-  const interestsStr = formatSkillsInterests(data.interests);
-  const isComplete = calculateCompleteness(user.role, data);
-  const profileId = crypto.randomUUID();
-  const currentAcademicYear = data.currentAcademicYear || data.currentYear;
+  const currentAcademicYear = data.currentAcademicYear !== undefined 
+    ? data.currentAcademicYear 
+    : (data.currentYear !== undefined ? data.currentYear : current.current_year);
+
+  const mergedData = {
+    fullName: isNotBlank(data.fullName) ? data.fullName : (current.full_name || user.fullName || user.email.split('@')[0]),
+    phone: isNotBlank(data.phone) ? data.phone : (current.phone || '9876543210'),
+    avatarUrl: isNotBlank(data.avatarUrl) ? data.avatarUrl : current.avatar_url,
+    bio: data.bio !== undefined ? data.bio : current.bio,
+    degree: isNotBlank(data.degree) ? data.degree : (current.degree || 'B.Tech'),
+    branch: isNotBlank(data.branch) ? data.branch : (current.branch || 'Computer Science & Engineering'),
+    graduationYear: data.graduationYear || current.graduation_year,
+    currentAcademicYear: currentAcademicYear,
+    currentYear: currentAcademicYear,
+    company: isNotBlank(data.company) ? data.company : current.company,
+    designation: isNotBlank(data.designation) ? data.designation : current.designation,
+    location: isNotBlank(data.location) ? data.location : current.location,
+    isAvailableForMentorship: data.isAvailableForMentorship !== undefined ? data.isAvailableForMentorship : (current.is_available_for_mentorship !== false),
+    linkedinUrl: isNotBlank(data.linkedinUrl) ? data.linkedinUrl : current.linkedin_url,
+    githubUrl: data.githubUrl !== undefined ? data.githubUrl : current.github_url,
+    websiteUrl: data.websiteUrl !== undefined ? data.websiteUrl : current.website_url,
+    skills: data.skills || current.skills,
+    interests: data.interests || current.interests,
+  };
+
+  validateRoleOnboarding(user.role, mergedData);
+
+  const skillsStr = formatSkillsInterests(mergedData.skills);
+  const interestsStr = formatSkillsInterests(mergedData.interests);
+  const isComplete = calculateCompleteness(user.role, mergedData);
+  const profileId = current.id || crypto.randomUUID();
 
   const queryText = `
     INSERT INTO user_profiles (
@@ -229,21 +257,21 @@ const completeOnboarding = async (user, data) => {
   const values = [
     profileId,
     user.id,
-    data.fullName.trim(),
-    data.phone ? data.phone.trim() : null,
-    data.avatarUrl ? data.avatarUrl.trim() : null,
-    data.bio ? data.bio.trim() : null,
-    data.degree ? data.degree.trim() : null,
-    data.branch ? data.branch.trim() : null,
-    data.graduationYear ? parseInt(data.graduationYear, 10) : null,
+    mergedData.fullName ? mergedData.fullName.trim() : '',
+    mergedData.phone ? mergedData.phone.trim() : null,
+    mergedData.avatarUrl ? mergedData.avatarUrl.trim() : null,
+    mergedData.bio ? mergedData.bio.trim() : null,
+    mergedData.degree ? mergedData.degree.trim() : null,
+    mergedData.branch ? mergedData.branch.trim() : null,
+    mergedData.graduationYear ? parseInt(mergedData.graduationYear, 10) : null,
     currentAcademicYear ? parseInt(currentAcademicYear, 10) : null,
-    data.company ? data.company.trim() : null,
-    data.designation ? data.designation.trim() : null,
-    data.location ? data.location.trim() : null,
-    data.isAvailableForMentorship !== false,
-    data.linkedinUrl ? data.linkedinUrl.trim() : null,
-    data.githubUrl ? data.githubUrl.trim() : null,
-    data.websiteUrl ? data.websiteUrl.trim() : null,
+    mergedData.company ? mergedData.company.trim() : null,
+    mergedData.designation ? mergedData.designation.trim() : null,
+    mergedData.location ? mergedData.location.trim() : null,
+    mergedData.isAvailableForMentorship !== false,
+    mergedData.linkedinUrl ? mergedData.linkedinUrl.trim() : null,
+    mergedData.githubUrl ? mergedData.githubUrl.trim() : null,
+    mergedData.websiteUrl ? mergedData.websiteUrl.trim() : null,
     skillsStr,
     interestsStr,
     isComplete,

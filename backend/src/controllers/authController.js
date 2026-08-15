@@ -30,7 +30,11 @@ const clearRefreshCookie = (res) => {
 const register = async (req, res, next) => {
   try {
     const userResponse = await authService.register(req.body || {});
-    return successResponse(res, userResponse, 'Registration successful. Please check your email for the verification code.', 201);
+    const isAlumni = userResponse.role === 'ALUMNI';
+    const msg = isAlumni
+      ? 'Your registration request has been sent to the JU Connect team for approval.'
+      : 'Registration successful. Please check your email for the verification code.';
+    return successResponse(res, userResponse, msg, 201);
   } catch (err) {
     next(err);
   }
@@ -96,15 +100,12 @@ const login = async (req, res, next) => {
 
 const googleLogin = async (req, res, next) => {
   try {
-    const { idToken } = req.body;
-    const authResponse = await authService.authenticateWithGoogle({ idToken, req });
-
-    if (authResponse.refreshToken) {
-      setRefreshCookie(res, authResponse.refreshToken);
-      delete authResponse.refreshToken;
+    const { idToken, role } = req.body || {};
+    const result = await authService.loginWithGoogle({ idToken, requestedRole: role, req });
+    if (result.refreshToken) {
+      setRefreshCookie(res, result.refreshToken);
     }
-
-    return successResponse(res, authResponse, 'Google authentication successful');
+    return successResponse(res, result, 'Authenticated successfully with Google.', 200);
   } catch (err) {
     next(err);
   }

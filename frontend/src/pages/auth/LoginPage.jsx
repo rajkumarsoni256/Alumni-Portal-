@@ -97,8 +97,8 @@ export const LoginPage = () => {
     } catch (err) {
       if (err.errorCode === 'EMAIL_NOT_VERIFIED') {
         setErrorMessage('Your email address is not verified yet. Please check your inbox or complete verification.');
-      } else if (err.errorCode === 'ALUMNI_APPROVAL_PENDING') {
-        setErrorMessage('Your alumni account is awaiting approval from JECRC administration. You will receive an email and notification once your account has been reviewed.');
+      } else if (err.errorCode === 'ACCOUNT_PENDING_APPROVAL' || err.errorCode === 'ALUMNI_APPROVAL_PENDING') {
+        setErrorMessage(err.message || 'Your account is currently under review and pending approval by the Admin.');
       } else if (err.errorCode === 'ALUMNI_APPROVAL_REJECTED') {
         setErrorMessage('Your alumni registration request was not approved by university administration.');
       } else {

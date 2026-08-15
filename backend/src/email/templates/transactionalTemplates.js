@@ -198,11 +198,31 @@ const getMentorshipEventTemplate = ({ recipientName, actorName, eventType, targe
   return { subject: isRequest ? `New Mentorship Request from ${actorName}` : `Mentorship Request Accepted by ${actorName}`, html, text };
 };
 
+// 12. Alumni Registration Request Received (Applicant Receipt)
+const getAlumniRegistrationReceivedTemplate = ({ name }) => {
+  const title = `Alumni Registration Request Received`;
+  const html = `
+    ${emailHeader(title)}
+    <p>Hi ${name || 'Graduate'},</p>
+    <p>Thank you for registering with JU Connect Alumni Network!</p>
+    <p>Your registration request has been successfully received and sent to the JU Connect team for administrative approval. Our alumni relations team will verify your details and approve your account shortly.</p>
+    <div class="info-box">
+      <p style="margin:4px 0;"><strong>Status:</strong> Pending Admin Verification</p>
+      <p style="margin:4px 0;"><strong>Note:</strong> You will receive an email notification once your account has been approved by the Admin.</p>
+    </div>
+    <p>Thank you for your patience!</p>
+    ${emailFooter()}
+  `;
+  const text = `Hi ${name || 'Graduate'},\n\nThank you for registering with JU Connect!\n\nYour registration request has been sent to the JU Connect team for approval. You will receive an email notification once your account has been approved.`;
+  return { subject: `JU Connect Alumni Registration Request Received`, html, text };
+};
+
 module.exports = {
   getWelcomeAccountTemplate,
   getAlumniVerificationRequestTemplate,
   getAlumniApprovedTemplate,
   getAlumniRejectedTemplate,
+  getAlumniRegistrationReceivedTemplate,
   getConnectionEventTemplate,
   getNewMessageTemplate,
   getJobApplicationTemplate,

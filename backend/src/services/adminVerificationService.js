@@ -251,7 +251,7 @@ const updateVerificationStatus = async (id, { status, rejectionReason, reviewerI
     // 4. Update related user profile role & account_status
     if (normStatus === 'APPROVED') {
       await client.query(
-        `UPDATE users SET role = 'ALUMNI', account_status = 'ACTIVE', updated_at = CURRENT_TIMESTAMP WHERE id = $1;`,
+        `UPDATE users SET role = 'ALUMNI', account_status = 'ACTIVE', email_verified = true, updated_at = CURRENT_TIMESTAMP WHERE id = $1;`,
         [currentRecord.user_id]
       );
     } else if (normStatus === 'REJECTED') {

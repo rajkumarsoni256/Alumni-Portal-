@@ -407,14 +407,16 @@ const register = async ({
     }
   }
 
-  const initialAccountStatus = upperRole === 'ALUMNI' ? 'PENDING_APPROVAL' : 'ACTIVE';
+  const isAlumniRole = upperRole === 'ALUMNI';
+  const initialAccountStatus = isAlumniRole ? 'PENDING_APPROVAL' : 'ACTIVE';
+  const initialEmailVerified = isAlumniRole ? true : false;
   const userId = crypto.randomUUID();
   const passwordHash = await bcrypt.hash(password, 10);
   const userResult = await db.query(
     `INSERT INTO users (id, email, password_hash, role, email_verified, account_status)
-     VALUES ($1, $2, $3, $4, false, $5)
+     VALUES ($1, $2, $3, $4, $5, $6)
      RETURNING id, email, role, email_verified, account_status`,
-    [userId, normalizedEmail, passwordHash, upperRole, initialAccountStatus]
+    [userId, normalizedEmail, passwordHash, upperRole, initialEmailVerified, initialAccountStatus]
   );
   const user = userResult.rows[0];
 
@@ -465,9 +467,15 @@ const register = async ({
     }
   }
 
-  // Send 6-digit OTP verification email (non-blocking)
-  emailService.sendVerificationCode(user.email, user.id, profileName)
-    .catch((err) => console.warn('[Email Verification Dispatch Warning]', err.message));
+  if (upperRole === 'ALUMNI') {
+    // Send Alumni Receipt Confirmation Email to applicant (NO OTP)
+    emailService.sendAlumniRegistrationReceivedEmail(user.email, profileName, user.id)
+      .catch((err) => console.warn('[Alumni Receipt Email Dispatch Warning]', err.message));
+  } else {
+    // Send 6-digit OTP verification email ONLY for Students
+    emailService.sendVerificationCode(user.email, user.id, profileName)
+      .catch((err) => console.warn('[Email Verification Dispatch Warning]', err.message));
+  }
 
   return {
     id: user.id,
@@ -551,6 +559,13 @@ const resendVerificationCode = async ({ email }) => {
   }
 
   const user = userResult.rows[0];
+  if (user.role === 'ALUMNI') {
+    const error = new Error('Alumni accounts do not require email OTP verification. Your account is pending administrator approval.');
+    error.statusCode = 400;
+    error.errorCode = 'ALUMNI_OTP_NOT_REQUIRED';
+    throw error;
+  }
+
   if (user.email_verified) {
     const error = new Error('This email address has already been verified.');
     error.statusCode = 400;
@@ -592,14 +607,14 @@ const login = async ({ email, password, req }) => {
   }
 
   if (user.account_status === 'PENDING_APPROVAL') {
-    const error = new Error('Your alumni account is awaiting administrator approval.');
+    const error = new Error('Your account is currently under review and pending approval by the Admin.');
     error.statusCode = 403;
-    error.errorCode = 'ALUMNI_APPROVAL_PENDING';
+    error.errorCode = 'ACCOUNT_PENDING_APPROVAL';
     throw error;
   }
 
   if (user.account_status === 'REJECTED') {
-    const error = new Error('Your alumni registration request was not approved.');
+    const error = new Error('Your alumni registration request was not approved by administrator.');
     error.statusCode = 403;
     error.errorCode = 'ALUMNI_APPROVAL_REJECTED';
     throw error;
@@ -645,7 +660,7 @@ const login = async ({ email, password, req }) => {
   };
 };
 
-const authenticateWithGoogle = async ({ idToken, req }) => {
+const authenticateWithGoogle = async ({ idToken, requestedRole, req }) => {
   const payload = await googleAuthService.verifyIdToken(idToken);
   const googleSub = payload.subjectId;
   const normalizedEmail = normalizeEmail(payload.email);
@@ -663,6 +678,12 @@ const authenticateWithGoogle = async ({ idToken, req }) => {
   let user;
   if (oauthResult.rows.length > 0) {
     user = oauthResult.rows[0];
+    if (user.account_status === 'PENDING_APPROVAL') {
+      const error = new Error('Your account is currently under review and pending approval by the Admin.');
+      error.statusCode = 403;
+      error.errorCode = 'ACCOUNT_PENDING_APPROVAL';
+      throw error;
+    }
     if (user.account_status !== 'ACTIVE') {
       const error = new Error('Account is disabled. Please contact support.');
       error.statusCode = 401;
@@ -681,6 +702,12 @@ const authenticateWithGoogle = async ({ idToken, req }) => {
 
     if (existingUserResult.rows.length > 0) {
       const existingUser = existingUserResult.rows[0];
+      if (existingUser.account_status === 'PENDING_APPROVAL') {
+        const error = new Error('Your account is currently under review and pending approval by the Admin.');
+        error.statusCode = 403;
+        error.errorCode = 'ACCOUNT_PENDING_APPROVAL';
+        throw error;
+      }
       if (existingUser.account_status !== 'ACTIVE') {
         const error = new Error('Account is disabled. Please contact support.');
         error.statusCode = 401;
@@ -701,14 +728,22 @@ const authenticateWithGoogle = async ({ idToken, req }) => {
 
       user = existingUser;
     } else {
-      // 3. Register new Google user (Role: STUDENT, email_verified: true)
+      // 3. Register new Google user
+      // Respect requestedRole from frontend tab if passed, otherwise check email domain
+      const isInstitutional = normalizedEmail.endsWith('@jecrcu.edu.in');
+      const upperRequested = requestedRole ? String(requestedRole).toUpperCase() : null;
+      const assignedRole = (upperRequested === 'ALUMNI' || upperRequested === 'STUDENT')
+        ? upperRequested
+        : (isInstitutional ? 'STUDENT' : 'ALUMNI');
+      const assignedStatus = assignedRole === 'STUDENT' ? 'ACTIVE' : 'PENDING_APPROVAL';
+
       const newUserId = crypto.randomUUID();
       const randomHash = await bcrypt.hash(crypto.randomUUID(), 10);
       const newUserResult = await db.query(
         `INSERT INTO users (id, email, password_hash, role, email_verified, account_status)
-         VALUES ($1, $2, $3, 'STUDENT', true, 'ACTIVE')
-         RETURNING id, email, role`,
-        [newUserId, normalizedEmail, randomHash]
+         VALUES ($1, $2, $3, $4, true, $5)
+         RETURNING id, email, role, account_status`,
+        [newUserId, normalizedEmail, randomHash, assignedRole, assignedStatus]
       );
       const newUser = newUserResult.rows[0];
 
@@ -718,12 +753,44 @@ const authenticateWithGoogle = async ({ idToken, req }) => {
         [crypto.randomUUID(), newUser.id, googleSub]
       );
 
+      const profileName = payload.name || normalizedEmail.split('@')[0];
+
       const newProfileResult = await db.query(
         `INSERT INTO user_profiles (id, user_id, full_name, avatar_url, is_profile_complete)
          VALUES ($1, $2, $3, $4, false)
          RETURNING full_name, is_profile_complete`,
-        [crypto.randomUUID(), newUser.id, payload.name, payload.pictureUrl]
+        [crypto.randomUUID(), newUser.id, profileName, payload.pictureUrl]
       );
+
+      if (assignedRole === 'ALUMNI') {
+        // Insert into alumni_verifications for Admin review
+        await db.query(
+          `INSERT INTO alumni_verifications (id, user_id, status, created_at, updated_at)
+           VALUES (gen_random_uuid(), $1, 'PENDING', NOW(), NOW());`,
+          [newUser.id]
+        );
+
+        // Notify active Admins
+        const adminUsersRes = await db.query(
+          `SELECT id FROM users WHERE role = 'ADMIN' AND account_status = 'ACTIVE'`
+        );
+        for (const adminRow of adminUsersRes.rows) {
+          await db.query(
+            `INSERT INTO notifications (id, recipient_id, user_id, type, title, message, actor_name, created_at)
+             VALUES (gen_random_uuid(), $1, $2, 'ALUMNI_VERIFICATION_REQUEST', 'New Alumni Verification Request', $3, $4, NOW());`,
+            [adminRow.id, newUser.id, `New Alumni registration submitted via Google by ${profileName} (${newUser.email}).`, profileName]
+          );
+        }
+
+        // Send receipt email to alumni
+        emailService.sendAlumniRegistrationReceivedEmail(newUser.email, profileName, newUser.id)
+          .catch(() => {});
+
+        const error = new Error('Your account is currently under review and pending approval by the Admin.');
+        error.statusCode = 403;
+        error.errorCode = 'ACCOUNT_PENDING_APPROVAL';
+        throw error;
+      }
 
       const profile = newProfileResult.rows[0];
       user = {
@@ -926,6 +993,7 @@ module.exports = {
   resendVerificationCode,
   login,
   authenticateWithGoogle,
+  loginWithGoogle: authenticateWithGoogle,
   forgotPassword,
   resetPassword,
   getCurrentUser,

@@ -15,6 +15,7 @@ const {
   getAlumniVerificationRequestTemplate,
   getAlumniApprovedTemplate,
   getAlumniRejectedTemplate,
+  getAlumniRegistrationReceivedTemplate,
   getConnectionEventTemplate,
   getNewMessageTemplate,
   getJobApplicationTemplate,
@@ -326,6 +327,16 @@ class EmailService {
     const { subject, html, text } = getAlumniRejectedTemplate({ name, rejectionReason });
     const result = await this.provider.sendEmail({ to: email, subject, html, text });
     await this.logDelivery({ userId, recipientEmail: email, emailType: 'ALUMNI_VERIFICATION_REJECTED', templateName: 'alumniRejected', subject, result });
+    return result;
+  }
+
+  /**
+   * 12. Send Alumni Registration Request Received Confirmation Email to Applicant
+   */
+  async sendAlumniRegistrationReceivedEmail(email, name, userId = null) {
+    const { subject, html, text } = getAlumniRegistrationReceivedTemplate({ name });
+    const result = await this.provider.sendEmail({ to: email, subject, html, text });
+    await this.logDelivery({ userId, recipientEmail: email, emailType: 'ALUMNI_REGISTRATION_RECEIVED', templateName: 'alumniRegistrationReceived', subject, result });
     return result;
   }
 

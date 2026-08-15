@@ -15,15 +15,15 @@ import {
 
 export const OnboardingPage = ({ defaultRole }) => {
   const navigate = useNavigate();
-  const { user: currentUser, activeRole, pendingRegistration, completeUserOnboarding } = useApp();
+  const { user: currentUser, authUser, activeRole, pendingRegistration, completeUserOnboarding } = useApp();
 
-  const isAdmin = currentUser?.role?.toUpperCase() === 'ADMIN' || activeRole === 'admin';
+  const isAdmin = authUser?.role?.toUpperCase() === 'ADMIN' || currentUser?.role?.toUpperCase() === 'ADMIN' || activeRole === 'admin';
   if (isAdmin) {
     return <Navigate to="/admin/dashboard" replace />;
   }
 
   const pathRole = window.location.pathname.includes('/alumni') ? 'alumni' : (window.location.pathname.includes('/student') ? 'student' : null);
-  const rawRole = currentUser?.role || pendingRegistration?.role || pathRole || defaultRole || 'student';
+  const rawRole = authUser?.role || currentUser?.role || activeRole || pendingRegistration?.role || pathRole || defaultRole || 'student';
   const userRole = String(rawRole).toLowerCase();
   const isStudent = userRole === 'student';
 
@@ -114,16 +114,8 @@ export const OnboardingPage = ({ defaultRole }) => {
 
   const validateStep1 = () => {
     setErrorMessage('');
-    if (!fullName.trim()) {
-      setErrorMessage('Please enter your full name.');
-      return false;
-    }
     if (!avatarUrl || !avatarUrl.trim() || avatarUrl.includes('unsplash')) {
       setErrorMessage('Profile photo is mandatory. Please upload your profile photo to continue.');
-      return false;
-    }
-    if (!phone.trim()) {
-      setErrorMessage('Please enter your mobile phone number.');
       return false;
     }
     if (!degree.trim()) {
@@ -134,26 +126,12 @@ export const OnboardingPage = ({ defaultRole }) => {
       setErrorMessage('Please enter your branch / specialization.');
       return false;
     }
-    if (!graduationYear) {
-      setErrorMessage('Please select your graduation year.');
-      return false;
-    }
-
     if (!isStudent) {
-      if (!company.trim()) {
-        setErrorMessage('Current company name is required for Alumni onboarding.');
-        return false;
-      }
-      if (!designation.trim()) {
-        setErrorMessage('Current job role / designation is required for Alumni onboarding.');
-        return false;
-      }
       if (!location.trim()) {
         setErrorMessage('Current location is required for Alumni onboarding.');
         return false;
       }
     }
-
     return true;
   };
 
@@ -187,21 +165,21 @@ export const OnboardingPage = ({ defaultRole }) => {
     setErrorMessage('');
     try {
       await completeUserOnboarding({
-        fullName,
-        phone,
+        fullName: fullName || currentUser?.name || currentUser?.fullName || '',
+        phone: phone || currentUser?.phone || '',
         avatarUrl,
         bio,
-        degree,
-        branch,
-        graduationYear,
+        degree: degree || currentUser?.degree || 'B.Tech',
+        branch: branch || currentUser?.branch || 'Computer Science & Engineering',
+        graduationYear: graduationYear || currentUser?.graduationYear || 2024,
         currentYear: isStudent ? currentYear : null,
         currentAcademicYear: isStudent ? currentYear : null,
-        company: isStudent ? null : company,
-        designation: isStudent ? null : designation,
+        company: isStudent ? null : (company || currentUser?.company || ''),
+        designation: isStudent ? null : (designation || currentUser?.designation || ''),
         location,
         isAvailableForMentorship,
-        linkedinUrl,
-        githubUrl,
+        linkedinUrl: linkedinUrl || currentUser?.linkedinUrl || '',
+        githubUrl: githubUrl || currentUser?.githubUrl || '',
         skills: selectedSkills,
         interests: selectedInterests,
       });
@@ -342,37 +320,6 @@ export const OnboardingPage = ({ defaultRole }) => {
 
               {/* Form Grid */}
               <div className="space-y-3.5">
-                {/* Full Name & Phone */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="text-xs font-semibold text-slate-700 block">
-                      Full name <span className="text-red-600">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={fullName}
-                      onChange={(e) => setFullName(e.target.value)}
-                      placeholder="e.g. Tokir Khan"
-                      className="w-full bg-slate-50 border border-slate-300 focus:border-slate-800 focus:bg-white rounded-md px-3 py-2 text-xs text-slate-900 focus:outline-none"
-                      required
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-xs font-semibold text-slate-700 block">
-                      Mobile Number <span className="text-red-600">*</span>
-                    </label>
-                    <input
-                      type="tel"
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                      placeholder="+91 98765 43210"
-                      className="w-full bg-slate-50 border border-slate-300 focus:border-slate-800 focus:bg-white rounded-md px-3 py-2 text-xs text-slate-900 focus:outline-none"
-                      required
-                    />
-                  </div>
-                </div>
-
                 {/* Degree & Branch */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1">
@@ -407,24 +354,22 @@ export const OnboardingPage = ({ defaultRole }) => {
                   </div>
                 </div>
 
-                {/* Graduation Year & Current Year */}
+                {/* Location & Year */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <label className="text-xs font-semibold text-slate-700 block">
-                      {isStudent ? 'Expected Graduation Year' : 'Graduation / Passout Year'} <span className="text-red-600">*</span>
+                      Current Location {!isStudent && <span className="text-red-600">*</span>}
                     </label>
-                    <select
-                      value={graduationYear}
-                      onChange={(e) => setGraduationYear(e.target.value)}
+                    <input
+                      type="text"
+                      value={location}
+                      onChange={(e) => setLocation(e.target.value)}
+                      placeholder="e.g. Bengaluru, India or Jaipur, Rajasthan"
                       className="w-full bg-slate-50 border border-slate-300 focus:border-slate-800 focus:bg-white rounded-md px-3 py-2 text-xs text-slate-900 focus:outline-none"
-                    >
-                      {[2028, 2027, 2026, 2025, 2024, 2023, 2022, 2021, 2020, 2019, 2018, 2017, 2016, 2015, 2014, 2013, 2012, 2010].map((yr) => (
-                        <option key={yr} value={yr}>Class of {yr}</option>
-                      ))}
-                    </select>
+                    />
                   </div>
 
-                  {isStudent ? (
+                  {isStudent && (
                     <div className="space-y-1">
                       <label className="text-xs font-semibold text-slate-700 block">
                         Current Academic Year <span className="text-red-600">*</span>
@@ -440,52 +385,8 @@ export const OnboardingPage = ({ defaultRole }) => {
                         <option value="4">4th Year</option>
                       </select>
                     </div>
-                  ) : (
-                    <div className="space-y-1">
-                      <label className="text-xs font-semibold text-slate-700 block">
-                        Current Location <span className="text-red-600">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        value={location}
-                        onChange={(e) => setLocation(e.target.value)}
-                        placeholder="e.g. Bengaluru, Karnataka or New York, USA"
-                        className="w-full bg-slate-50 border border-slate-300 focus:border-slate-800 focus:bg-white rounded-md px-3 py-2 text-xs text-slate-900 focus:outline-none"
-                      />
-                    </div>
                   )}
                 </div>
-
-                {/* Alumni Professional Section */}
-                {!isStudent && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1 border-t border-slate-100">
-                    <div className="space-y-1">
-                      <label className="text-xs font-semibold text-slate-700 block">
-                        Current Company <span className="text-red-600">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        value={company}
-                        onChange={(e) => setCompany(e.target.value)}
-                        placeholder="e.g. Google, Microsoft, Amazon"
-                        className="w-full bg-slate-50 border border-slate-300 focus:border-slate-800 focus:bg-white rounded-md px-3 py-2 text-xs text-slate-900 focus:outline-none"
-                      />
-                    </div>
-
-                    <div className="space-y-1">
-                      <label className="text-xs font-semibold text-slate-700 block">
-                        Job Title / Designation <span className="text-red-600">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        value={designation}
-                        onChange={(e) => setDesignation(e.target.value)}
-                        placeholder="e.g. Senior Software Engineer"
-                        className="w-full bg-slate-50 border border-slate-300 focus:border-slate-800 focus:bg-white rounded-md px-3 py-2 text-xs text-slate-900 focus:outline-none"
-                      />
-                    </div>
-                  </div>
-                )}
 
                 {/* Bio / About */}
                 <div className="space-y-1">

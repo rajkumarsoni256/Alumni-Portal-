@@ -37,9 +37,10 @@ export const authService = {
   /**
    * User login with verified Google OAuth ID Token
    */
-  loginWithGoogle: async (idToken) => {
+  loginWithGoogle: async (idToken, role = null) => {
     const response = await apiClient.post('/api/v1/auth/google', {
       idToken,
+      role: role ? String(role).toUpperCase() : undefined,
     });
     if (response && response.token) {
       setAuthToken(response.token);
@@ -130,3 +131,5 @@ export const authService = {
   setToken: setAuthToken,
   clearToken: clearAuthToken,
 };
+
+export default authService;
