@@ -13,7 +13,7 @@ class SMTPEmailProvider extends EmailProvider {
     const user = config.user || process.env.SMTP_USER;
     const pass = config.password || process.env.SMTP_PASSWORD;
 
-    this.fromAddress = process.env.EMAIL_FROM || 'no-reply@jecrc.ac.in';
+    this.fromAddress = (user && user.includes('@gmail.com')) ? user : (process.env.EMAIL_FROM || 'no-reply@jecrc.ac.in');
     this.fromName = process.env.EMAIL_FROM_NAME || 'JU Connect Alumni Network';
     this.replyTo = process.env.EMAIL_REPLY_TO || this.fromAddress;
 
