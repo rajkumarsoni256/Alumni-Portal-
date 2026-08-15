@@ -257,6 +257,27 @@ const verifyStudentRegistrationOTP = async ({
 
     await client.query('COMMIT');
 
+    // Dispatch Welcome Email to personal and institutional emails
+    emailService.sendWelcomeEmail(normPersonalEmail, profileName, user.id)
+      .catch((err) => console.warn('[Welcome Email Dispatch Warning]', err.message));
+
+    if (normInstitutionalEmail && normInstitutionalEmail !== normPersonalEmail) {
+      emailService.sendWelcomeEmail(normInstitutionalEmail, profileName, user.id)
+        .catch(() => {});
+    }
+
+    // Create in-app Welcome Notification
+    await db.query(
+      `INSERT INTO notifications (id, user_id, title, message, type, is_read, created_at)
+       VALUES ($1, $2, $3, $4, 'WELCOME', false, CURRENT_TIMESTAMP)`,
+      [
+        crypto.randomUUID(),
+        user.id,
+        'Welcome to JU Connect!',
+        `Welcome to JU Connect Alumni Network, ${profileName}! Your account has been verified successfully. Connect with fellow students, explore alumni opportunities, and build your professional network.`,
+      ]
+    ).catch((err) => console.warn('Failed to insert in-app welcome notification:', err.message));
+
     const sessionData = await sessionService.createSession({
       userId: user.id,
       ipAddress: req?.ip || req?.headers?.['x-forwarded-for'] || null,
