@@ -195,17 +195,10 @@ const verifyStudentRegistrationOTP = async ({
   const normRollNumber = validateAndNormalizeRollNumber(rollNumber);
   const years = validateAcademicYears(joiningYear, graduationYear);
 
-  // Verify OTP
-  await emailService.verifyOTPCode({
-    email: normInstitutionalEmail,
-    code,
-    purpose: 'STUDENT_VERIFICATION',
-  });
-
-  // Re-verify uniqueness
+  // Re-verify uniqueness BEFORE burning/verifying OTP code
   const existingPersonal = await db.query('SELECT id FROM users WHERE email = $1', [normPersonalEmail]);
   if (existingPersonal.rows.length > 0) {
-    const error = new Error(`An account with email '${normPersonalEmail}' already exists`);
+    const error = new Error(`An account with personal email '${normPersonalEmail}' already exists. Please log in.`);
     error.statusCode = 409;
     error.errorCode = 'EMAIL_ALREADY_EXISTS';
     throw error;
@@ -216,40 +209,58 @@ const verifyStudentRegistrationOTP = async ({
     [normRollNumber]
   );
   if (rollCheck.rows.length > 0) {
-    const error = new Error(`University Roll Number '${normRollNumber}' is already registered.`);
+    const error = new Error(`University Roll Number '${normRollNumber}' is already registered. Please log in.`);
     error.statusCode = 409;
     error.errorCode = 'DUPLICATE_ROLL_NUMBER';
     throw error;
   }
 
+  // Verify OTP (marks code as used)
+  await emailService.verifyOTPCode({
+    email: normInstitutionalEmail,
+    code,
+    purpose: 'STUDENT_VERIFICATION',
+  });
+
   const userId = crypto.randomUUID();
   const passwordHash = await bcrypt.hash(password, 10);
   const profileName = name ? name.trim() : normPersonalEmail.split('@')[0];
 
-  // Insert Student User with personalEmail as login email!
-  const userResult = await db.query(
-    `INSERT INTO users (id, email, password_hash, role, email_verified, account_status, institutional_email, institutional_email_verified, email_verification_status)
-     VALUES ($1, $2, $3, 'STUDENT', true, 'ACTIVE', $4, true, 'VERIFIED')
-     RETURNING id, email, role, email_verified, account_status, institutional_email`,
-    [userId, normPersonalEmail, passwordHash, normInstitutionalEmail]
-  );
-  const user = userResult.rows[0];
+  let user;
+  try {
+    // Insert Student User with personalEmail as login email
+    const userResult = await db.query(
+      `INSERT INTO users (id, email, password_hash, role, email_verified, account_status, institutional_email, institutional_email_verified, email_verification_status)
+       VALUES ($1, $2, $3, 'STUDENT', true, 'ACTIVE', $4, true, 'VERIFIED')
+       RETURNING id, email, role, email_verified, account_status, institutional_email`,
+      [userId, normPersonalEmail, passwordHash, normInstitutionalEmail]
+    );
+    user = userResult.rows[0];
 
-  // Insert Profile with phone and verified roll number
-  await db.query(
-    `INSERT INTO user_profiles (id, user_id, full_name, university_roll_number, phone, course, joining_year, graduation_year, is_profile_complete)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, true)`,
-    [
-      crypto.randomUUID(),
-      user.id,
-      profileName,
-      normRollNumber,
-      normPhone,
-      course ? String(course).trim().toUpperCase() : 'BTECH',
-      years.joiningYear,
-      years.graduationYear,
-    ]
-  );
+    // Insert Profile with phone and verified roll number
+    await db.query(
+      `INSERT INTO user_profiles (id, user_id, full_name, university_roll_number, phone, course, joining_year, graduation_year, is_profile_complete)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, true)`,
+      [
+        crypto.randomUUID(),
+        user.id,
+        profileName,
+        normRollNumber,
+        normPhone,
+        course ? String(course).trim().toUpperCase() : 'BTECH',
+        years.joiningYear,
+        years.graduationYear,
+      ]
+    );
+  } catch (dbErr) {
+    if (dbErr.code === '23505') {
+      const error = new Error('An account with this email, phone, or roll number already exists. Please log in.');
+      error.statusCode = 409;
+      error.errorCode = 'DUPLICATE_ACCOUNT';
+      throw error;
+    }
+    throw dbErr;
+  }
 
   const sessionData = await sessionService.createSession({
     userId: user.id,
