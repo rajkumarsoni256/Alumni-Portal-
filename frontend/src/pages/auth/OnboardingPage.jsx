@@ -17,7 +17,9 @@ export const OnboardingPage = ({ defaultRole }) => {
   const navigate = useNavigate();
   const { user: currentUser, pendingRegistration, completeUserOnboarding } = useApp();
 
-  const userRole = (currentUser?.role || pendingRegistration?.role || defaultRole || 'student').toLowerCase();
+  const pathRole = window.location.pathname.includes('/alumni') ? 'alumni' : (window.location.pathname.includes('/student') ? 'student' : null);
+  const rawRole = currentUser?.role || pendingRegistration?.role || pathRole || defaultRole || 'student';
+  const userRole = String(rawRole).toLowerCase();
   const isStudent = userRole === 'student';
 
   const [step, setStep] = useState(1); // 1: Profile & Academic/Work | 2: Skills & Links | 3: Complete

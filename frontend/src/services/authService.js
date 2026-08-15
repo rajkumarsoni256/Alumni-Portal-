@@ -9,15 +9,13 @@ export const authService = {
   /**
    * Register new user (STUDENT or ALUMNI)
    */
-  register: async ({ name, email, password, role = 'student' }) => {
-    const formattedRole = role.toUpperCase(); // 'STUDENT' | 'ALUMNI'
+  register: async (payload) => {
+    const formattedRole = payload && payload.role ? String(payload.role).toUpperCase() : 'ALUMNI';
     const response = await apiClient.post('/api/v1/auth/register', {
-      name,
-      email: email.trim().toLowerCase(),
-      password,
+      ...payload,
+      email: payload && payload.email ? payload.email.trim().toLowerCase() : '',
       role: formattedRole,
     });
-    // Returns { user: UserAuthResponse, message: string }
     return response;
   },
 

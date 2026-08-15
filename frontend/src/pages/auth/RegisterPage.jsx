@@ -243,13 +243,13 @@ export const RegisterPage = () => {
         mobileNumber: mobileNumber.trim(),
         phone: mobileNumber.trim(),
         password,
-        role: 'alumni',
+        role: 'ALUMNI',
         graduationYear,
         company: company.trim(),
         designation: designation.trim(),
         linkedinUrl: linkedinUrl.trim(),
       });
-      navigate('/verify-email');
+      navigate('/onboarding/alumni');
     } catch (err) {
       if (err.errors && typeof err.errors === 'object') {
         setErrors(err.errors);
