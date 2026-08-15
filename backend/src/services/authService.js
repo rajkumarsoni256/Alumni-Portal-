@@ -628,10 +628,15 @@ const login = async ({ email, password, req }) => {
   }
 
   if (!user.email_verified) {
-    const error = new Error('Please verify your email before logging in');
-    error.statusCode = 403;
-    error.errorCode = 'EMAIL_NOT_VERIFIED';
-    throw error;
+    if (user.role === 'ALUMNI') {
+      // Auto-heal Alumni accounts in database so Alumni are never blocked by email OTP verification
+      await db.query('UPDATE users SET email_verified = true WHERE id = $1', [user.id]).catch(() => {});
+    } else {
+      const error = new Error('Please verify your email before logging in');
+      error.statusCode = 403;
+      error.errorCode = 'EMAIL_NOT_VERIFIED';
+      throw error;
+    }
   }
 
   // Device detection and new device alert
