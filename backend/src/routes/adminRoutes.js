@@ -22,6 +22,7 @@ router.patch('/users/:id/role', authenticateToken, requireAdmin, adminUserContro
 router.patch('/users/:id/status', authenticateToken, requireAdmin, adminUserController.updateUserStatus);
 router.patch('/users/:id/approve', authenticateToken, requireAdmin, adminUserController.approveUser);
 router.patch('/users/:id/reject', authenticateToken, requireAdmin, adminUserController.rejectUser);
+router.delete('/users/:id', authenticateToken, requireAdmin, adminUserController.deleteUser);
 
 // Phase 4 — Data Quality & Hygiene Stats
 router.get('/data-quality/stats', authenticateToken, requireAdmin, adminDataQualityController.getDataQualityStats);

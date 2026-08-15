@@ -315,6 +315,13 @@ export const adminUserService = {
   },
 
   /**
+   * Delete user account permanently
+   */
+  deleteUser: async (id) => {
+    return await apiClient.delete(`/api/v1/admin/users/${id}`);
+  },
+
+  /**
    * Phase 13: Fetch real Admin Notification Inbox records
    */
   getNotificationInbox: async (params = {}) => {

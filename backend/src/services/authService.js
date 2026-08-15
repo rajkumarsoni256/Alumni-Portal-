@@ -188,57 +188,59 @@ const verifyStudentRegistrationOTP = async ({
   joiningYear,
   graduationYear,
   code,
+  req,
 }) => {
   const normInstitutionalEmail = validateJECRCEmail(institutionalEmail);
   const normPersonalEmail = normalizeEmail(personalEmail);
   const normPhone = validateMobileNumber(mobileNumber || phone);
   const normRollNumber = validateAndNormalizeRollNumber(rollNumber);
   const years = validateAcademicYears(joiningYear, graduationYear);
-
-  // Re-verify uniqueness BEFORE burning/verifying OTP code
-  const existingPersonal = await db.query('SELECT id FROM users WHERE email = $1', [normPersonalEmail]);
-  if (existingPersonal.rows.length > 0) {
-    const error = new Error(`An account with personal email '${normPersonalEmail}' already exists. Please log in.`);
-    error.statusCode = 409;
-    error.errorCode = 'EMAIL_ALREADY_EXISTS';
-    throw error;
-  }
-
-  const rollCheck = await db.query(
-    `SELECT user_id FROM user_profiles WHERE university_roll_number = $1 LIMIT 1`,
-    [normRollNumber]
-  );
-  if (rollCheck.rows.length > 0) {
-    const error = new Error(`University Roll Number '${normRollNumber}' is already registered. Please log in.`);
-    error.statusCode = 409;
-    error.errorCode = 'DUPLICATE_ROLL_NUMBER';
-    throw error;
-  }
-
-  // Verify OTP (marks code as used)
-  await emailService.verifyOTPCode({
-    email: normInstitutionalEmail,
-    code,
-    purpose: 'STUDENT_VERIFICATION',
-  });
-
-  const userId = crypto.randomUUID();
-  const passwordHash = await bcrypt.hash(password, 10);
-  const profileName = name ? name.trim() : normPersonalEmail.split('@')[0];
-
-  let user;
+  const client = await db.getClient();
   try {
+    await client.query('BEGIN');
+
+    // Re-verify uniqueness BEFORE burning/verifying OTP code
+    const existingPersonal = await client.query('SELECT id FROM users WHERE email = $1', [normPersonalEmail]);
+    if (existingPersonal.rows.length > 0) {
+      const error = new Error(`An account with personal email '${normPersonalEmail}' already exists. Please log in.`);
+      error.statusCode = 409;
+      error.errorCode = 'EMAIL_ALREADY_EXISTS';
+      throw error;
+    }
+
+    const rollCheck = await client.query(
+      `SELECT user_id FROM user_profiles WHERE university_roll_number = $1 LIMIT 1`,
+      [normRollNumber]
+    );
+    if (rollCheck.rows.length > 0) {
+      const error = new Error(`University Roll Number '${normRollNumber}' is already registered. Please log in.`);
+      error.statusCode = 409;
+      error.errorCode = 'DUPLICATE_ROLL_NUMBER';
+      throw error;
+    }
+
+    // Verify OTP (marks code as used)
+    await emailService.verifyOTPCode({
+      email: normInstitutionalEmail,
+      code,
+      purpose: 'STUDENT_VERIFICATION',
+    });
+
+    const userId = crypto.randomUUID();
+    const passwordHash = await bcrypt.hash(password, 10);
+    const profileName = name ? name.trim() : normPersonalEmail.split('@')[0];
+
     // Insert Student User with personalEmail as login email
-    const userResult = await db.query(
+    const userResult = await client.query(
       `INSERT INTO users (id, email, password_hash, role, email_verified, account_status, institutional_email, institutional_email_verified, email_verification_status)
        VALUES ($1, $2, $3, 'STUDENT', true, 'ACTIVE', $4, true, 'VERIFIED')
        RETURNING id, email, role, email_verified, account_status, institutional_email`,
       [userId, normPersonalEmail, passwordHash, normInstitutionalEmail]
     );
-    user = userResult.rows[0];
+    const user = userResult.rows[0];
 
     // Insert Profile with phone and verified roll number
-    await db.query(
+    await client.query(
       `INSERT INTO user_profiles (id, user_id, full_name, university_roll_number, phone, course, joining_year, graduation_year, is_profile_complete)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, true)`,
       [
@@ -252,42 +254,47 @@ const verifyStudentRegistrationOTP = async ({
         years.graduationYear,
       ]
     );
-  } catch (dbErr) {
-    if (dbErr.code === '23505') {
+
+    await client.query('COMMIT');
+
+    const sessionData = await sessionService.createSession({
+      userId: user.id,
+      ipAddress: req?.ip || req?.headers?.['x-forwarded-for'] || null,
+      userAgent: req?.headers ? req.headers['user-agent'] : null,
+    });
+
+    const token = generateToken(user.id, user.role);
+
+    return {
+      user: {
+        id: user.id,
+        email: user.email,
+        institutionalEmail: user.institutional_email,
+        role: user.role,
+        fullName: profileName,
+        profileComplete: true,
+        universityRollNumber: normRollNumber,
+        phone: normPhone,
+        course: course ? String(course).trim().toUpperCase() : 'BTECH',
+        joiningYear: years.joiningYear,
+        graduationYear: years.graduationYear,
+      },
+      token,
+      accessToken: token,
+      refreshToken: sessionData.rawRefreshToken,
+    };
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    if (err.code === '23505') {
       const error = new Error('An account with this email, phone, or roll number already exists. Please log in.');
       error.statusCode = 409;
       error.errorCode = 'DUPLICATE_ACCOUNT';
       throw error;
     }
-    throw dbErr;
+    throw err;
+  } finally {
+    client.release();
   }
-
-  const sessionData = await sessionService.createSession({
-    userId: user.id,
-    ipAddress: req?.ip || req?.headers?.['x-forwarded-for'] || null,
-    userAgent: req?.headers ? req.headers['user-agent'] : null,
-  });
-
-  const token = generateToken(user.id, user.role);
-
-  return {
-    user: {
-      id: user.id,
-      email: user.email,
-      institutionalEmail: user.institutional_email,
-      role: user.role,
-      fullName: profileName,
-      profileComplete: true,
-      universityRollNumber: normRollNumber,
-      phone: normPhone,
-      course: course ? String(course).trim().toUpperCase() : 'BTECH',
-      joiningYear: years.joiningYear,
-      graduationYear: years.graduationYear,
-    },
-    token,
-    accessToken: token,
-    refreshToken: sessionData.rawRefreshToken,
-  };
 };
 
 const register = async ({

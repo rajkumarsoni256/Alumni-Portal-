@@ -539,6 +539,64 @@ const updateUserRole = async (adminUserId, targetUserId, newRole) => {
   }
 };
 
+/**
+ * Permanently delete user from PostgreSQL database with audit logging
+ */
+const deleteUser = async (adminUserId, targetUserId) => {
+  const client = await db.getClient();
+  try {
+    await client.query('BEGIN');
+
+    const userCheck = await client.query(
+      `SELECT u.id, u.email, u.role, p.full_name
+       FROM users u
+       LEFT JOIN user_profiles p ON u.id = p.user_id
+       WHERE u.id = $1 FOR UPDATE OF u`,
+      [targetUserId]
+    );
+
+    if (userCheck.rows.length === 0) {
+      const error = new Error(`User not found with ID: ${targetUserId}`);
+      error.statusCode = 404;
+      error.errorCode = 'USER_NOT_FOUND';
+      throw error;
+    }
+
+    const targetUser = userCheck.rows[0];
+
+    if (targetUser.role === 'ADMIN') {
+      const error = new Error('Admin users cannot be deleted via user directory.');
+      error.statusCode = 403;
+      error.errorCode = 'CANNOT_DELETE_ADMIN';
+      throw error;
+    }
+
+    // Clean dependent records
+    await client.query(`DELETE FROM auth_sessions WHERE user_id = $1`, [targetUserId]);
+    await client.query(`DELETE FROM user_profiles WHERE user_id = $1`, [targetUserId]);
+    await client.query(`DELETE FROM alumni_verifications WHERE user_id = $1`, [targetUserId]);
+    await client.query(`DELETE FROM verification_codes WHERE user_id = $1 OR email = $2`, [targetUserId, targetUser.email]);
+    await client.query(`DELETE FROM notifications WHERE user_id = $1`, [targetUserId]);
+    await client.query(`DELETE FROM users WHERE id = $1`, [targetUserId]);
+
+    await logAdminAction({
+      client,
+      adminUserId,
+      action: 'USER_DELETED',
+      targetUserId,
+      details: { deletedEmail: targetUser.email, deletedName: targetUser.full_name, role: targetUser.role },
+    });
+
+    await client.query('COMMIT');
+    return { success: true, message: `User '${targetUser.full_name || targetUser.email}' deleted successfully.` };
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+};
+
 const getUserStats = async () => {
   const query = `
     SELECT
@@ -569,6 +627,7 @@ module.exports = {
   getUserById,
   updateUserStatus,
   updateUserRole,
+  deleteUser,
   getUserStats,
   buildUserQueryFilters,
 };

@@ -23,7 +23,8 @@ import {
   Shield,
   AlertTriangle,
   RefreshCw,
-  Lock
+  Lock,
+  Trash2
 } from 'lucide-react';
 
 export const AdminUsersPage = () => {
@@ -39,6 +40,7 @@ export const AdminUsersPage = () => {
   const [openDropdownUserId, setOpenDropdownUserId] = useState(null);
   const [promoteModalUser, setPromoteModalUser] = useState(null);
   const [statusModalUser, setStatusModalUser] = useState(null);
+  const [deleteModalUser, setDeleteModalUser] = useState(null);
   const [isActionLoading, setIsActionLoading] = useState(false);
 
   // Filters State
@@ -175,6 +177,22 @@ export const AdminUsersPage = () => {
   useEffect(() => {
     fetchUsers();
   }, [debouncedQuery, filters, sortField, sortOrder, page, pageSize]);
+
+  const handleDeleteUser = async () => {
+    if (!deleteModalUser) return;
+    setIsActionLoading(true);
+    try {
+      await adminUserService.deleteUser(deleteModalUser.id);
+      showNotification(`User '${deleteModalUser.name}' deleted successfully`, 'success');
+      setDeleteModalUser(null);
+      fetchUsers();
+      fetchStats();
+    } catch (err) {
+      showNotification(err.message || 'Failed to delete user', 'error');
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
 
   // Sync state with URL search params
   useEffect(() => {
@@ -770,6 +788,21 @@ export const AdminUsersPage = () => {
                                       )}
                                     </button>
                                   )}
+
+                                  {/* Delete Account */}
+                                  {currentUser?.id !== user.id && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setOpenDropdownUserId(null);
+                                        setDeleteModalUser(user);
+                                      }}
+                                      className="w-full flex items-center gap-2 px-3 py-1.5 text-red-700 hover:bg-red-50 font-semibold transition-colors cursor-pointer text-left border-t border-slate-100 mt-1 pt-1.5"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5 text-red-700" />
+                                      <span>Delete Account</span>
+                                    </button>
+                                  )}
                                 </div>
                               )}
                             </div>
@@ -999,6 +1032,58 @@ export const AdminUsersPage = () => {
                     <span>{isActionLoading ? 'Deactivating...' : 'Confirm Deactivation'}</span>
                   </>
                 )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete User Confirmation Modal */}
+      {deleteModalUser && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in-50">
+          <div className="bg-white rounded-2xl border border-red-100 max-w-md w-full p-5 space-y-4 shadow-xl">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-xl bg-red-100 text-red-700 flex items-center justify-center shrink-0">
+                <Trash2 className="w-5 h-5" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="font-bold text-slate-900 text-sm">Delete User Account</h3>
+                <p className="text-xs text-slate-500">
+                  Permanently remove user record from the PostgreSQL database
+                </p>
+              </div>
+            </div>
+
+            <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200/90 text-xs space-y-1">
+              <p className="font-bold text-slate-900">{deleteModalUser.name}</p>
+              <p className="text-slate-500">Email: {deleteModalUser.email}</p>
+              <p className="text-slate-500">Role: {deleteModalUser.role}</p>
+            </div>
+
+            <div className="p-3 rounded-xl border border-red-200 bg-red-50 text-red-800 text-xs flex items-start gap-2">
+              <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+              <span>
+                <b>Warning:</b> This action is permanent and cannot be undone. User profiles, sessions, and verification records will be permanently deleted.
+              </span>
+            </div>
+
+            <div className="pt-2 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setDeleteModalUser(null)}
+                disabled={isActionLoading}
+                className="px-3.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteUser}
+                disabled={isActionLoading}
+                className="px-4 py-1.5 rounded-lg bg-red-700 hover:bg-red-800 text-white text-xs font-bold cursor-pointer shadow-2xs inline-flex items-center gap-1.5 disabled:opacity-50"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>{isActionLoading ? 'Deleting...' : 'Delete User Permanently'}</span>
               </button>
             </div>
           </div>
