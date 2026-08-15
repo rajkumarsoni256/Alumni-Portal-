@@ -525,13 +525,13 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  const registerUser = async ({ name, email, password, role }) => {
+  const registerUser = async (registrationData) => {
     try {
-      const response = await authService.register({ name, email, password, role });
+      const response = await authService.register(registrationData);
       setPendingRegistration({
-        name,
-        email,
-        role: role.toLowerCase(),
+        name: registrationData.name,
+        email: registrationData.email,
+        role: (registrationData.role || 'alumni').toLowerCase(),
         emailVerified: false,
         profileCompleted: false,
       });
