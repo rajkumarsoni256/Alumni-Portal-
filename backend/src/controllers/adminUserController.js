@@ -146,19 +146,8 @@ const updateUserStatus = async (req, res, next) => {
       return errorResponse(res, 'Account status is required (ACTIVE or DISABLED)', 'VALIDATION_ERROR', 400);
     }
 
-    const updatedUser = await adminUserService.updateUserStatus(id.trim(), targetStatus);
-
-    // Audit log
-    adminAuditService.logAdminAction({
-      adminUserId: req.user?.id,
-      action: 'USER_STATUS_UPDATED',
-      targetEntity: 'USER',
-      targetId: id.trim(),
-      details: {
-        targetUserId: id.trim(),
-        newStatus: updatedUser.account_status,
-      },
-    }).catch((err) => console.error('Failed to log USER_STATUS_UPDATED audit:', err));
+    const adminUserId = req.user?.id;
+    const updatedUser = await adminUserService.updateUserStatus(adminUserId, id.trim(), targetStatus);
 
     return successResponse(res, updatedUser, `User account status updated to ${updatedUser.account_status}`);
   } catch (err) {
@@ -167,6 +156,35 @@ const updateUserStatus = async (req, res, next) => {
     }
     console.error('Error updating user status:', err);
     return errorResponse(res, 'Failed to update user status', 'INTERNAL_SERVER_ERROR', 500);
+  }
+};
+
+/**
+ * Controller to promote Student to Alumni role
+ */
+const changeUserRole = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { role } = req.body || {};
+
+    if (!id || !UUID_REGEX.test(id.trim())) {
+      return errorResponse(res, 'Invalid user ID format. Must be a valid UUID.', 'INVALID_ID_FORMAT', 400);
+    }
+
+    if (!role) {
+      return errorResponse(res, 'Role property is required in request body.', 'VALIDATION_ERROR', 400);
+    }
+
+    const adminUserId = req.user?.id;
+    const updatedUser = await adminUserService.updateUserRole(adminUserId, id.trim(), role);
+
+    return successResponse(res, updatedUser, `User successfully promoted to ${updatedUser.role}`);
+  } catch (err) {
+    if (err.statusCode) {
+      return errorResponse(res, err.message, err.errorCode || 'BAD_REQUEST', err.statusCode);
+    }
+    console.error('Error updating user role:', err);
+    return errorResponse(res, 'Failed to update user role', 'INTERNAL_SERVER_ERROR', 500);
   }
 };
 
@@ -253,6 +271,7 @@ module.exports = {
   getUsers,
   getUserById,
   updateUserStatus,
+  changeUserRole,
   approveUser,
   rejectUser,
   getPendingAlumni,

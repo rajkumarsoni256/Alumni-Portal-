@@ -8,6 +8,11 @@ const AUDIT_ACTIONS = {
   VERIFICATION_REJECTED: 'VERIFICATION_REJECTED',
   DATA_QUALITY_VIEWED: 'DATA_QUALITY_VIEWED',
   SETTING_UPDATED: 'SETTING_UPDATED',
+  ADMIN_PROFILE_UPDATED: 'ADMIN_PROFILE_UPDATED',
+  USER_ROLE_CHANGED: 'USER_ROLE_CHANGED',
+  USER_DEACTIVATED: 'USER_DEACTIVATED',
+  USER_REACTIVATED: 'USER_REACTIVATED',
+  NOTIFICATION_READ: 'NOTIFICATION_READ',
   NOTIFICATION_CREATED: 'NOTIFICATION_CREATED',
   NOTIFICATION_UPDATED: 'NOTIFICATION_UPDATED',
   NOTIFICATION_PUBLISHED: 'NOTIFICATION_PUBLISHED',
@@ -231,6 +236,16 @@ const generateDescription = (row) => {
       return `${actor} inspected data quality & hygiene metrics`;
     case 'SETTING_UPDATED':
       return `${actor} updated platform system settings`;
+    case 'ADMIN_PROFILE_UPDATED':
+      return `${actor} updated administrator profile details`;
+    case 'USER_ROLE_CHANGED':
+      return `${actor} promoted ${target} from ${row.details?.previousRole || 'Student'} to ${row.details?.newRole || 'Alumni'}`;
+    case 'USER_DEACTIVATED':
+      return `${actor} deactivated account for ${target}`;
+    case 'USER_REACTIVATED':
+      return `${actor} restored active access for ${target}`;
+    case 'NOTIFICATION_READ':
+      return `${actor} marked notification as read`;
     case 'NOTIFICATION_CREATED':
       return `${actor} created announcement draft: "${row.details?.title || 'Announcement'}"`;
     case 'NOTIFICATION_UPDATED':

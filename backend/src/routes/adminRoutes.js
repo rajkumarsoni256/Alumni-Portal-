@@ -13,11 +13,12 @@ const { authenticateToken, requireAdmin } = require('../middleware/authMiddlewar
 
 const adminContentController = require('../controllers/adminContentController');
 
-// Phase 3 & 12D & 14 — Admin User Directory, Details, Approvals & Account Status Control
+// Phase 3 & 12D & 13 & 14 — Admin User Directory, Details, Role Promotion, Approvals & Account Status Control
 router.get('/users', authenticateToken, requireAdmin, adminUserController.getUsers);
 router.get('/users/stats', authenticateToken, requireAdmin, adminUserController.getUserStats);
 router.get('/users/pending-alumni', authenticateToken, requireAdmin, adminUserController.getPendingAlumni);
 router.get('/users/:id', authenticateToken, requireAdmin, adminUserController.getUserById);
+router.patch('/users/:id/role', authenticateToken, requireAdmin, adminUserController.changeUserRole);
 router.patch('/users/:id/status', authenticateToken, requireAdmin, adminUserController.updateUserStatus);
 router.patch('/users/:id/approve', authenticateToken, requireAdmin, adminUserController.approveUser);
 router.patch('/users/:id/reject', authenticateToken, requireAdmin, adminUserController.rejectUser);
@@ -44,7 +45,10 @@ router.get('/health/email', authenticateToken, requireAdmin, adminDashboardContr
 router.get('/settings', authenticateToken, requireAdmin, adminSettingsController.getSettings);
 router.patch('/settings', authenticateToken, requireAdmin, adminSettingsController.updateSettings);
 
-// Phase 10 — Admin Communication & Notification Management
+// Phase 10 & 13 — Admin Communication & Notification Inbox Management
+router.get('/notifications/inbox', authenticateToken, requireAdmin, adminNotificationController.getNotificationInbox);
+router.patch('/notifications/read-all', authenticateToken, requireAdmin, adminNotificationController.markAllNotificationsRead);
+router.patch('/notifications/:id/read', authenticateToken, requireAdmin, adminNotificationController.markNotificationRead);
 router.get('/notifications', authenticateToken, requireAdmin, adminNotificationController.getNotifications);
 router.post('/notifications', authenticateToken, requireAdmin, adminNotificationController.createNotification);
 router.post('/notifications/preview-audience', authenticateToken, requireAdmin, adminNotificationController.previewAudience);

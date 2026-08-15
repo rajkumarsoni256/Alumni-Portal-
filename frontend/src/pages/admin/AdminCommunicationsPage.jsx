@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { AdminLayout } from '../../components/admin/layout/AdminLayout';
 import { useApp } from '../../context/AppContext';
 import { adminUserService } from '../../services/adminUserService';
+import { UserAvatar } from '../../components/common/UserAvatar';
 import {
   Megaphone,
   Plus,
@@ -27,11 +29,87 @@ import {
   Building,
   GraduationCap,
   MapPin,
-  FileText
+  FileText,
+  Bell,
+  CheckCheck
 } from 'lucide-react';
 
 export const AdminCommunicationsPage = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
   const { showNotification } = useApp();
+
+  // Tab State: 'announcements' | 'notifications'
+  const [activeTab, setActiveTab] = useState(searchParams.get('tab') === 'notifications' ? 'notifications' : 'announcements');
+
+  useEffect(() => {
+    const tabParam = searchParams.get('tab');
+    if (tabParam === 'notifications') {
+      setActiveTab('notifications');
+    } else {
+      setActiveTab('announcements');
+    }
+  }, [searchParams]);
+
+  const handleTabChange = (newTab) => {
+    setActiveTab(newTab);
+    setSearchParams(newTab === 'notifications' ? { tab: 'notifications' } : {});
+  };
+
+  // Notification Inbox State
+  const [inboxItems, setInboxItems] = useState([]);
+  const [inboxUnreadCount, setInboxUnreadCount] = useState(0);
+  const [inboxFilter, setInboxFilter] = useState('all'); // 'all' | 'unread' | 'read'
+  const [isInboxLoading, setIsInboxLoading] = useState(false);
+
+  const fetchInboxRecords = useCallback(async () => {
+    setIsInboxLoading(true);
+    try {
+      const res = await adminUserService.getNotificationInbox({
+        page: 1,
+        limit: 50,
+      });
+      if (res && res.data) {
+        setInboxItems(res.data || []);
+        setInboxUnreadCount(typeof res.unreadCount === 'number' ? res.unreadCount : 0);
+      }
+    } catch (err) {
+      console.error('Failed to load admin notification inbox:', err);
+    } finally {
+      setIsInboxLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === 'notifications') {
+      fetchInboxRecords();
+    }
+  }, [activeTab, fetchInboxRecords]);
+
+  const handleMarkAsRead = async (id) => {
+    try {
+      await adminUserService.markNotificationAsRead(id);
+      setInboxItems((prev) =>
+        prev.map((item) => (item.id === id ? { ...item, isRead: true, unread: false } : item))
+      );
+      setInboxUnreadCount((prev) => Math.max(0, prev - 1));
+      showNotification('Notification marked as read.', 'success');
+    } catch (err) {
+      console.error('Failed to mark notification as read:', err);
+      showNotification(err.message || 'Failed to mark notification as read.', 'error');
+    }
+  };
+
+  const handleMarkAllAsRead = async () => {
+    try {
+      await adminUserService.markAllNotificationsAsRead();
+      setInboxItems((prev) => prev.map((item) => ({ ...item, isRead: true, unread: false })));
+      setInboxUnreadCount(0);
+      showNotification('All notifications marked as read.', 'success');
+    } catch (err) {
+      console.error('Failed to mark all notifications as read:', err);
+      showNotification(err.message || 'Failed to mark all notifications as read.', 'error');
+    }
+  };
 
   // Listing state
   const [notifications, setNotifications] = useState([]);
@@ -370,22 +448,218 @@ export const AdminCommunicationsPage = () => {
           <div>
             <h1 className="text-xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
               <Megaphone className="w-5 h-5 text-red-700" />
-              <span>Communications & Announcements</span>
+              <span>Communications &amp; Notification Center</span>
             </h1>
             <p className="text-xs text-slate-500">
-              Compose, segment, publish, and track administrative announcements and platform alerts across the JECRC community.
+              Manage system announcements, segment target audiences, and inspect platform notification activity.
             </p>
           </div>
 
+          {activeTab === 'announcements' && (
+            <button
+              type="button"
+              onClick={() => handleOpenCompose()}
+              className="px-3.5 py-1.5 rounded bg-red-700 hover:bg-red-800 text-white text-xs font-semibold transition-colors inline-flex items-center gap-1.5 cursor-pointer shrink-0"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Compose Announcement</span>
+            </button>
+          )}
+        </div>
+
+        {/* Tab Navigation */}
+        <div className="border-b border-slate-200 flex items-center gap-6 text-xs font-bold">
           <button
             type="button"
-            onClick={() => handleOpenCompose()}
-            className="px-3.5 py-1.5 rounded bg-red-700 hover:bg-red-800 text-white text-xs font-semibold transition-colors inline-flex items-center gap-1.5 cursor-pointer shrink-0"
+            onClick={() => handleTabChange('announcements')}
+            className={`pb-2.5 flex items-center gap-2 transition-colors cursor-pointer border-b-2 ${
+              activeTab === 'announcements'
+                ? 'border-red-700 text-red-700'
+                : 'border-transparent text-slate-500 hover:text-slate-900'
+            }`}
           >
-            <Plus className="w-4 h-4" />
-            <span>Compose Announcement</span>
+            <Megaphone className="w-4 h-4" />
+            <span>System Announcements</span>
+            <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-slate-100 text-slate-600 font-extrabold">
+              {summary.totalAnnouncements}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleTabChange('notifications')}
+            className={`pb-2.5 flex items-center gap-2 transition-colors cursor-pointer border-b-2 ${
+              activeTab === 'notifications'
+                ? 'border-red-700 text-red-700'
+                : 'border-transparent text-slate-500 hover:text-slate-900'
+            }`}
+          >
+            <Bell className="w-4 h-4" />
+            <span>Notification Center (Inbox)</span>
+            {inboxUnreadCount > 0 && (
+              <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-red-700 text-white font-extrabold">
+                {inboxUnreadCount}
+              </span>
+            )}
           </button>
         </div>
+
+        {/* TAB 2: NOTIFICATION INBOX PANEL */}
+        {activeTab === 'notifications' ? (
+          <div className="space-y-4">
+            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setInboxFilter('all')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+                    inboxFilter === 'all'
+                      ? 'bg-slate-900 text-white'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  All Notifications
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setInboxFilter('unread')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer inline-flex items-center gap-1.5 ${
+                    inboxFilter === 'unread'
+                      ? 'bg-red-700 text-white'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  <span>Unread</span>
+                  {inboxUnreadCount > 0 && (
+                    <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-white text-red-700 font-extrabold">
+                      {inboxUnreadCount}
+                    </span>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setInboxFilter('read')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+                    inboxFilter === 'read'
+                      ? 'bg-slate-900 text-white'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  Read
+                </button>
+              </div>
+
+              <div className="flex items-center gap-2">
+                {inboxUnreadCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleMarkAllAsRead}
+                    className="px-3 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-800 text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer transition-colors"
+                  >
+                    <CheckCheck className="w-4 h-4 text-emerald-600" />
+                    <span>Mark All as Read</span>
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  onClick={fetchInboxRecords}
+                  className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors cursor-pointer"
+                  title="Refresh Notifications"
+                >
+                  <RefreshCw className={`w-4 h-4 ${isInboxLoading ? 'animate-spin' : ''}`} />
+                </button>
+              </div>
+            </div>
+
+            {/* Notification Items List */}
+            <div className="bg-white rounded-xl border border-slate-200 shadow-2xs overflow-hidden divide-y divide-slate-100">
+              {isInboxLoading ? (
+                <div className="p-12 text-center text-xs text-slate-500 space-y-2">
+                  <RefreshCw className="w-5 h-5 animate-spin mx-auto text-red-700" />
+                  <p>Loading notification records from PostgreSQL database...</p>
+                </div>
+              ) : (
+                (() => {
+                  const filtered = inboxItems.filter((item) => {
+                    if (inboxFilter === 'unread') return item.isRead === false || item.unread === true;
+                    if (inboxFilter === 'read') return item.isRead === true;
+                    return true;
+                  });
+
+                  if (filtered.length === 0) {
+                    return (
+                      <div className="p-12 text-center text-slate-500 space-y-2">
+                        <Bell className="w-8 h-8 text-slate-300 mx-auto" />
+                        <p className="text-xs font-bold text-slate-700">No notifications found</p>
+                        <p className="text-[11px] text-slate-400">
+                          {inboxFilter === 'unread'
+                            ? 'You have caught up with all notifications.'
+                            : 'No notification records present.'}
+                        </p>
+                      </div>
+                    );
+                  }
+
+                  return filtered.map((item) => {
+                    const isUnread = item.isRead === false || item.unread === true;
+                    return (
+                      <div
+                        key={item.id}
+                        className={`p-4 transition-colors flex items-start justify-between gap-4 ${
+                          isUnread ? 'bg-red-50/20' : 'hover:bg-slate-50/80'
+                        }`}
+                      >
+                        <div className="flex items-start gap-3 min-w-0 flex-1">
+                          <UserAvatar
+                            src={item.avatar || item.actor?.avatar}
+                            name={item.actor?.name || item.title || 'System Notification'}
+                            className="w-9 h-9 shrink-0 mt-0.5"
+                          />
+                          <div className="space-y-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-bold text-slate-900 text-xs truncate">
+                                {item.title || 'System Notification'}
+                              </span>
+                              <span className="px-2 py-0.5 rounded text-[9px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                                {item.type || 'SYSTEM'}
+                              </span>
+                              {isUnread && (
+                                <span className="px-1.5 py-0.2 rounded text-[9px] font-extrabold bg-red-700 text-white">
+                                  Unread
+                                </span>
+                              )}
+                            </div>
+
+                            <p className="text-xs text-slate-600 leading-relaxed">
+                              {item.message || item.text}
+                            </p>
+
+                            <span className="text-[10px] text-slate-400 block pt-0.5">
+                              {item.createdAt ? new Date(item.createdAt).toLocaleString() : 'Recently'}
+                            </span>
+                          </div>
+                        </div>
+
+                        {isUnread && (
+                          <button
+                            type="button"
+                            onClick={() => handleMarkAsRead(item.id)}
+                            className="px-2.5 py-1 rounded bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 text-xs font-semibold shrink-0 cursor-pointer shadow-2xs"
+                          >
+                            Mark Read
+                          </button>
+                        )}
+                      </div>
+                    );
+                  });
+                })()
+              )}
+            </div>
+          </div>
+        ) : (
+          /* TAB 1: SYSTEM ANNOUNCEMENTS PANEL */
+          <>
 
         {/* 1. Summary Metrics Cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -1024,6 +1298,8 @@ export const AdminCommunicationsPage = () => {
               </div>
             </div>
           </div>
+        )}
+        </>
         )}
 
       </div>

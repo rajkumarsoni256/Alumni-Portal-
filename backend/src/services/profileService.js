@@ -291,6 +291,27 @@ const updateProfile = async (user, data) => {
   const currentProfileResult = await db.query('SELECT * FROM user_profiles WHERE user_id = $1', [user.id]);
   let current = currentProfileResult.rows[0] || {};
 
+  // Roll Number Immutability Safeguard
+  const newRoll = data.universityRollNumber || data.rollNumber;
+  if (
+    current.university_roll_number &&
+    newRoll &&
+    String(newRoll).trim().toUpperCase() !== String(current.university_roll_number).trim().toUpperCase()
+  ) {
+    const error = new Error('Verified University Roll Number is immutable and cannot be modified.');
+    error.statusCode = 400;
+    error.errorCode = 'ROLL_NUMBER_IMMUTABLE';
+    throw error;
+  }
+
+  // Academic Year Validation Safeguard (graduationYear > joiningYear)
+  const checkJoiningYear = data.joiningYear || data.joining_year || current.joining_year;
+  const checkGradYear = data.graduationYear || current.graduation_year;
+  if (checkJoiningYear && checkGradYear) {
+    const { validateAcademicYears } = require('../utils/courseConfig');
+    validateAcademicYears(checkJoiningYear, checkGradYear);
+  }
+
   const currentAcademicYear = data.currentAcademicYear !== undefined 
     ? data.currentAcademicYear 
     : (data.currentYear !== undefined ? data.currentYear : current.current_year);

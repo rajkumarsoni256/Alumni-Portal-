@@ -5,15 +5,17 @@ const db = require('../config/db');
 const googleAuthService = require('./googleAuthService');
 const emailService = require('../email/emailService');
 
+const sessionService = require('./sessionService');
+
 const JWT_SECRET = process.env.JWT_SECRET || '404E635266556A586E3272357538782F413F4428472B4B6250655368566D5970';
-const JWT_EXPIRATION = process.env.JWT_EXPIRATION || '1h';
+const ACCESS_TOKEN_TTL = process.env.ACCESS_TOKEN_TTL || '15m';
 
 const normalizeEmail = (email) => {
   return email ? email.trim().toLowerCase() : '';
 };
 
 const generateToken = (userId, role) => {
-  return jwt.sign({ sub: userId, role }, JWT_SECRET, { expiresIn: JWT_EXPIRATION });
+  return jwt.sign({ sub: userId, role }, JWT_SECRET, { expiresIn: ACCESS_TOKEN_TTL });
 };
 
 const parseUserAgent = (uaString = '') => {
@@ -78,13 +80,218 @@ const detectDeviceAndSendAlert = async (user, req = {}, authMethod = 'PASSWORD')
   }
 };
 
-const { validateAndNormalizeRollNumber, validateAcademicYears } = require('../utils/courseConfig');
+const {
+  validateAndNormalizeRollNumber,
+  validateAcademicYears,
+  validateJECRCEmail,
+  validateMobileNumber,
+} = require('../utils/courseConfig');
+
+/**
+ * Phase 14: Step 1 of Student Registration — Validate inputs & send OTP to JECRC Email
+ */
+const initiateStudentRegistration = async ({
+  name,
+  rollNumber,
+  institutionalEmail,
+  personalEmail,
+  mobileNumber,
+  phone,
+  password,
+  course,
+  joiningYear,
+  graduationYear,
+}) => {
+  const normInstitutionalEmail = validateJECRCEmail(institutionalEmail);
+  const normPersonalEmail = normalizeEmail(personalEmail);
+  const normPhone = validateMobileNumber(mobileNumber || phone);
+  const normRollNumber = validateAndNormalizeRollNumber(rollNumber);
+
+  if (!normPersonalEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normPersonalEmail)) {
+    const err = new Error('Please enter a valid personal email address.');
+    err.statusCode = 400;
+    err.errorCode = 'INVALID_PERSONAL_EMAIL';
+    throw err;
+  }
+
+  if (normPersonalEmail === normInstitutionalEmail) {
+    const err = new Error('Personal email address cannot be the same as your JECRC institutional email.');
+    err.statusCode = 400;
+    err.errorCode = 'SAME_EMAIL_ERROR';
+    throw err;
+  }
+
+  if (!password || String(password).length < 8) {
+    const err = new Error('Password must be at least 8 characters long.');
+    err.statusCode = 400;
+    err.errorCode = 'WEAK_PASSWORD';
+    throw err;
+  }
+
+  const years = validateAcademicYears(joiningYear, graduationYear);
+
+  // Check system settings for registration permission
+  const settingsRes = await db.query(`SELECT registration_enabled FROM system_settings WHERE id = 'default'`).catch(() => ({ rows: [] }));
+  if (settingsRes.rows.length > 0 && settingsRes.rows[0].registration_enabled === false) {
+    const error = new Error('Public registration is currently disabled by administrator.');
+    error.statusCode = 403;
+    error.errorCode = 'REGISTRATION_DISABLED';
+    throw error;
+  }
+
+  // Check personal email uniqueness in users table
+  const existingPersonal = await db.query('SELECT id FROM users WHERE email = $1', [normPersonalEmail]);
+  if (existingPersonal.rows.length > 0) {
+    const error = new Error(`An account with personal email '${normPersonalEmail}' already exists.`);
+    error.statusCode = 409;
+    error.errorCode = 'EMAIL_ALREADY_EXISTS';
+    throw error;
+  }
+
+  // Check roll number uniqueness in user_profiles
+  const rollCheck = await db.query(
+    `SELECT user_id FROM user_profiles WHERE university_roll_number = $1 LIMIT 1`,
+    [normRollNumber]
+  );
+  if (rollCheck.rows.length > 0) {
+    const error = new Error(`University Roll Number '${normRollNumber}' is already registered.`);
+    error.statusCode = 409;
+    error.errorCode = 'DUPLICATE_ROLL_NUMBER';
+    throw error;
+  }
+
+  // Store OTP for student verification in emailService (purpose: 'STUDENT_VERIFICATION')
+  const rawCode = await emailService.createAndStoreOTP({
+    email: normInstitutionalEmail,
+    purpose: 'STUDENT_VERIFICATION',
+  });
+
+  // Send OTP email to JECRC Institutional Email (non-blocking log warning)
+  emailService.sendVerificationCode(normInstitutionalEmail, null, name || 'Student', rawCode)
+    .catch((err) => console.warn('[OTP Email Send Warning]', err.message));
+
+  return {
+    success: true,
+    message: 'Verification OTP sent to your JECRC institutional email address.',
+    institutionalEmail: normInstitutionalEmail,
+    personalEmail: normPersonalEmail,
+    rollNumber: normRollNumber,
+  };
+};
+
+/**
+ * Phase 14: Step 2 of Student Registration — Verify OTP & create verified STUDENT account
+ */
+const verifyStudentRegistrationOTP = async ({
+  name,
+  rollNumber,
+  institutionalEmail,
+  personalEmail,
+  mobileNumber,
+  phone,
+  password,
+  course,
+  joiningYear,
+  graduationYear,
+  code,
+}) => {
+  const normInstitutionalEmail = validateJECRCEmail(institutionalEmail);
+  const normPersonalEmail = normalizeEmail(personalEmail);
+  const normPhone = validateMobileNumber(mobileNumber || phone);
+  const normRollNumber = validateAndNormalizeRollNumber(rollNumber);
+  const years = validateAcademicYears(joiningYear, graduationYear);
+
+  // Verify OTP
+  await emailService.verifyOTPCode({
+    email: normInstitutionalEmail,
+    code,
+    purpose: 'STUDENT_VERIFICATION',
+  });
+
+  // Re-verify uniqueness
+  const existingPersonal = await db.query('SELECT id FROM users WHERE email = $1', [normPersonalEmail]);
+  if (existingPersonal.rows.length > 0) {
+    const error = new Error(`An account with email '${normPersonalEmail}' already exists`);
+    error.statusCode = 409;
+    error.errorCode = 'EMAIL_ALREADY_EXISTS';
+    throw error;
+  }
+
+  const rollCheck = await db.query(
+    `SELECT user_id FROM user_profiles WHERE university_roll_number = $1 LIMIT 1`,
+    [normRollNumber]
+  );
+  if (rollCheck.rows.length > 0) {
+    const error = new Error(`University Roll Number '${normRollNumber}' is already registered.`);
+    error.statusCode = 409;
+    error.errorCode = 'DUPLICATE_ROLL_NUMBER';
+    throw error;
+  }
+
+  const userId = crypto.randomUUID();
+  const passwordHash = await bcrypt.hash(password, 10);
+  const profileName = name ? name.trim() : normPersonalEmail.split('@')[0];
+
+  // Insert Student User with personalEmail as login email!
+  const userResult = await db.query(
+    `INSERT INTO users (id, email, password_hash, role, email_verified, account_status, institutional_email, institutional_email_verified, email_verification_status)
+     VALUES ($1, $2, $3, 'STUDENT', true, 'ACTIVE', $4, true, 'VERIFIED')
+     RETURNING id, email, role, email_verified, account_status, institutional_email`,
+    [userId, normPersonalEmail, passwordHash, normInstitutionalEmail]
+  );
+  const user = userResult.rows[0];
+
+  // Insert Profile with phone and verified roll number
+  await db.query(
+    `INSERT INTO user_profiles (id, user_id, full_name, university_roll_number, phone, course, joining_year, graduation_year, is_profile_complete)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, true)`,
+    [
+      crypto.randomUUID(),
+      user.id,
+      profileName,
+      normRollNumber,
+      normPhone,
+      course ? String(course).trim().toUpperCase() : 'BTECH',
+      years.joiningYear,
+      years.graduationYear,
+    ]
+  );
+
+  const sessionData = await sessionService.createSession({
+    userId: user.id,
+    ipAddress: req?.ip || req?.headers?.['x-forwarded-for'] || null,
+    userAgent: req?.headers ? req.headers['user-agent'] : null,
+  });
+
+  const token = generateToken(user.id, user.role);
+
+  return {
+    user: {
+      id: user.id,
+      email: user.email,
+      institutionalEmail: user.institutional_email,
+      role: user.role,
+      fullName: profileName,
+      profileComplete: true,
+      universityRollNumber: normRollNumber,
+      phone: normPhone,
+      course: course ? String(course).trim().toUpperCase() : 'BTECH',
+      joiningYear: years.joiningYear,
+      graduationYear: years.graduationYear,
+    },
+    token,
+    accessToken: token,
+    refreshToken: sessionData.rawRefreshToken,
+  };
+};
 
 const register = async ({
   name,
   email,
   password,
   role,
+  mobileNumber,
+  phone,
   rollNumber,
   universityRollNumber,
   course,
@@ -117,6 +324,9 @@ const register = async ({
     throw error;
   }
 
+  // Validate mobile number for ALUMNI
+  const normPhone = validateMobileNumber(mobileNumber || phone);
+
   // Check system settings for registration permission
   const settingsRes = await db.query(`SELECT registration_enabled FROM system_settings WHERE id = 'default'`).catch(() => ({ rows: [] }));
   if (settingsRes.rows.length > 0 && settingsRes.rows[0].registration_enabled === false) {
@@ -140,14 +350,16 @@ const register = async ({
   let validatedJoiningYear = joiningYear || joining_year ? parseInt(joiningYear || joining_year, 10) : null;
   let validatedGraduationYear = graduationYear || graduation_year ? parseInt(graduationYear || graduation_year, 10) : null;
 
-  // Student Identity Validation
-  if (upperRole === 'STUDENT') {
-    const rawRoll = rollNumber || universityRollNumber;
-    normRollNumber = validateAndNormalizeRollNumber(rawRoll, normCourse, validatedJoiningYear);
-
+  if (validatedJoiningYear && validatedGraduationYear) {
     const years = validateAcademicYears(validatedJoiningYear, validatedGraduationYear);
     validatedJoiningYear = years.joiningYear;
     validatedGraduationYear = years.graduationYear;
+  }
+
+  // Student Identity Validation
+  if (upperRole === 'STUDENT') {
+    const rawRoll = rollNumber || universityRollNumber;
+    normRollNumber = validateAndNormalizeRollNumber(rawRoll);
 
     // Database Uniqueness check for Roll Number
     const rollCheck = await db.query(
@@ -177,13 +389,14 @@ const register = async ({
 
   // Create initial profile
   await db.query(
-    `INSERT INTO user_profiles (id, user_id, full_name, university_roll_number, course, joining_year, graduation_year, is_profile_complete)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, false)`,
+    `INSERT INTO user_profiles (id, user_id, full_name, university_roll_number, phone, course, joining_year, graduation_year, is_profile_complete)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, false)`,
     [
       crypto.randomUUID(),
       user.id,
       profileName,
       normRollNumber,
+      normPhone,
       normCourse,
       validatedJoiningYear,
       validatedGraduationYear,
@@ -376,6 +589,12 @@ const login = async ({ email, password, req }) => {
   // Device detection and new device alert
   await detectDeviceAndSendAlert(user, req, 'PASSWORD');
 
+  const sessionData = await sessionService.createSession({
+    userId: user.id,
+    ipAddress: req?.ip || req?.headers?.['x-forwarded-for'] || null,
+    userAgent: req?.headers ? req.headers['user-agent'] : null,
+  });
+
   const token = generateToken(user.id, user.role);
 
   return {
@@ -388,6 +607,8 @@ const login = async ({ email, password, req }) => {
       profileComplete: !!user.is_profile_complete,
     },
     token,
+    accessToken: token,
+    refreshToken: sessionData.rawRefreshToken,
   };
 };
 
@@ -485,6 +706,12 @@ const authenticateWithGoogle = async ({ idToken, req }) => {
   // Device detection and new device alert
   await detectDeviceAndSendAlert(user, req, 'GOOGLE_OAUTH');
 
+  const sessionData = await sessionService.createSession({
+    userId: user.id,
+    ipAddress: req?.ip || req?.headers?.['x-forwarded-for'] || null,
+    userAgent: req?.headers ? req.headers['user-agent'] : null,
+  });
+
   const token = generateToken(user.id, user.role);
 
   return {
@@ -496,6 +723,8 @@ const authenticateWithGoogle = async ({ idToken, req }) => {
       profileComplete: !!user.is_profile_complete,
     },
     token,
+    accessToken: token,
+    refreshToken: sessionData.rawRefreshToken,
   };
 };
 
@@ -600,6 +829,9 @@ const resetPassword = async ({ token, code, email, newPassword }) => {
   const passwordHash = await bcrypt.hash(newPassword, 10);
   await db.query('UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2', [passwordHash, targetUserId]);
 
+  // Security Hardening: Revoke all active sessions on password change
+  await sessionService.revokeAllUserSessions(targetUserId, 'PASSWORD_CHANGED').catch(() => {});
+
   // Trigger Security Alert Email: Password Changed
   if (targetUserEmail) {
     try {
@@ -655,6 +887,8 @@ const getCurrentUser = async (user) => {
 
 module.exports = {
   register,
+  initiateStudentRegistration,
+  verifyStudentRegistrationOTP,
   verifyEmail,
   resendVerificationCode,
   login,
