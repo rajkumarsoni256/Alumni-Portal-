@@ -196,6 +196,19 @@ class EmailService {
   }
 
   /**
+   * 1b. Send Student Institutional Email Verification OTP Code
+   */
+  async sendStudentVerificationCode(email, name) {
+    const rawCode = await this.createAndStoreOTP({ email, purpose: 'STUDENT_VERIFICATION' });
+    const { subject, html, text } = getVerificationCodeTemplate({ code: rawCode, name, expiresMinutes: this.OTP_EXPIRY_MINUTES });
+
+    console.log(`[OTP DISPATCH] Student Verification OTP for ${email}: ${rawCode}`);
+    const result = await this.provider.sendEmail({ to: email, subject, html, text });
+    await this.logDelivery({ userId: null, recipientEmail: email, emailType: 'STUDENT_VERIFICATION', templateName: 'verificationCode', subject, result });
+    return result;
+  }
+
+  /**
    * 2. Send Password Reset OTP Code
    */
   async sendPasswordResetCode(email, userId, name, resetToken = null) {

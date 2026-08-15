@@ -160,14 +160,8 @@ const initiateStudentRegistration = async ({
     throw error;
   }
 
-  // Store OTP for student verification in emailService (purpose: 'STUDENT_VERIFICATION')
-  const rawCode = await emailService.createAndStoreOTP({
-    email: normInstitutionalEmail,
-    purpose: 'STUDENT_VERIFICATION',
-  });
-
-  // Send OTP email to JECRC Institutional Email (non-blocking log warning)
-  emailService.sendVerificationCode(normInstitutionalEmail, null, name || 'Student', rawCode)
+  // Send OTP email to JECRC Institutional Email with STUDENT_VERIFICATION purpose
+  await emailService.sendStudentVerificationCode(normInstitutionalEmail, name || 'Student')
     .catch((err) => console.warn('[OTP Email Send Warning]', err.message));
 
   return {
