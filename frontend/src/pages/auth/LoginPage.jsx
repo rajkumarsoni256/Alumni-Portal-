@@ -328,53 +328,8 @@ export const LoginPage = () => {
             </div>
           </div>
 
-          {/* Quick Demo Login Fill Buttons */}
-          <div className="pt-3 border-t border-slate-100 space-y-2">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block text-center">
-              Quick Portal Demo Accounts
-            </span>
-            <div className="flex items-center justify-center gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setEmail('admin@jecrc.ac.in');
-                  setPassword('AdminPassword@123');
-                  setErrors({});
-                  setErrorMessage('');
-                }}
-                className="px-2.5 py-1 rounded text-[11px] font-semibold text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 transition-colors cursor-pointer"
-              >
-                Fill Demo Admin
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setEmail('student@jecrc.ac.in');
-                  setPassword('StudentPassword@123');
-                  setErrors({});
-                  setErrorMessage('');
-                }}
-                className="px-2.5 py-1 rounded text-[11px] font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-200 transition-colors cursor-pointer"
-              >
-                Fill Demo Student
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setEmail('alumni@jecrc.ac.in');
-                  setPassword('AlumniPassword@123');
-                  setErrors({});
-                  setErrorMessage('');
-                }}
-                className="px-2.5 py-1 rounded text-[11px] font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-200 transition-colors cursor-pointer"
-              >
-                Fill Demo Alumni
-              </button>
-            </div>
-          </div>
-
           {/* Footer Register Link */}
-          <div className="pt-2 text-center text-xs text-slate-500">
+          <div className="pt-3 border-t border-slate-100 text-center text-xs text-slate-500">
             Don't have an account?{' '}
             <Link to="/register" className="text-red-700 font-semibold hover:underline">
               Join the Community
