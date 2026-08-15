@@ -298,5 +298,40 @@ export const adminUserService = {
    */
   previewAudience: async (payload) => {
     return await apiClient.post('/api/v1/admin/notifications/preview-audience', payload);
+  },
+
+  /**
+   * Phase 13: Promote Student to Alumni role
+   */
+  promoteUserToAlumni: async (id) => {
+    return await apiClient.patch(`/api/v1/admin/users/${id}/role`, { role: 'ALUMNI' });
+  },
+
+  /**
+   * Phase 13: Update user account status (ACTIVE or DISABLED)
+   */
+  updateUserStatus: async (id, status) => {
+    return await apiClient.patch(`/api/v1/admin/users/${id}/status`, { accountStatus: status });
+  },
+
+  /**
+   * Phase 13: Fetch real Admin Notification Inbox records
+   */
+  getNotificationInbox: async (params = {}) => {
+    return await apiClient.get('/api/v1/admin/notifications/inbox', { params });
+  },
+
+  /**
+   * Phase 13: Mark single notification as read
+   */
+  markNotificationAsRead: async (id) => {
+    return await apiClient.patch(`/api/v1/admin/notifications/${id}/read`);
+  },
+
+  /**
+   * Phase 13: Mark all notifications as read
+   */
+  markAllNotificationsAsRead: async () => {
+    return await apiClient.patch('/api/v1/admin/notifications/read-all');
   }
 };

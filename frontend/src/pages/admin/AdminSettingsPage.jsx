@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 
 export const AdminSettingsPage = () => {
-  const { showNotification } = useApp();
+  const { showNotification, updateAdminProfileState } = useApp();
 
   // Admin Profile State
   const [name, setName] = useState('');
@@ -60,8 +60,11 @@ export const AdminSettingsPage = () => {
         setAlumniVerificationEnabled(data.alumniVerificationEnabled !== false);
         setMaintenanceMode(Boolean(data.maintenanceMode));
         if (data.adminProfile) {
-          setName(data.adminProfile.name || 'Dean of Alumni Relations');
+          setName(data.adminProfile.name || 'Administrator');
           setEmail(data.adminProfile.email || 'admin@jecrc.ac.in');
+          if (updateAdminProfileState) {
+            updateAdminProfileState(data.adminProfile);
+          }
         }
       }
     } catch (err) {
@@ -81,7 +84,10 @@ export const AdminSettingsPage = () => {
     e.preventDefault();
     setIsSavingProfile(true);
     try {
-      await adminUserService.updateSettings({ name, email });
+      const updated = await adminUserService.updateSettings({ name, email });
+      if (updateAdminProfileState) {
+        updateAdminProfileState(updated?.adminProfile || { name, email });
+      }
       showNotification('Administrator profile saved successfully.', 'success');
     } catch (err) {
       console.error('Failed to save admin profile:', err);

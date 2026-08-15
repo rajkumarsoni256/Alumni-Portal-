@@ -153,7 +153,7 @@ export const AdminHeader = ({ onSearch }) => {
             </div>
             <div className="hidden sm:block min-w-0">
               <span className="text-xs font-bold text-slate-900 truncate block leading-tight">
-                {currentUser?.name || 'Dean of Alumni'}
+                {currentUser?.name || 'Administrator'}
               </span>
               <span className="text-[10px] text-slate-500 truncate block leading-tight">
                 Directorate of Alumni

@@ -1,4 +1,5 @@
 const db = require('../config/db');
+const { logAdminAction, AUDIT_ACTIONS } = require('./adminAuditService');
 
 const parseList = (str) => {
   if (!str || typeof str !== 'string' || str.trim() === '') return [];
@@ -379,9 +380,9 @@ const getUserById = async (userId) => {
 };
 
 /**
- * Enable or Disable user account (updates users.account_status)
+ * Enable or Disable user account (updates users.account_status) with transaction and audit logging
  */
-const updateUserStatus = async (userId, accountStatus) => {
+const updateUserStatus = async (adminUserId, targetUserId, accountStatus) => {
   const normStatus = String(accountStatus).toUpperCase().trim();
   if (!['ACTIVE', 'DISABLED'].includes(normStatus)) {
     const error = new Error('Invalid account status. Allowed values: ACTIVE, DISABLED');
@@ -390,20 +391,146 @@ const updateUserStatus = async (userId, accountStatus) => {
     throw error;
   }
 
-  const query = `
-    UPDATE users
-    SET account_status = $2, updated_at = CURRENT_TIMESTAMP
-    WHERE id = $1
-    RETURNING id, email, role, account_status;
-  `;
-  const res = await db.query(query, [userId, normStatus]);
-  if (res.rows.length === 0) {
-    const error = new Error(`User not found with ID: ${userId}`);
-    error.statusCode = 404;
-    error.errorCode = 'USER_NOT_FOUND';
+  // Prevent admin self-deactivation
+  if (adminUserId && adminUserId === targetUserId && normStatus === 'DISABLED') {
+    const error = new Error('Administrators cannot deactivate their own account.');
+    error.statusCode = 400;
+    error.errorCode = 'SELF_DEACTIVATION_PROHIBITED';
     throw error;
   }
-  return res.rows[0];
+
+  const client = await db.getClient();
+  try {
+    await client.query('BEGIN');
+
+    const userCheck = await client.query(
+      `SELECT u.id, u.email, u.role, u.account_status, p.full_name
+       FROM users u
+       LEFT JOIN user_profiles p ON u.id = p.user_id
+       WHERE u.id = $1 FOR UPDATE OF u`,
+      [targetUserId]
+    );
+
+    if (userCheck.rows.length === 0) {
+      const error = new Error(`User not found with ID: ${targetUserId}`);
+      error.statusCode = 404;
+      error.errorCode = 'USER_NOT_FOUND';
+      throw error;
+    }
+
+    const prevUser = userCheck.rows[0];
+
+    const updateRes = await client.query(
+      `UPDATE users
+       SET account_status = $2, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $1
+       RETURNING id, email, role, account_status;`,
+      [targetUserId, normStatus]
+    );
+
+    const auditAction = normStatus === 'DISABLED' ? AUDIT_ACTIONS.USER_DEACTIVATED : AUDIT_ACTIONS.USER_REACTIVATED;
+
+    await logAdminAction({
+      client,
+      adminUserId,
+      action: auditAction,
+      targetEntity: 'USER',
+      targetId: targetUserId,
+      details: {
+        targetUserId,
+        targetUserName: prevUser.full_name || prevUser.email,
+        previousStatus: prevUser.account_status,
+        newStatus: normStatus,
+      },
+    });
+
+    await client.query('COMMIT');
+    return updateRes.rows[0];
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+};
+
+/**
+ * Promote Student to Alumni (updates users.role = 'ALUMNI') with transaction and audit logging
+ */
+const updateUserRole = async (adminUserId, targetUserId, newRole) => {
+  const normRole = String(newRole).toUpperCase().trim();
+  if (normRole !== 'ALUMNI') {
+    const error = new Error('Invalid role transition. Only promotion to ALUMNI is supported.');
+    error.statusCode = 400;
+    error.errorCode = 'INVALID_ROLE_TRANSITION';
+    throw error;
+  }
+
+  const client = await db.getClient();
+  try {
+    await client.query('BEGIN');
+
+    const userCheck = await client.query(
+      `SELECT u.id, u.email, u.role, u.account_status, p.full_name
+       FROM users u
+       LEFT JOIN user_profiles p ON u.id = p.user_id
+       WHERE u.id = $1 FOR UPDATE OF u`,
+      [targetUserId]
+    );
+
+    if (userCheck.rows.length === 0) {
+      const error = new Error(`User not found with ID: ${targetUserId}`);
+      error.statusCode = 404;
+      error.errorCode = 'USER_NOT_FOUND';
+      throw error;
+    }
+
+    const targetUser = userCheck.rows[0];
+
+    if (targetUser.role === 'ALUMNI') {
+      const error = new Error(`User '${targetUser.full_name || targetUser.email}' is already an Alumni.`);
+      error.statusCode = 409;
+      error.errorCode = 'ALREADY_ALUMNI';
+      throw error;
+    }
+
+    if (targetUser.role !== 'STUDENT') {
+      const error = new Error(`Cannot promote user with role '${targetUser.role}'. Only STUDENT can be promoted to ALUMNI.`);
+      error.statusCode = 400;
+      error.errorCode = 'INVALID_ROLE_TRANSITION';
+      throw error;
+    }
+
+    const updateRes = await client.query(
+      `UPDATE users
+       SET role = 'ALUMNI', updated_at = CURRENT_TIMESTAMP
+       WHERE id = $1
+       RETURNING id, email, role, account_status;`,
+      [targetUserId]
+    );
+
+    await logAdminAction({
+      client,
+      adminUserId,
+      action: AUDIT_ACTIONS.USER_ROLE_CHANGED,
+      targetEntity: 'USER',
+      targetId: targetUserId,
+      details: {
+        targetUserId,
+        targetUserName: targetUser.full_name || targetUser.email,
+        previousRole: targetUser.role,
+        newRole: 'ALUMNI',
+      },
+    });
+
+    await client.query('COMMIT');
+    return updateRes.rows[0];
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
 };
 
 const getUserStats = async () => {
@@ -435,6 +562,7 @@ module.exports = {
   getUsers,
   getUserById,
   updateUserStatus,
+  updateUserRole,
   getUserStats,
   buildUserQueryFilters,
 };

@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { AdminLayout } from '../../components/admin/layout/AdminLayout';
 import { adminUserService } from '../../services/adminUserService';
 import { ExportModal } from '../../components/admin/export/ExportModal';
+import { UserAvatar } from '../../components/common/UserAvatar';
 import { useApp } from '../../context/AppContext';
 import { 
   Search, 
@@ -16,17 +17,29 @@ import {
   CheckSquare,
   Square,
   AlertCircle,
-  ChevronDown
+  ChevronDown,
+  UserCheck,
+  UserX,
+  Shield,
+  AlertTriangle,
+  RefreshCw,
+  Lock
 } from 'lucide-react';
 
 export const AdminUsersPage = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { showNotification } = useApp();
+  const { showNotification, currentUser } = useApp();
 
   // Search State
   const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || '');
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+
+  // User Actions State
+  const [openDropdownUserId, setOpenDropdownUserId] = useState(null);
+  const [promoteModalUser, setPromoteModalUser] = useState(null);
+  const [statusModalUser, setStatusModalUser] = useState(null);
+  const [isActionLoading, setIsActionLoading] = useState(false);
 
   // Filters State
   const [filters, setFilters] = useState({
@@ -61,6 +74,17 @@ export const AdminUsersPage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (!e.target.closest('.user-action-dropdown')) {
+        setOpenDropdownUserId(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   // Debounce search query
   const [debouncedQuery, setDebouncedQuery] = useState(searchQuery);
   useEffect(() => {
@@ -79,6 +103,40 @@ export const AdminUsersPage = () => {
       }
     } catch (err) {
       console.error('Failed to load user stats:', err);
+    }
+  };
+
+  const handlePromoteConfirm = async () => {
+    if (!promoteModalUser) return;
+    setIsActionLoading(true);
+    try {
+      await adminUserService.promoteUserToAlumni(promoteModalUser.id);
+      showNotification(`Successfully promoted '${promoteModalUser.name}' to Alumni role!`, 'success');
+      setPromoteModalUser(null);
+      await Promise.all([fetchUsers(), fetchStats()]);
+    } catch (err) {
+      console.error('Failed to promote user:', err);
+      showNotification(err.message || 'Failed to promote user to Alumni.', 'error');
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
+  const handleStatusConfirm = async () => {
+    if (!statusModalUser) return;
+    const targetStatus = statusModalUser.currentStatus === 'DISABLED' ? 'ACTIVE' : 'DISABLED';
+    setIsActionLoading(true);
+    try {
+      await adminUserService.updateUserStatus(statusModalUser.id, targetStatus);
+      const actionText = targetStatus === 'DISABLED' ? 'deactivated' : 'reactivated';
+      showNotification(`User '${statusModalUser.name}' account ${actionText} successfully.`, 'success');
+      setStatusModalUser(null);
+      await Promise.all([fetchUsers(), fetchStats()]);
+    } catch (err) {
+      console.error('Failed to update user account status:', err);
+      showNotification(err.message || 'Failed to update user account status.', 'error');
+    } finally {
+      setIsActionLoading(false);
     }
   };
 
@@ -524,13 +582,11 @@ export const AdminUsersPage = () => {
                         {/* USER */}
                         <td className="p-3.5 font-semibold text-slate-900">
                           <div className="flex items-center gap-3">
-                            <div className="w-9 h-9 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center font-bold text-slate-700 text-xs shrink-0 overflow-hidden">
-                              {user.avatar ? (
-                                <img src={user.avatar} alt={user.name} className="w-full h-full object-cover" />
-                              ) : (
-                                <span>{user.name ? user.name.charAt(0).toUpperCase() : 'U'}</span>
-                              )}
-                            </div>
+                            <UserAvatar
+                              src={user.avatar || user.avatarUrl}
+                              name={user.name}
+                              className="w-9 h-9"
+                            />
                             <div className="min-w-0">
                               <Link
                                 to={`/admin/users/${user.id}`}
@@ -627,8 +683,8 @@ export const AdminUsersPage = () => {
                           </span>
                         </td>
 
-                        {/* ACTIONS */}
-                        <td className="p-3.5 text-right">
+                        {/* ACTIONS DROPDOWN */}
+                        <td className="p-3.5 text-right relative user-action-dropdown">
                           {isPending ? (
                             <Link
                               to="/admin/approvals"
@@ -636,17 +692,87 @@ export const AdminUsersPage = () => {
                             >
                               <Eye className="w-3.5 h-3.5" />
                               <span>Review</span>
-                              <ChevronDown className="w-3 h-3 text-red-700 opacity-60" />
                             </Link>
                           ) : (
-                            <Link
-                              to={`/admin/users/${user.id}`}
-                              className="px-3 py-1 rounded text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-300 transition-colors inline-flex items-center gap-1 cursor-pointer shadow-2xs"
-                            >
-                              <Eye className="w-3.5 h-3.5 text-slate-500" />
-                              <span>View</span>
-                              <ChevronDown className="w-3 h-3 text-slate-400" />
-                            </Link>
+                            <div className="relative inline-block text-left">
+                              <button
+                                type="button"
+                                onClick={() => setOpenDropdownUserId(openDropdownUserId === user.id ? null : user.id)}
+                                className="px-3 py-1 rounded text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-300 transition-colors inline-flex items-center gap-1 cursor-pointer shadow-2xs"
+                              >
+                                <span>Actions</span>
+                                <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+                              </button>
+
+                              {openDropdownUserId === user.id && (
+                                <div className="absolute right-0 mt-1 w-44 bg-white rounded-md border border-slate-200 shadow-lg py-1 z-50 text-xs text-left animate-in fade-in-50">
+                                  <Link
+                                    to={`/admin/users/${user.id}`}
+                                    onClick={() => setOpenDropdownUserId(null)}
+                                    className="flex items-center gap-2 px-3 py-1.5 text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors"
+                                  >
+                                    <Eye className="w-3.5 h-3.5 text-slate-400" />
+                                    <span>View Profile</span>
+                                  </Link>
+
+                                  {/* Promote to Alumni option for Student */}
+                                  {user.role === 'Student' && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setOpenDropdownUserId(null);
+                                        setPromoteModalUser(user);
+                                      }}
+                                      className="w-full flex items-center gap-2 px-3 py-1.5 text-red-700 hover:bg-red-50 font-semibold transition-colors cursor-pointer text-left"
+                                    >
+                                      <UserCheck className="w-3.5 h-3.5 text-red-700" />
+                                      <span>Promote to Alumni</span>
+                                    </button>
+                                  )}
+
+                                  {/* Deactivate / Activate User */}
+                                  {currentUser?.id === user.id ? (
+                                    <span
+                                      className="flex items-center gap-2 px-3 py-1.5 text-slate-400 cursor-not-allowed text-[11px]"
+                                      title="You cannot deactivate your own account"
+                                    >
+                                      <Lock className="w-3.5 h-3.5 text-slate-300" />
+                                      <span>Self Deactivation</span>
+                                    </span>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setOpenDropdownUserId(null);
+                                        setStatusModalUser({
+                                          id: user.id,
+                                          name: user.name,
+                                          role: user.role,
+                                          currentStatus: rawStatus,
+                                        });
+                                      }}
+                                      className={`w-full flex items-center gap-2 px-3 py-1.5 font-semibold transition-colors cursor-pointer text-left ${
+                                        isDisabled
+                                          ? 'text-emerald-700 hover:bg-emerald-50'
+                                          : 'text-rose-700 hover:bg-rose-50'
+                                      }`}
+                                    >
+                                      {isDisabled ? (
+                                        <>
+                                          <UserCheck className="w-3.5 h-3.5 text-emerald-600" />
+                                          <span>Restore Access</span>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <UserX className="w-3.5 h-3.5 text-rose-600" />
+                                          <span>Deactivate User</span>
+                                        </>
+                                      )}
+                                    </button>
+                                  )}
+                                </div>
+                              )}
+                            </div>
                           )}
                         </td>
                       </tr>
@@ -741,6 +867,142 @@ export const AdminUsersPage = () => {
           exportCount={selectedUserIds.length > 0 ? selectedUserIds.length : dataResult.totalCount}
           isSelectionExport={selectedUserIds.length > 0}
         />
+      )}
+
+      {/* 1. Student -> Alumni Promotion Confirmation Modal */}
+      {promoteModalUser && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-xl max-w-md w-full p-6 space-y-4 animate-in fade-in zoom-in-95">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-red-100 text-red-700 flex items-center justify-center shrink-0">
+                <UserCheck className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-slate-900">Promote Student to Alumni</h3>
+                <p className="text-xs text-slate-500">
+                  Update role from <span className="font-semibold text-blue-700">Student</span> to <span className="font-semibold text-red-700">Alumni</span>.
+                </p>
+              </div>
+            </div>
+
+            <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200/90 text-xs space-y-1">
+              <p className="font-bold text-slate-900">{promoteModalUser.name}</p>
+              <p className="text-slate-500">{promoteModalUser.email}</p>
+              {promoteModalUser.rollNumber && (
+                <p className="text-slate-400 text-[11px]">Roll No: {promoteModalUser.rollNumber}</p>
+              )}
+            </div>
+
+            <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-amber-800 text-xs flex items-start gap-2">
+              <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+              <span>
+                This will grant alumni networking capabilities, increment live alumni metrics, and log an administrative audit event in PostgreSQL.
+              </span>
+            </div>
+
+            <div className="pt-2 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setPromoteModalUser(null)}
+                disabled={isActionLoading}
+                className="px-3.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handlePromoteConfirm}
+                disabled={isActionLoading}
+                className="px-4 py-1.5 rounded-lg bg-red-700 hover:bg-red-800 text-white text-xs font-bold cursor-pointer shadow-2xs inline-flex items-center gap-1.5 disabled:opacity-50"
+              >
+                <UserCheck className="w-3.5 h-3.5" />
+                <span>{isActionLoading ? 'Promoting...' : 'Confirm Promotion'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 2. Deactivate / Restore User Confirmation Modal */}
+      {statusModalUser && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-xl max-w-md w-full p-6 space-y-4 animate-in fade-in zoom-in-95">
+            <div className="flex items-center gap-3">
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${
+                statusModalUser.currentStatus === 'DISABLED'
+                  ? 'bg-emerald-100 text-emerald-700'
+                  : 'bg-rose-100 text-rose-700'
+              }`}>
+                {statusModalUser.currentStatus === 'DISABLED' ? (
+                  <UserCheck className="w-5 h-5" />
+                ) : (
+                  <UserX className="w-5 h-5" />
+                )}
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-slate-900">
+                  {statusModalUser.currentStatus === 'DISABLED' ? 'Restore User Account' : 'Deactivate User Account'}
+                </h3>
+                <p className="text-xs text-slate-500">
+                  {statusModalUser.currentStatus === 'DISABLED'
+                    ? 'Reactivate account access for this user'
+                    : 'Prevent account authentication without deleting records'}
+                </p>
+              </div>
+            </div>
+
+            <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200/90 text-xs space-y-1">
+              <p className="font-bold text-slate-900">{statusModalUser.name}</p>
+              <p className="text-slate-500">Role: {statusModalUser.role}</p>
+            </div>
+
+            <div className={`p-3 rounded-xl border text-xs flex items-start gap-2 ${
+              statusModalUser.currentStatus === 'DISABLED'
+                ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                : 'bg-rose-50 border-rose-200 text-rose-800'
+            }`}>
+              <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+              <span>
+                {statusModalUser.currentStatus === 'DISABLED'
+                  ? 'Restoring access will allow the user to authenticate again immediately.'
+                  : 'Deactivating will block active JWT sessions and authentication attempts. Audit logs and user data remain safely intact.'}
+              </span>
+            </div>
+
+            <div className="pt-2 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setStatusModalUser(null)}
+                disabled={isActionLoading}
+                className="px-3.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleStatusConfirm}
+                disabled={isActionLoading}
+                className={`px-4 py-1.5 rounded-lg text-white text-xs font-bold cursor-pointer shadow-2xs inline-flex items-center gap-1.5 disabled:opacity-50 ${
+                  statusModalUser.currentStatus === 'DISABLED'
+                    ? 'bg-emerald-600 hover:bg-emerald-700'
+                    : 'bg-rose-700 hover:bg-rose-800'
+                }`}
+              >
+                {statusModalUser.currentStatus === 'DISABLED' ? (
+                  <>
+                    <UserCheck className="w-3.5 h-3.5" />
+                    <span>{isActionLoading ? 'Restoring...' : 'Confirm Restore'}</span>
+                  </>
+                ) : (
+                  <>
+                    <UserX className="w-3.5 h-3.5" />
+                    <span>{isActionLoading ? 'Deactivating...' : 'Confirm Deactivation'}</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </AdminLayout>
   );

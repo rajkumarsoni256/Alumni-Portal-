@@ -381,11 +381,40 @@ export const AppProvider = ({ children }) => {
     };
   }, []);
 
+  const updateAdminProfileState = (updatedProfile) => {
+    if (!updatedProfile) return;
+    const adminData = updatedProfile.adminProfile || updatedProfile;
+    const name = adminData.name || adminData.fullName;
+    const email = adminData.email;
+    const avatar = adminData.avatar || adminData.avatarUrl;
+
+    setAuthUser((prev) =>
+      prev
+        ? {
+            ...prev,
+            email: email || prev.email,
+            fullName: name || prev.fullName,
+            avatarUrl: avatar !== undefined ? avatar : prev.avatarUrl,
+          }
+        : prev
+    );
+
+    setUserProfile((prev) =>
+      prev
+        ? {
+            ...prev,
+            fullName: name || prev.fullName,
+            avatarUrl: avatar !== undefined ? avatar : prev.avatarUrl,
+          }
+        : { fullName: name, avatarUrl: avatar }
+    );
+  };
+
   const currentUser = authUser?.role?.toUpperCase() === 'ADMIN'
     ? {
         id: authUser.id,
-        name: 'Dean of Alumni Relations',
-        email: authUser.email,
+        name: userProfile?.fullName || authUser?.fullName || 'Administrator',
+        email: authUser?.email || 'admin@jecrc.ac.in',
         role: 'admin',
         roleUpper: 'ADMIN',
         avatar: userProfile?.avatarUrl || authUser?.avatarUrl || null,
@@ -963,6 +992,7 @@ export const AppProvider = ({ children }) => {
         markAllNotificationsRead,
         toggleEventRegistration,
         updateUserProfile,
+        updateAdminProfileState,
         submitMentorshipRequest,
         updateRequestStatus,
         userSettings,

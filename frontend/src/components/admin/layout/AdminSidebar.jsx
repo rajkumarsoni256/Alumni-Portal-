@@ -150,7 +150,7 @@ export const AdminSidebar = ({ className = '' }) => {
 
             <div className="min-w-0 flex-1">
               <span className="text-xs font-bold text-slate-900 truncate block">
-                {currentUser?.name || 'Dean of Alumni Relations'}
+                {currentUser?.name || 'Administrator'}
               </span>
               <span className="text-[10px] text-slate-500 truncate block">
                 Directorate of Alumni Relations

@@ -158,6 +158,85 @@ const previewAudience = async (req, res, next) => {
   }
 };
 
+/**
+ * Controller to fetch Admin Notification Inbox records
+ */
+const getNotificationInbox = async (req, res, next) => {
+  try {
+    const notificationService = require('../services/notificationService');
+    const adminUserId = req.user?.id;
+    const result = await notificationService.getNotifications(adminUserId, req.query);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Admin notification inbox retrieved successfully',
+      data: result.notifications,
+      unreadCount: result.unreadCount,
+      pagination: {
+        totalCount: result.total,
+        page: result.page,
+        limit: result.limit,
+        totalPages: result.pages,
+        hasMore: result.hasMore,
+      },
+    });
+  } catch (error) {
+    console.error('Error fetching admin notification inbox:', error);
+    next(error);
+  }
+};
+
+/**
+ * Controller to mark single notification as read
+ */
+const markNotificationRead = async (req, res, next) => {
+  try {
+    const notificationService = require('../services/notificationService');
+    const { logAdminAction, AUDIT_ACTIONS } = require('../services/adminAuditService');
+    const adminUserId = req.user?.id;
+    const { id } = req.params;
+
+    const result = await notificationService.markAsRead(adminUserId, id);
+
+    logAdminAction({
+      adminUserId,
+      action: AUDIT_ACTIONS.NOTIFICATION_READ,
+      targetEntity: 'NOTIFICATION',
+      targetId: id,
+      details: { notificationId: id },
+    }).catch((err) => console.error('Failed to log NOTIFICATION_READ audit:', err));
+
+    return res.status(200).json({
+      success: true,
+      message: result.message,
+    });
+  } catch (error) {
+    console.error('Error marking notification as read:', error);
+    next(error);
+  }
+};
+
+/**
+ * Controller to mark all admin notifications as read
+ */
+const markAllNotificationsRead = async (req, res, next) => {
+  try {
+    const notificationService = require('../services/notificationService');
+    const adminUserId = req.user?.id;
+
+    const result = await notificationService.markAllAsRead(adminUserId);
+
+    return res.status(200).json({
+      success: true,
+      message: result.message,
+      updatedCount: result.updatedCount,
+    });
+  } catch (error) {
+    console.error('Error marking all notifications as read:', error);
+    next(error);
+  }
+};
+
 module.exports = {
   getNotifications,
   getNotificationById,
@@ -167,4 +246,7 @@ module.exports = {
   cancelNotification,
   deleteNotification,
   previewAudience,
+  getNotificationInbox,
+  markNotificationRead,
+  markAllNotificationsRead,
 };
