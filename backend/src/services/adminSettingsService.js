@@ -323,7 +323,31 @@ const updateSettings = async (adminUserId, payload = {}) => {
   }
 };
 
+const getPublicSettings = async () => {
+  const settingsRes = await db.query(
+    `SELECT 
+        platform_name AS "platformName",
+        support_email AS "supportEmail",
+        registration_enabled AS "registrationEnabled",
+        alumni_verification_enabled AS "alumniVerificationEnabled",
+        maintenance_mode AS "maintenanceMode"
+     FROM system_settings 
+     WHERE id = 'default'`
+  );
+  if (settingsRes.rows.length > 0) {
+    return settingsRes.rows[0];
+  }
+  return {
+    platformName: 'JECRC Community Platform',
+    supportEmail: 'alumni@jecrc.ac.in',
+    registrationEnabled: true,
+    alumniVerificationEnabled: true,
+    maintenanceMode: false,
+  };
+};
+
 module.exports = {
   getSettings,
   updateSettings,
+  getPublicSettings,
 };

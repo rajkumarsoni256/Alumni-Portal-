@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { AdminLayout } from '../../components/admin/layout/AdminLayout';
+import { UserAvatar } from '../../components/common/UserAvatar';
 import { useApp } from '../../context/AppContext';
 import { 
   ShieldCheck, 
@@ -24,6 +25,7 @@ export const AdminProfilePage = () => {
   const adminName = currentUser?.name || authUser?.name || 'Dean of Alumni Relations';
   const adminEmail = authUser?.email || 'admin@jecrc.ac.in';
   const adminRole = authUser?.role || 'ADMIN';
+  const avatarUrl = currentUser?.avatar || authUser?.avatarUrl || null;
 
   return (
     <AdminLayout>
@@ -55,10 +57,10 @@ export const AdminProfilePage = () => {
         <div className="bg-white rounded-md border border-slate-200 p-5 space-y-5">
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 pb-5 border-b border-slate-100">
             <div className="relative">
-              <img
-                src={currentUser?.avatar || 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&q=80&w=200'}
-                alt={adminName}
-                className="w-16 h-16 rounded-full object-cover border border-slate-200"
+              <UserAvatar
+                src={avatarUrl}
+                name={adminName}
+                className="w-16 h-16 text-lg"
               />
               <span className="absolute bottom-0 right-0 p-1 bg-red-700 text-white rounded-full border border-white" title="Verified Administrator">
                 <ShieldCheck className="w-3 h-3" />

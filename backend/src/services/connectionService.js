@@ -547,6 +547,105 @@ const getUserConnections = async (targetUserId, queryParams = {}, authUserId = n
   };
 };
 
+const getMutualConnectionsCount = async (userAId, userBId) => {
+  if (!userAId || !userBId || userAId === userBId) return 0;
+  try {
+    const res = await db.query(
+      `SELECT COUNT(*) AS mutual_count
+       FROM (
+         SELECT CASE WHEN requester_id = $1 THEN receiver_id ELSE requester_id END AS friend_id
+         FROM connections
+         WHERE (requester_id = $1 OR receiver_id = $1) AND UPPER(status) = 'ACCEPTED'
+       ) a
+       JOIN (
+         SELECT CASE WHEN requester_id = $2 THEN receiver_id ELSE requester_id END AS friend_id
+         FROM connections
+         WHERE (requester_id = $2 OR receiver_id = $2) AND UPPER(status) = 'ACCEPTED'
+       ) b ON a.friend_id = b.friend_id
+       WHERE a.friend_id != $1 AND a.friend_id != $2`,
+      [userAId, userBId]
+    );
+    return parseInt(res.rows[0]?.mutual_count || '0', 10);
+  } catch {
+    return 0;
+  }
+};
+
+const getSuggestions = async (user, queryParams = {}) => {
+  const limit = Math.min(20, Math.max(1, parseInt(queryParams.limit || 6, 10)));
+  
+  const selfProfileRes = await db.query(
+    `SELECT branch, graduation_year, degree FROM user_profiles WHERE user_id = $1`,
+    [user.id]
+  ).catch(() => ({ rows: [] }));
+  
+  const selfProfile = selfProfileRes.rows[0] || {};
+  const selfBranch = (selfProfile.branch || '').toLowerCase();
+  const selfGradYear = selfProfile.graduation_year || 0;
+
+  const query = `
+    SELECT u.id AS user_id, u.email, u.role, p.full_name, p.avatar_url,
+           p.degree, p.branch, p.graduation_year, p.company, p.designation, p.location,
+           (
+             CASE
+               WHEN LOWER(COALESCE(p.branch, '')) = $2 AND $2 != '' THEN 3
+               ELSE 0
+             END +
+             CASE
+               WHEN p.graduation_year = $3 AND $3 > 0 THEN 2
+               ELSE 0
+             END
+           ) AS relevance_score
+    FROM users u
+    LEFT JOIN user_profiles p ON u.id = p.user_id
+    WHERE u.id != $1
+      AND UPPER(u.role) != 'ADMIN'
+      AND u.account_status = 'ACTIVE'
+      AND NOT EXISTS (
+        SELECT 1 FROM connections c
+        WHERE ((c.requester_id = $1 AND c.receiver_id = u.id) OR (c.receiver_id = $1 AND c.requester_id = u.id))
+          AND UPPER(c.status) IN ('ACCEPTED', 'PENDING')
+      )
+      AND NOT EXISTS (
+        SELECT 1 FROM user_blocks ub
+        WHERE (ub.blocker_id = $1 AND ub.blocked_id = u.id) OR (ub.blocker_id = u.id AND ub.blocked_id = $1)
+      )
+    ORDER BY relevance_score DESC, u.created_at DESC
+    LIMIT $4;
+  `;
+
+  const res = await db.query(query, [user.id, selfBranch, selfGradYear, limit]);
+
+  const suggestions = await Promise.all(
+    res.rows.map(async (row) => {
+      const userCard = formatUserCard(row);
+      const mutualCount = await getMutualConnectionsCount(user.id, row.user_id);
+      return {
+        id: row.user_id,
+        userId: row.user_id,
+        name: userCard.name,
+        fullName: userCard.fullName,
+        email: userCard.email,
+        role: userCard.role,
+        avatar: userCard.avatar,
+        avatarUrl: userCard.avatarUrl,
+        headline: userCard.currentRole ? `${userCard.currentRole}${userCard.company ? ` @ ${userCard.company}` : ''}` : (userCard.degree ? `${userCard.degree} ${userCard.branch || ''}` : 'JECRC Member'),
+        company: userCard.company,
+        designation: userCard.designation,
+        branch: userCard.branch,
+        graduationYear: userCard.graduationYear,
+        batch: userCard.batch,
+        isAlumni: userCard.isAlumni,
+        connectionStatus: 'none',
+        mutualCount,
+        mutualConnectionsCount: mutualCount,
+      };
+    })
+  );
+
+  return { suggestions, total: suggestions.length };
+};
+
 module.exports = {
   sendRequest,
   acceptRequest,
@@ -559,4 +658,6 @@ module.exports = {
   getMyConnections,
   getConnectionsCount,
   getUserConnections,
+  getSuggestions,
+  getMutualConnectionsCount,
 };

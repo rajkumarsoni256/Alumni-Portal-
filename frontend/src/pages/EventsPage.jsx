@@ -15,6 +15,8 @@ export const EventsPage = () => {
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [confirmUnregisterEvent, setConfirmUnregisterEvent] = useState(null);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   const categories = [
     'All',
@@ -24,6 +26,25 @@ export const EventsPage = () => {
     'Webinars',
     'Chapter Meets',
   ];
+
+  const handleActionClick = (evt) => {
+    if (evt.isRegistered) {
+      setConfirmUnregisterEvent(evt);
+    } else {
+      toggleEventRegistration(evt.id);
+    }
+  };
+
+  const handleConfirmUnregister = async () => {
+    if (!confirmUnregisterEvent) return;
+    setIsProcessing(true);
+    try {
+      await toggleEventRegistration(confirmUnregisterEvent.id);
+      setConfirmUnregisterEvent(null);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
   useEffect(() => {
     const loadEvents = async () => {
@@ -166,10 +187,10 @@ export const EventsPage = () => {
 
                   <button
                     type="button"
-                    onClick={() => toggleEventRegistration(evt.id)}
+                    onClick={() => handleActionClick(evt)}
                     className={`px-4 py-1.5 rounded-md text-xs font-semibold transition-colors cursor-pointer inline-flex items-center gap-1 ${
                       evt.isRegistered
-                        ? 'bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100'
+                        ? 'bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 hover:text-red-700 hover:border-red-200'
                         : 'bg-red-700 hover:bg-red-800 text-white'
                     }`}
                   >
@@ -198,6 +219,46 @@ export const EventsPage = () => {
         )}
 
       </div>
+
+      {/* Cancel RSVP Confirmation Modal */}
+      {confirmUnregisterEvent && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs">
+          <div className="bg-white rounded-xl shadow-xl border border-slate-200 p-6 max-w-sm w-full space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-red-100 text-red-700 flex items-center justify-center shrink-0">
+                <CalendarX className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-slate-900">Cancel Event RSVP?</h3>
+                <p className="text-xs text-slate-500">Your seat will be released for others.</p>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-600">
+              Are you sure you want to cancel your registration for <strong className="text-slate-900">{confirmUnregisterEvent.title}</strong>?
+            </p>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                disabled={isProcessing}
+                onClick={() => setConfirmUnregisterEvent(null)}
+                className="px-3 py-1.5 rounded-lg border border-slate-300 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+              >
+                Keep Registration
+              </button>
+              <button
+                type="button"
+                disabled={isProcessing}
+                onClick={handleConfirmUnregister}
+                className="px-3.5 py-1.5 rounded-lg bg-red-700 text-xs font-semibold text-white hover:bg-red-800 disabled:opacity-50 transition-colors cursor-pointer"
+              >
+                {isProcessing ? 'Cancelling...' : 'Cancel RSVP'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

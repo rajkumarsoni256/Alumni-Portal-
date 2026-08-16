@@ -8,7 +8,7 @@ import { NewMessageModal } from '../components/messaging/NewMessageModal';
 import { EmptyChatState, MessagingErrorState } from '../components/messaging/MessagingStates';
 
 export const MessagesPage = () => {
-  const { currentUser, usersMap, showNotification } = useApp();
+  const { currentUser, usersMap, showNotification, refreshUnreadMessagesCount } = useApp();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [conversations, setConversations] = useState([]);
@@ -78,7 +78,9 @@ export const MessagesPage = () => {
     setSearchParams({ conv: conv.id });
 
     // Mark as read in backend & local state
-    messageService.markAsRead(conv.id);
+    messageService.markAsRead(conv.id).then(() => {
+      if (refreshUnreadMessagesCount) refreshUnreadMessagesCount();
+    });
     setConversations((prev) =>
       prev.map((c) => (c.id === conv.id ? { ...c, unreadCount: 0 } : c))
     );

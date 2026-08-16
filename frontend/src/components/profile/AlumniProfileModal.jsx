@@ -27,23 +27,19 @@ export const AlumniProfileModal = ({ isOpen, onClose, alumni }) => {
     name: alumni.name || 'Rehan Khan',
     roleBadge: 'Alumni',
     currentRole: alumni.currentRole || 'Software Development Engineer',
-    company: alumni.company || 'Google',
-    location: alumni.location || 'Bengaluru, Karnataka, India',
-    education: alumni.education || 'JECRC B.Tech (CSE) • Class of 2020',
+    company: alumni.company || 'JECRC Network',
+    location: alumni.location || 'India',
+    education: alumni.education || `${alumni.degree || 'B.Tech'} ${alumni.branch ? `(${alumni.branch})` : ''} ${alumni.graduationYear ? `• Class of ${alumni.graduationYear}` : ''}`.trim(),
     avatar: alumni.avatar || alumni.avatarUrl || null,
-    rating: alumni.rating || '12',
-    connectionsCount: alumni.connectionsCount || 356,
-    experienceYears: alumni.experienceYears || '5+',
-    mutualCount: alumni.mutualCount || 23,
-    badgeTitle: alumni.badgeTitle || 'Top 10%',
-    badgeSubtext: 'JECRC Alumni',
-    featuredSkills: alumni.featuredSkills || [
-      'System Design',
-      'Machine Learning & LLMs',
-      'Cloud Architecture (GCP/AWS)'
-    ],
-    skills: alumni.skills || ['Node.js', 'Python', 'Docker', 'Kubernetes', '+3'],
-    about: alumni.about || 'Passionate about building scalable systems and solving real-world problems using technology. Always open to collaborate and mentor.'
+    rating: alumni.rating || null,
+    connectionsCount: alumni.connectionsCount ?? alumni.connectionCount ?? 0,
+    experienceYears: alumni.experienceYears || null,
+    mutualCount: alumni.mutualCount ?? alumni.mutualConnectionsCount ?? 0,
+    badgeTitle: alumni.badgeTitle || (alumni.isAlumni ? 'Verified Alumni' : null),
+    badgeSubtext: 'JECRC Community',
+    featuredSkills: alumni.featuredSkills || (Array.isArray(alumni.skills) ? alumni.skills.slice(0, 3) : []),
+    skills: alumni.skills || [],
+    about: alumni.about || alumni.bio || 'JECRC Alumni community member.'
   };
 
   const handleViewFullProfile = () => {

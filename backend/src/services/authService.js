@@ -323,6 +323,7 @@ const register = async ({
   email,
   password,
   role,
+  mobile,
   mobileNumber,
   phone,
   rollNumber,
@@ -358,7 +359,7 @@ const register = async ({
   }
 
   // Validate mobile number for ALUMNI
-  const normPhone = validateMobileNumber(mobileNumber || phone);
+  const normPhone = validateMobileNumber(mobileNumber || mobile || phone);
 
   // Check system settings for registration permission
   const settingsRes = await db.query(`SELECT registration_enabled FROM system_settings WHERE id = 'default'`).catch(() => ({ rows: [] }));
@@ -609,7 +610,7 @@ const login = async ({ email, password, req }) => {
   if (user.account_status === 'PENDING_APPROVAL') {
     const error = new Error('Your account is currently under review and pending approval by the Admin.');
     error.statusCode = 403;
-    error.errorCode = 'ACCOUNT_PENDING_APPROVAL';
+    error.errorCode = user.role === 'ALUMNI' ? 'ALUMNI_APPROVAL_PENDING' : 'ACCOUNT_PENDING_APPROVAL';
     throw error;
   }
 

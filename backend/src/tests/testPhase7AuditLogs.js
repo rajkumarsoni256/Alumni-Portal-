@@ -33,9 +33,17 @@ const runPhase7Tests = async () => {
     // ------------------------------------------------------------------
     // Setup Tokens & Helpers
     // ------------------------------------------------------------------
-    const adminUser = (await db.query(`SELECT id, email FROM users WHERE role = 'ADMIN' LIMIT 1`)).rows[0];
-    const studentUser = (await db.query(`SELECT id, email FROM users WHERE role = 'STUDENT' LIMIT 1`)).rows[0];
-    const alumniUser = (await db.query(`SELECT id, email FROM users WHERE role = 'ALUMNI' LIMIT 1`)).rows[0];
+    const adminUser = (await db.query(`SELECT id, email FROM users WHERE role = 'ADMIN' AND account_status = 'ACTIVE' LIMIT 1`)).rows[0];
+    let studentUser = (await db.query(`SELECT id, email FROM users WHERE role = 'STUDENT' AND account_status = 'ACTIVE' LIMIT 1`)).rows[0];
+    if (!studentUser) {
+      const ins = await db.query(`INSERT INTO users (email, password_hash, role, account_status, email_verified) VALUES ('test_student_p7@jecrc.ac.in', 'hash', 'STUDENT', 'ACTIVE', TRUE) RETURNING id, email`);
+      studentUser = ins.rows[0];
+    }
+    let alumniUser = (await db.query(`SELECT id, email FROM users WHERE role = 'ALUMNI' AND account_status = 'ACTIVE' LIMIT 1`)).rows[0];
+    if (!alumniUser) {
+      const ins = await db.query(`INSERT INTO users (email, password_hash, role, account_status, email_verified) VALUES ('test_alumni_p7@jecrc.ac.in', 'hash', 'ALUMNI', 'ACTIVE', TRUE) RETURNING id, email`);
+      alumniUser = ins.rows[0];
+    }
 
     const adminToken = jwt.sign({ sub: adminUser.id, role: 'ADMIN' }, JWT_SECRET, { expiresIn: '1h' });
     const studentToken = jwt.sign({ sub: studentUser.id, role: 'STUDENT' }, JWT_SECRET, { expiresIn: '1h' });

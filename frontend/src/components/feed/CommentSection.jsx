@@ -982,8 +982,14 @@ export const CommentSection = ({ post, forceExpanded = false, onExpand }) => {
               value={commentText}
               onFocus={() => setIsComposerExpanded(true)}
               onChange={(e) => {
-                setCommentText(e.target.value);
+                const val = e.target.value;
+                setCommentText(val);
                 if (!isComposerExpanded) setIsComposerExpanded(true);
+                const cursorPos = e.target.selectionStart;
+                const textBeforeCursor = val.slice(0, cursorPos);
+                if (/(?:^|\s)@([a-zA-Z0-9_]*)$/.test(textBeforeCursor)) {
+                  setShowMentionList(true);
+                }
               }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {

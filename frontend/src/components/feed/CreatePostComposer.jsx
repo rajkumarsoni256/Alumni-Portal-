@@ -21,13 +21,15 @@ export const CreatePostComposer = ({
   editingPost = null, 
   onSaveEdit 
 }) => {
-  const { currentUser, createPost, editPost, showNotification } = useApp();
+  const { currentUser, usersMap, createPost, editPost, showNotification } = useApp();
   const [isOpen, setIsOpen] = useState(initialExpanded || !!editingPost);
   const [postType, setPostType] = useState(editingPost ? (editingPost.postType || editingPost.type || 'TEXT') : 'TEXT');
   const [visibility, setVisibility] = useState(editingPost ? (editingPost.visibility || 'PUBLIC') : 'PUBLIC');
   const [content, setContent] = useState(editingPost ? editingPost.content : '');
   const [selectedTags, setSelectedTags] = useState(editingPost ? (editingPost.tags || editingPost.hashtags || []) : ['#JECRC']);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [mentionQuery, setMentionQuery] = useState('');
+  const [showMentionDropdown, setShowMentionDropdown] = useState(false);
 
   // Media files & preview
   const [mediaFile, setMediaFile] = useState(null);
@@ -96,6 +98,46 @@ export const CreatePostComposer = ({
       resetForm();
     }
     if (onCloseModal) onCloseModal();
+  };
+
+  const handleContentChange = (e) => {
+    const val = e.target.value;
+    setContent(val);
+
+    const cursorPos = e.target.selectionStart;
+    const textBeforeCursor = val.slice(0, cursorPos);
+    const mentionMatch = textBeforeCursor.match(/(?:^|\s)@([a-zA-Z0-9_]*)$/);
+
+    if (mentionMatch) {
+      setMentionQuery(mentionMatch[1].toLowerCase());
+      setShowMentionDropdown(true);
+    } else {
+      setShowMentionDropdown(false);
+    }
+  };
+
+  const matchingUsers = Object.values(usersMap || {})
+    .filter((u) => {
+      if (!mentionQuery) return true;
+      const name = (u.name || u.fullName || '').toLowerCase();
+      const email = (u.email || '').toLowerCase();
+      return name.includes(mentionQuery) || email.includes(mentionQuery);
+    })
+    .slice(0, 5);
+
+  const insertMention = (user) => {
+    if (!textareaRef.current) return;
+    const cursorPos = textareaRef.current.selectionStart;
+    const textBeforeCursor = content.slice(0, cursorPos);
+    const textAfterCursor = content.slice(cursorPos);
+    const lastAtIdx = textBeforeCursor.lastIndexOf('@');
+    
+    if (lastAtIdx !== -1) {
+      const mentionName = `@${user.name || user.fullName || 'User'} `;
+      const newText = textBeforeCursor.slice(0, lastAtIdx) + mentionName + textAfterCursor;
+      setContent(newText);
+    }
+    setShowMentionDropdown(false);
   };
 
   const handleToggleTag = (tag) => {
@@ -390,16 +432,38 @@ export const CreatePostComposer = ({
                 </div>
               </div>
 
-              {/* Main Content Text Area */}
-              <textarea
-                ref={textareaRef}
-                rows={4}
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-                placeholder="What's on your mind?"
-                className="w-full text-xs text-slate-800 placeholder-slate-400 outline-none resize-none min-h-[90px] leading-relaxed"
-                aria-label="Post content"
-              />
+              {/* Main Content Text Area with Mention Dropdown */}
+              <div className="relative">
+                <textarea
+                  ref={textareaRef}
+                  rows={4}
+                  value={content}
+                  onChange={handleContentChange}
+                  placeholder="What's on your mind? (Type @ to mention community members)"
+                  className="w-full text-xs text-slate-800 placeholder-slate-400 outline-none resize-none min-h-[90px] leading-relaxed"
+                  aria-label="Post content"
+                />
+
+                {showMentionDropdown && matchingUsers.length > 0 && (
+                  <div className="absolute left-0 top-full z-20 bg-white border border-slate-200 rounded-lg shadow-lg max-h-48 overflow-y-auto w-64 p-1 space-y-0.5">
+                    <p className="text-[10px] font-bold text-slate-400 px-2 py-1 uppercase">Mention Member</p>
+                    {matchingUsers.map((user) => (
+                      <button
+                        key={user.id || user.userId}
+                        type="button"
+                        onClick={() => insertMention(user)}
+                        className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-left hover:bg-slate-50 transition-colors cursor-pointer text-xs"
+                      >
+                        <UserAvatar src={user.avatar || user.avatarUrl} name={user.name || user.fullName} className="w-6 h-6 text-[10px]" />
+                        <div className="min-w-0 flex-1">
+                          <span className="font-semibold text-slate-900 block truncate">{user.name || user.fullName}</span>
+                          <span className="text-[10px] text-slate-400 block truncate">{user.role || 'Member'} {user.branch ? `• ${user.branch}` : ''}</span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
 
               {/* Media Preview Box */}
               {mediaPreview && (

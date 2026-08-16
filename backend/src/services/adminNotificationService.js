@@ -1,5 +1,6 @@
 const db = require('../config/db');
 const { logAdminAction, AUDIT_ACTIONS } = require('./adminAuditService');
+const emailService = require('../email/emailService');
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -711,6 +712,32 @@ const publishNotification = async (adminUserId, id) => {
     });
 
     await client.query('COMMIT');
+
+    // Trigger transactional announcement broadcast emails asynchronously after commit
+    db.query(
+      `SELECT u.id, u.email, p.full_name
+       FROM users u
+       JOIN announcement_recipients ar ON u.id = ar.user_id
+       LEFT JOIN user_profiles p ON u.id = p.user_id
+       WHERE ar.announcement_id = $1 AND u.email_verified = TRUE AND u.account_status = 'ACTIVE'`,
+      [id]
+    ).then((audienceEmailsRes) => {
+      if (audienceEmailsRes && audienceEmailsRes.rows.length > 0) {
+        audienceEmailsRes.rows.forEach((recipient) => {
+          emailService.sendAnnouncementBroadcastEmail(
+            recipient.email,
+            recipient.id,
+            {
+              recipientName: recipient.full_name || 'Community Member',
+              title: announcement.title,
+              message: announcement.message,
+              type: announcement.type,
+              announcementId: id,
+            }
+          ).catch((e) => console.warn('[Announcement Email Dispatch Warning]', e.message));
+        });
+      }
+    }).catch((e) => console.warn('[Announcement Audience Resolution Warning]', e.message));
 
     return await getNotificationById(id);
   } catch (err) {

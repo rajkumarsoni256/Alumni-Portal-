@@ -48,9 +48,9 @@ export const AppProvider = ({ children }) => {
 
   const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
 
-  const refreshUnreadMessagesCount = async (userId = 'st_101') => {
+  const refreshUnreadMessagesCount = async (userId = null) => {
     try {
-      const count = await messageService.getUnreadCount(userId);
+      const count = await messageService.getUnreadCount();
       setUnreadMessagesCount(typeof count === 'number' ? count : 0);
     } catch {
       setUnreadMessagesCount(0);
@@ -169,18 +169,19 @@ export const AppProvider = ({ children }) => {
 
   const fetchSuggestedPeople = async () => {
     try {
-      const res = await userService.getUsers({ limit: 4 });
+      const res = await userService.getUsers({ limit: 6 });
       const currentId = authUser?.id;
       const mapped = (res.users || [])
         .filter((u) => (u.userId || u.id) !== currentId)
         .map((u) => ({
           id: u.userId || u.id,
-          name: u.fullName || (u.email ? u.email.split('@')[0] : 'Community Member'),
-          role: u.designation || (u.role === 'ALUMNI' ? 'Alumni' : 'Student'),
+          name: u.fullName || u.name || (u.email ? u.email.split('@')[0] : 'Community Member'),
+          role: u.designation || (u.role === 'ALUMNI' || u.isAlumni ? 'Alumni' : 'Student'),
           company: u.company || 'JECRC Network',
-          batch: u.graduationYear ? `Class of ${u.graduationYear}` : 'JECRC',
-          avatar: u.avatarUrl || u.avatar || 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=300',
+          batch: u.graduationYear ? `Class of ${u.graduationYear}` : (u.batch || 'JECRC'),
+          avatar: u.avatarUrl || u.avatar || null,
           connectionStatus: u.connectionStatus || 'none',
+          mutualCount: u.mutualCount || u.mutualConnectionsCount || 0,
         }));
       setSuggestedPeople(mapped);
     } catch (err) {
@@ -223,8 +224,8 @@ export const AppProvider = ({ children }) => {
 
   const fetchMentorshipRequests = async () => {
     try {
-      const res = await mentorshipService.getMentorshipRequests();
-      setRequests(res.requests || []);
+      const data = await mentorshipService.getMyRequests();
+      setRequests(data || []);
     } catch (err) {
       console.warn('Failed to load mentorship requests:', err);
       setRequests([]);
@@ -269,20 +270,20 @@ export const AppProvider = ({ children }) => {
   };
 
   const toggleEventRegistration = async (eventId) => {
-    const targetEvt = events.find((e) => e.id === eventId);
-    if (!targetEvt) return;
-
     try {
+      const targetEvt = events.find((e) => e.id === eventId);
+      if (!targetEvt) return;
+
       if (targetEvt.isRegistered) {
-        const res = await eventService.cancelRegistration(eventId);
+        await eventService.cancelRegistration(eventId);
         setEvents((prev) =>
           prev.map((e) =>
             e.id === eventId
               ? {
                   ...e,
                   isRegistered: false,
-                  registeredCount: res.registeredCount,
-                  seatsLeft: e.capacity ? Math.max(0, e.capacity - res.registeredCount) : 'Unlimited',
+                  registeredCount: Math.max(0, (e.registeredCount || 1) - 1),
+                  seatsLeft: (e.seatsLeft || 0) + 1,
                 }
               : e
           )
@@ -312,7 +313,20 @@ export const AppProvider = ({ children }) => {
 
   useEffect(() => {
     const initializeAuthSession = async () => {
-      const token = authService.getToken();
+      let token = authService.getToken();
+
+      // If token is missing, attempt silent refresh with HttpOnly cookie first
+      if (!token) {
+        try {
+          const refreshRes = await authService.refreshToken();
+          if (refreshRes && (refreshRes.token || refreshRes.accessToken)) {
+            token = refreshRes.token || refreshRes.accessToken;
+          }
+        } catch {
+          token = null;
+        }
+      }
+
       if (token) {
         try {
           const user = await authService.getCurrentUser();
@@ -332,6 +346,7 @@ export const AppProvider = ({ children }) => {
             await fetchNotifications();
             await fetchEvents();
             await fetchMentorshipRequests();
+            await refreshUnreadMessagesCount(user.id);
 
             if (user.role?.toUpperCase() === 'ADMIN' || isComplete) {
               setAuthStatus('AUTHENTICATED');
@@ -370,6 +385,8 @@ export const AppProvider = ({ children }) => {
   // Displays SessionExpiredModal and preserves current internal return path.
   useEffect(() => {
     const handleSessionExpired = () => {
+      const hadActiveSession = !!authUser || !!authService.getToken();
+
       if (typeof window !== 'undefined') {
         const currentPath = window.location.pathname;
         const isInternalPath =
@@ -388,14 +405,16 @@ export const AppProvider = ({ children }) => {
       setAuthUser(null);
       setActiveRole('student');
       setAuthStatus('UNAUTHENTICATED');
-      setIsSessionExpiredModalOpen(true);
+      if (hadActiveSession) {
+        setIsSessionExpiredModalOpen(true);
+      }
     };
 
     window.addEventListener('auth:session-expired', handleSessionExpired);
     return () => {
       window.removeEventListener('auth:session-expired', handleSessionExpired);
     };
-  }, []);
+  }, [authUser]);
 
   const updateAdminProfileState = (updatedProfile) => {
     if (!updatedProfile) return;

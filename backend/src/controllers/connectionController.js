@@ -98,6 +98,15 @@ const getUserConnections = async (req, res, next) => {
   }
 };
 
+const getSuggestions = async (req, res, next) => {
+  try {
+    const result = await connectionService.getSuggestions(req.user, req.query);
+    return successResponse(res, result, 'Connection suggestions fetched successfully');
+  } catch (err) {
+    next(err);
+  }
+};
+
 module.exports = {
   sendRequest,
   acceptRequest,
@@ -109,4 +118,5 @@ module.exports = {
   getOutgoingRequests,
   getMyConnections,
   getUserConnections,
+  getSuggestions,
 };

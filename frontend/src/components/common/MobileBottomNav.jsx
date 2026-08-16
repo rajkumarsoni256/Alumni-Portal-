@@ -42,7 +42,7 @@ export const MobileBottomNav = () => {
       name: 'Messages', 
       icon: MessageSquare, 
       path: '/messages',
-      badge: unreadMessagesCount > 0 ? unreadMessagesCount : 3
+      badge: unreadMessagesCount > 0 ? unreadMessagesCount : null
     },
     { 
       name: 'Notifications', 
