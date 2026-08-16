@@ -101,6 +101,45 @@ app.use((req, res, next) => {
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
+// Terminal Request/Response Console Logger Middleware
+app.use((req, res, next) => {
+  const start = Date.now();
+  const timestamp = new Date().toLocaleTimeString('en-US', { hour12: false });
+  const method = req.method;
+  const url = req.originalUrl || req.url;
+  const ip = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress || '127.0.0.1';
+
+  // Listen for the finish event to log status code and response duration
+  res.on('finish', () => {
+    const duration = Date.now() - start;
+    const statusCode = res.statusCode;
+
+    // ANSI Colors for terminal output
+    const reset = '\x1b[0m';
+    const dim = '\x1b[2m';
+    const bold = '\x1b[1m';
+    let statusColor = '\x1b[32m'; // Green (2xx)
+
+    if (statusCode >= 500) {
+      statusColor = '\x1b[31m'; // Red (5xx)
+    } else if (statusCode >= 400) {
+      statusColor = '\x1b[33m'; // Yellow (4xx)
+    } else if (statusCode >= 300) {
+      statusColor = '\x1b[36m'; // Cyan (3xx)
+    }
+
+    const methodColor = method === 'GET' ? '\x1b[34m' : method === 'POST' ? '\x1b[32m' : method === 'PUT' || method === 'PATCH' ? '\x1b[33m' : '\x1b[31m';
+    const userRole = req.user?.role ? `[${req.user.role}]` : '';
+    const userEmail = req.user?.email ? `(${req.user.email})` : '';
+
+    console.log(
+      `${dim}[${timestamp}]${reset} ${bold}${methodColor}${method.padEnd(6)}${reset} ${url.padEnd(35)} ${statusColor}${bold}${statusCode}${reset} ${dim}${duration}ms${reset} ${userRole} ${userEmail}`.trim()
+    );
+  });
+
+  next();
+});
+
 // Serve static upload directory
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
@@ -150,12 +189,14 @@ app.use(errorHandler);
 // Initialize DB and start server
 const startServer = async () => {
   try {
+    console.log('\n\x1b[1m\x1b[31m[JU CONNECT]\x1b[0m \x1b[36mInitializing PostgreSQL Database & Services...\x1b[0m');
     await migrate();
     app.listen(PORT, '0.0.0.0', () => {
-      console.log(`[JECRC Backend] Node.js Express server is listening on 0.0.0.0:${PORT}`);
+      console.log(`\x1b[1m\x1b[32m✔ [JECRC Backend]\x1b[0m Server listening on \x1b[4mhttp://localhost:${PORT}\x1b[0m`);
+      console.log(`\x1b[2m  API Base: http://localhost:${PORT}/api/v1 | Static Uploads: /uploads\x1b[0m\n`);
     });
   } catch (err) {
-    console.error('Failed to start server:', err);
+    console.error('\x1b[31mFailed to start server:\x1b[0m', err);
     process.exit(1);
   }
 };

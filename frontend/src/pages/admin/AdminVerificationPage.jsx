@@ -192,9 +192,97 @@ export const AdminVerificationPage = () => {
           </div>
         )}
 
-        {/* Verification Queue Table */}
+        {/* Verification Queue (Desktop Table + Mobile Cards) */}
         <div className="bg-white rounded-md border border-slate-200 overflow-hidden">
-          <div className="overflow-x-auto">
+          {/* Mobile Cards View (< md) */}
+          <div className="block md:hidden divide-y divide-slate-100">
+            {isLoading ? (
+              <div className="p-8 text-center text-xs text-slate-500 font-semibold">
+                <div className="w-6 h-6 border-2 border-red-700 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+                <p>Loading verification queue from database...</p>
+              </div>
+            ) : verifications.length === 0 ? (
+              <div className="p-8 text-center text-slate-400 space-y-2">
+                <CheckCircle2 className="w-8 h-8 text-emerald-500 mx-auto" />
+                <p className="font-bold text-slate-900 text-xs">No Pending Requests</p>
+                <p className="text-[11px] text-slate-500">All alumni registrations are up to date.</p>
+              </div>
+            ) : (
+              verifications.map((item) => (
+                <div key={item.id || item.userId} className="p-4 space-y-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="w-9 h-9 rounded-full bg-red-50 border border-red-200 text-red-700 font-bold flex items-center justify-center text-xs shrink-0">
+                        {item.name ? item.name.charAt(0).toUpperCase() : 'A'}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-bold text-slate-900 text-xs truncate">{item.name}</p>
+                        <p className="text-[11px] text-slate-500 truncate">{item.email}</p>
+                      </div>
+                    </div>
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200 shrink-0">
+                      Pending
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-xs bg-slate-50 p-2.5 rounded border border-slate-100">
+                    <div>
+                      <span className="text-[10px] font-bold text-slate-400 uppercase block">Roll Number</span>
+                      <span className="font-semibold text-slate-800">{item.universityRollNumber || '—'}</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-bold text-slate-400 uppercase block">Course & Batch</span>
+                      <span className="font-semibold text-slate-800 truncate block">
+                        {item.degree || item.course || 'B.Tech'} {item.graduationYear ? `'${String(item.graduationYear).slice(-2)}` : ''}
+                      </span>
+                    </div>
+                    <div className="col-span-2">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase block">Branch / Organization</span>
+                      <span className="text-slate-700 font-medium truncate block">
+                        {item.branch || 'CSE'} {item.company ? `• ${item.company}` : ''}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-end gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedRecord(item);
+                        setShowRejectModal(false);
+                      }}
+                      className="flex-1 py-1.5 bg-white border border-slate-300 text-slate-700 rounded text-xs font-semibold hover:bg-slate-50 transition-colors text-center"
+                    >
+                      Details
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedRecord(item);
+                        setShowRejectModal(true);
+                        setRejectionReason('');
+                      }}
+                      className="px-3 py-1.5 bg-white border border-red-300 text-red-700 rounded text-xs font-semibold hover:bg-red-50 transition-colors"
+                    >
+                      Reject
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isSubmitting}
+                      onClick={() => handleApprove(item)}
+                      className="px-3.5 py-1.5 bg-red-700 hover:bg-red-800 text-white rounded text-xs font-semibold transition-colors flex items-center gap-1"
+                    >
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      <span>Approve</span>
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* Desktop Table View (>= md) */}
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-left text-xs text-slate-700">
               <thead className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider select-none">
                 <tr>

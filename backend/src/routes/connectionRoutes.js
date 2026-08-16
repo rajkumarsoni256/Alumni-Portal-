@@ -11,6 +11,7 @@ router.post('/:id/cancel', authenticateToken, connectionController.cancelRequest
 router.delete('/:id', authenticateToken, connectionController.removeConnection);
 
 router.get('/status/:userId', authenticateToken, connectionController.getConnectionStatus);
+router.get('/suggestions', authenticateToken, connectionController.getSuggestions);
 router.get('/requests/incoming', authenticateToken, connectionController.getIncomingRequests);
 router.get('/requests/outgoing', authenticateToken, connectionController.getOutgoingRequests);
 router.get('/', authenticateToken, connectionController.getMyConnections);

@@ -27,6 +27,9 @@ export const ConversationList = ({
     { id: 'mentor', label: 'Mentors' },
   ];
 
+  const totalCount = conversations.length;
+  const unreadTotal = conversations.reduce((sum, c) => sum + (c.unreadCount || 0), 0);
+
   const filteredConversations = conversations.filter((conv) => {
     if (activeFilter === 'all') return true;
     const role = conv.partner?.role?.toLowerCase() || '';
@@ -38,11 +41,20 @@ export const ConversationList = ({
 
   return (
     <div className="flex flex-col h-full bg-white border-r border-slate-200">
-      {/* 1. Header with Title and New Message Action */}
+      {/* 1. Header with Title, Total Count, and New Message Action */}
       <div className="p-3.5 sm:p-4 border-b border-slate-100 flex items-center justify-between gap-3 shrink-0 bg-white sticky top-0 z-10">
         <div>
-          <h2 className="text-base font-bold text-slate-900 tracking-tight">Messages</h2>
-          <p className="text-[11px] text-slate-400">Direct community chats</p>
+          <div className="flex items-center gap-2">
+            <h2 className="text-base font-bold text-slate-900 tracking-tight">Messages</h2>
+            {unreadTotal > 0 && (
+              <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-700">
+                {unreadTotal} unread
+              </span>
+            )}
+          </div>
+          <p className="text-[11px] text-slate-400">
+            {totalCount} {totalCount === 1 ? 'conversation' : 'conversations'} • Direct chats
+          </p>
         </div>
 
         <button

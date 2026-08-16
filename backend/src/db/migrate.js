@@ -131,6 +131,11 @@ const migrate = async () => {
       console.warn('[MIGRATION] course add warning:', e.message);
     }
     try {
+      await db.query(`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS last_seen_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;`);
+    } catch (e) {
+      console.warn('[MIGRATION] last_seen_at add warning:', e.message);
+    }
+    try {
       await db.query(
         `CREATE UNIQUE INDEX IF NOT EXISTS idx_user_profiles_roll_number ON user_profiles(university_roll_number) WHERE university_roll_number IS NOT NULL;`
       );

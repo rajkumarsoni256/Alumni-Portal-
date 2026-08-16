@@ -88,4 +88,16 @@ export const connectionService = {
     const url = `/api/v1/users/${userId}/connections${queryString ? `?${queryString}` : ''}`;
     return apiClient.get(url);
   },
+
+  /**
+   * Get personalized connection suggestions for authenticated user
+   * @param {Object} params { limit }
+   */
+  getSuggestions: async (params = {}) => {
+    const query = new URLSearchParams();
+    if (params.limit) query.append('limit', params.limit);
+    const queryString = query.toString();
+    const data = await apiClient.get(`/api/v1/connections/suggestions${queryString ? `?${queryString}` : ''}`);
+    return data ? (data.suggestions || []) : [];
+  },
 };

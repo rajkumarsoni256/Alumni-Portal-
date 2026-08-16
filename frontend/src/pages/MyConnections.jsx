@@ -48,17 +48,26 @@ export const MyConnections = () => {
     }
   };
 
+  const [confirmRemoveUser, setConfirmRemoveUser] = useState(null);
+  const [isRemoving, setIsRemoving] = useState(false);
+
   useEffect(() => {
     loadMyConnections();
   }, []);
 
-  const handleRemoveConnection = async (targetUserId, targetName) => {
+  const handleRemoveConnection = async () => {
+    if (!confirmRemoveUser) return;
+    const { id: targetUserId, name: targetName } = confirmRemoveUser;
+    setIsRemoving(true);
     try {
       await connectionService.removeConnection(targetUserId);
       setMyConnections((prev) => prev.filter((c) => c.user?.id !== targetUserId && c.user?.userId !== targetUserId));
       showNotification(`Removed connection with ${targetName || 'user'}`, 'info');
+      setConfirmRemoveUser(null);
     } catch (err) {
       showNotification(err.message || 'Failed to remove connection', 'error');
+    } finally {
+      setIsRemoving(false);
     }
   };
 
@@ -252,7 +261,7 @@ export const MyConnections = () => {
 
                         <button
                           type="button"
-                          onClick={() => handleRemoveConnection(targetUserId, name)}
+                          onClick={() => setConfirmRemoveUser({ id: targetUserId, name })}
                           className="px-2.5 py-1.5 rounded-md text-xs font-semibold text-slate-400 hover:text-red-700 hover:bg-red-50 border border-slate-200 transition-colors cursor-pointer"
                           title="Remove Connection"
                         >
@@ -375,6 +384,46 @@ export const MyConnections = () => {
         )}
 
       </div>
+
+      {/* Remove Connection Confirmation Modal */}
+      {confirmRemoveUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs">
+          <div className="bg-white rounded-xl shadow-xl border border-slate-200 p-6 max-w-sm w-full space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-red-100 text-red-700 flex items-center justify-center shrink-0">
+                <UserX className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-slate-900">Remove Connection</h3>
+                <p className="text-xs text-slate-500">This action can be undone by sending a new request.</p>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-600">
+              Are you sure you want to remove <strong className="text-slate-900">{confirmRemoveUser.name || 'this member'}</strong> from your university connections?
+            </p>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                disabled={isRemoving}
+                onClick={() => setConfirmRemoveUser(null)}
+                className="px-3 py-1.5 rounded-lg border border-slate-300 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isRemoving}
+                onClick={handleRemoveConnection}
+                className="px-3.5 py-1.5 rounded-lg bg-red-700 text-xs font-semibold text-white hover:bg-red-800 disabled:opacity-50 transition-colors cursor-pointer"
+              >
+                {isRemoving ? 'Removing...' : 'Remove Connection'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

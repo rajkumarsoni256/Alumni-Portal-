@@ -377,6 +377,47 @@ class EmailService {
     await this.logDelivery({ userId: recipientId, recipientEmail, emailType: eventType, templateName: 'platformNotification', subject, result });
     return result;
   }
+
+  /**
+   * 13. Send Announcement Broadcast Email to targeted recipient
+   */
+  async sendAnnouncementBroadcastEmail(recipientEmail, userId = null, announcementData = {}) {
+    const title = announcementData.title || 'Official Announcement from JU Connect';
+    const message = announcementData.message || '';
+    const recipientName = announcementData.recipientName || 'Community Member';
+    const type = announcementData.type || 'SYSTEM';
+
+    const subject = `[JU Connect Official] ${title}`;
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px; background-color: #ffffff;">
+        <div style="background-color: #991b1b; padding: 15px; border-radius: 6px 6px 0 0; text-align: center;">
+          <h1 style="color: #ffffff; margin: 0; font-size: 20px;">JU Connect Official Announcement</h1>
+        </div>
+        <div style="padding: 20px; color: #1e293b; line-height: 1.6;">
+          <p>Hello <strong>${recipientName}</strong>,</p>
+          <div style="background-color: #f8fafc; border-left: 4px solid #991b1b; padding: 15px; margin: 15px 0;">
+            <h2 style="margin-top: 0; color: #0f172a; font-size: 16px;">${title}</h2>
+            <p style="margin-bottom: 0; white-space: pre-wrap; font-size: 14px;">${message}</p>
+          </div>
+          <p style="font-size: 12px; color: #64748b; margin-top: 20px;">
+            This is an official institutional broadcast sent from the Directorate of Alumni Relations at JECRC University.
+          </p>
+        </div>
+      </div>
+    `;
+    const text = `JU Connect Official Announcement\n\nHello ${recipientName},\n\n${title}\n\n${message}\n\n-- Directorate of Alumni Relations`;
+
+    const result = await this.provider.sendEmail({ to: recipientEmail, subject, html, text });
+    await this.logDelivery({
+      userId,
+      recipientEmail,
+      emailType: 'SYSTEM_ANNOUNCEMENT',
+      templateName: 'announcementBroadcast',
+      subject,
+      result,
+    });
+    return result;
+  }
 }
 
 module.exports = new EmailService();

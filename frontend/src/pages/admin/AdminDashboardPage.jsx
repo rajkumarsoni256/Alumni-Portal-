@@ -3,6 +3,8 @@ import { useNavigate, Link } from 'react-router-dom';
 import { AdminLayout } from '../../components/admin/layout/AdminLayout';
 import { adminUserService } from '../../services/adminUserService';
 import { ExportModal } from '../../components/admin/export/ExportModal';
+import { UserAvatar } from '../../components/common/UserAvatar';
+import { useApp } from '../../context/AppContext';
 import { 
   Users, 
   GraduationCap, 
@@ -12,12 +14,21 @@ import {
   FileSpreadsheet, 
   AlertCircle, 
   TrendingUp, 
-  CheckCircle2 
+  CheckCircle2,
+  XCircle,
+  ShieldCheck,
+  Check,
+  X,
+  Eye
 } from 'lucide-react';
 
 export const AdminDashboardPage = () => {
   const navigate = useNavigate();
+  const { showNotification } = useApp();
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [pendingVerifications, setPendingVerifications] = useState([]);
+  const [isLoadingVerifs, setIsLoadingVerifs] = useState(false);
+  const [processingId, setProcessingId] = useState(null);
   const [stats, setStats] = useState({
     metrics: {
       totalUsers: 0,
@@ -40,14 +51,65 @@ export const AdminDashboardPage = () => {
     setError(null);
     setErrorStatus(null);
     try {
-      const data = await adminUserService.getAdminDashboardStats();
+      const [data, verifRes] = await Promise.all([
+        adminUserService.getAdminDashboardStats(),
+        adminUserService.getVerifications({ status: 'PENDING', pageSize: 5 }).catch(() => ({ verifications: [] })),
+      ]);
       if (data) setStats(data);
+      if (verifRes) {
+        setPendingVerifications(verifRes.verifications || (Array.isArray(verifRes) ? verifRes : []));
+      }
     } catch (err) {
       console.error('Failed to load dashboard statistics:', err);
       setError(err.message || 'Failed to fetch dashboard statistics from database.');
       setErrorStatus(err.status || null);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleApprove = async (verifId, applicantName) => {
+    setProcessingId(verifId);
+    try {
+      await adminUserService.updateVerificationStatus(verifId, 'APPROVED');
+      setPendingVerifications((prev) => prev.filter((v) => v.id !== verifId));
+      setStats((prev) => ({
+        ...prev,
+        verification: {
+          ...prev.verification,
+          pending: Math.max(0, (prev.verification.pending || 1) - 1),
+          approved: (prev.verification.approved || 0) + 1,
+        },
+      }));
+      showNotification(`Approved alumni verification for ${applicantName || 'applicant'}`, 'success');
+    } catch (err) {
+      showNotification(err.message || 'Failed to approve verification', 'error');
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  const handleReject = async (verifId, applicantName) => {
+    const reason = window.prompt(`Enter rejection reason for ${applicantName || 'applicant'}:`, 'Document or roll number mismatch');
+    if (reason === null) return;
+
+    setProcessingId(verifId);
+    try {
+      await adminUserService.updateVerificationStatus(verifId, 'REJECTED', reason.trim() || 'Verification details could not be validated.');
+      setPendingVerifications((prev) => prev.filter((v) => v.id !== verifId));
+      setStats((prev) => ({
+        ...prev,
+        verification: {
+          ...prev.verification,
+          pending: Math.max(0, (prev.verification.pending || 1) - 1),
+          rejected: (prev.verification.rejected || 0) + 1,
+        },
+      }));
+      showNotification(`Rejected alumni verification for ${applicantName || 'applicant'}`, 'info');
+    } catch (err) {
+      showNotification(err.message || 'Failed to reject verification', 'error');
+    } finally {
+      setProcessingId(null);
     }
   };
 
@@ -228,7 +290,126 @@ export const AdminDashboardPage = () => {
 
         </div>
 
-        {/* 2. Middle Section: Activity Stream & Data Quality */}
+        {/* 2. Pending Alumni Verifications Review Section */}
+        <div className="bg-white rounded-md border border-slate-200 p-4 space-y-3">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+            <div className="flex items-center gap-2">
+              <UserCheck className="w-4 h-4 text-red-700" />
+              <div>
+                <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                  Pending Alumni Verifications
+                </h3>
+                <p className="text-[11px] text-slate-500">
+                  Graduation and document validation queue awaiting institutional approval
+                </p>
+              </div>
+            </div>
+            <Link
+              to="/admin/approvals"
+              className="text-xs font-semibold text-red-700 hover:underline inline-flex items-center gap-1"
+            >
+              <span>View Full Queue ({stats.verification?.pending || pendingVerifications.length})</span>
+              <ArrowRight className="w-3 h-3" />
+            </Link>
+          </div>
+
+          {isLoading ? (
+            <div className="py-6 text-center text-xs text-slate-400">Loading pending requests...</div>
+          ) : pendingVerifications.length === 0 ? (
+            <div className="py-6 text-center text-xs text-slate-500 bg-slate-50/50 rounded-md border border-dashed border-slate-200">
+              <CheckCircle2 className="w-6 h-6 text-emerald-600 mx-auto mb-1" />
+              <p className="font-semibold text-slate-800">Verification Queue Clear</p>
+              <p className="text-[11px] text-slate-400">No alumni verification requests currently require administrative review.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-slate-100 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                    <th className="pb-2">APPLICANT</th>
+                    <th className="pb-2">ROLL NUMBER</th>
+                    <th className="pb-2">COURSE & BATCH</th>
+                    <th className="pb-2">SUBMITTED</th>
+                    <th className="pb-2 text-right">ACTIONS</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 font-medium">
+                  {pendingVerifications.map((item) => {
+                    const isProcessing = processingId === item.id;
+                    const applicantName = item.fullName || item.name || item.applicantName || 'Applicant';
+                    const applicantEmail = item.email || item.applicantEmail || '—';
+                    const rollNo = item.rollNumber || item.universityRollNumber || '—';
+                    const course = `${item.degree || item.course || 'B.Tech'} ${item.branch ? `• ${item.branch}` : ''}`.trim();
+                    const batch = item.graduationYear ? `Class of ${item.graduationYear}` : (item.batch || '—');
+
+                    return (
+                      <tr key={item.id} className="hover:bg-slate-50/60 transition-colors">
+                        <td className="py-3 pr-3">
+                          <div className="flex items-center gap-2.5">
+                            <UserAvatar
+                              src={item.avatar || item.avatarUrl}
+                              name={applicantName}
+                              className="w-7 h-7 text-[10px]"
+                            />
+                            <div className="min-w-0">
+                              <span className="font-bold text-slate-900 block truncate">{applicantName}</span>
+                              <span className="text-[11px] text-slate-500 font-normal block truncate">{applicantEmail}</span>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-3 pr-3">
+                          <span className="font-mono font-semibold text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded text-[11px]">
+                            {rollNo}
+                          </span>
+                        </td>
+                        <td className="py-3 pr-3">
+                          <span className="font-semibold text-slate-800 block">{course}</span>
+                          <span className="text-[11px] text-slate-500 block">{batch}</span>
+                        </td>
+                        <td className="py-3 pr-3 text-slate-500 text-[11px]">
+                          {item.createdAt || item.requestedAt ? new Date(item.createdAt || item.requestedAt).toLocaleDateString() : 'Pending'}
+                        </td>
+                        <td className="py-3 text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <Link
+                              to={`/admin/approvals?id=${item.id}`}
+                              className="px-2 py-1 text-[11px] font-semibold text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded transition-colors"
+                              title="Review details"
+                            >
+                              Review
+                            </Link>
+                            <button
+                              type="button"
+                              disabled={isProcessing}
+                              onClick={() => handleApprove(item.id, applicantName)}
+                              className="px-2.5 py-1 text-[11px] font-bold text-white bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 rounded transition-colors inline-flex items-center gap-1 cursor-pointer"
+                              title="Approve verification"
+                            >
+                              <Check className="w-3 h-3" />
+                              <span>Approve</span>
+                            </button>
+                            <button
+                              type="button"
+                              disabled={isProcessing}
+                              onClick={() => handleReject(item.id, applicantName)}
+                              className="px-2.5 py-1 text-[11px] font-bold text-red-700 hover:bg-red-50 border border-red-200 disabled:opacity-50 rounded transition-colors inline-flex items-center gap-1 cursor-pointer"
+                              title="Reject verification"
+                            >
+                              <X className="w-3 h-3" />
+                              <span>Reject</span>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        {/* 3. Middle Section: Activity Stream & Data Quality */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
           
           {/* Recent Administrative Activity Stream */}

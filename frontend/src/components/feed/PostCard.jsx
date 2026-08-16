@@ -43,6 +43,7 @@ export const PostCard = ({ post }) => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [imageError, setImageError] = useState(false);
   const menuRef = useRef(null);
 
   const author = usersMap[post.authorId] || post.author || {
@@ -326,12 +327,13 @@ export const PostCard = ({ post }) => {
           )}
 
           {/* Image Attachment */}
-          {imageUrl && !videoUrl && (
+          {imageUrl && !videoUrl && !imageError && (
             <div className="rounded-xl overflow-hidden border border-slate-200/80 bg-slate-100">
               <img
-                src={imageUrl}
+                src={imageUrl.startsWith('http') || imageUrl.startsWith('data:') || imageUrl.startsWith('blob:') ? imageUrl : (imageUrl.startsWith('/') ? imageUrl : `/${imageUrl}`)}
                 alt="Post media"
                 loading="lazy"
+                onError={() => setImageError(true)}
                 className="w-full h-auto max-h-[450px] object-cover"
               />
             </div>

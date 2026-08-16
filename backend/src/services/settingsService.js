@@ -337,9 +337,21 @@ const deactivateAccount = async (user) => {
 };
 
 const deleteAccount = async (user, password) => {
-  const userRes = await db.query('SELECT password_hash FROM users WHERE id = $1', [user.id]);
-  if (userRes.rows.length > 0 && password) {
-    const isValid = await bcrypt.compare(password, userRes.rows[0].password_hash);
+  const userRes = await db.query(
+    'SELECT u.password_hash, u.email, p.full_name FROM users u LEFT JOIN user_profiles p ON u.id = p.user_id WHERE u.id = $1',
+    [user.id]
+  );
+  
+  if (userRes.rows.length === 0) {
+    const err = new Error('User not found');
+    err.statusCode = 404;
+    throw err;
+  }
+
+  const userData = userRes.rows[0];
+
+  if (userData.password_hash && password) {
+    const isValid = await bcrypt.compare(password, userData.password_hash);
     if (!isValid) {
       const err = new Error('Incorrect password');
       err.statusCode = 400;
@@ -348,20 +360,24 @@ const deleteAccount = async (user, password) => {
     }
   }
 
-  await db.query(`UPDATE users SET account_status = 'DISABLED', updated_at = NOW() WHERE id = $1`, [user.id]);
-
+  // Send Account Deleted confirmation email before dropping database records
   try {
-    const uRes = await db.query('SELECT u.email, p.full_name FROM users u LEFT JOIN user_profiles p ON u.id = p.user_id WHERE u.id = $1', [user.id]);
-    if (uRes.rows.length > 0) {
-      await emailService.sendAccountDeletedAlert(uRes.rows[0].email, uRes.rows[0].full_name, user.id);
+    if (userData.email) {
+      await emailService.sendAccountDeletedAlert(userData.email, userData.full_name || 'Community Member', user.id);
     }
   } catch (err) {
     console.warn('[Account Deleted Alert Warning]', err.message);
   }
 
+  // Set user_id in audit_logs to null so foreign keys don't block deletion
+  await db.query('UPDATE audit_logs SET user_id = NULL WHERE user_id = $1', [user.id]).catch(() => {});
+
+  // Permanently delete user record (foreign keys ON DELETE CASCADE will clean up user_profiles, auth_sessions, posts, comments, connections, registrations, etc.)
+  await db.query('DELETE FROM users WHERE id = $1', [user.id]);
+
   return {
     success: true,
-    message: 'Account deletion requested and account disabled according to JU Connect retention policy.',
+    message: 'Your account and personal data have been permanently deleted from JU Connect.',
   };
 };
 

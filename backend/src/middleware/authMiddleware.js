@@ -24,6 +24,28 @@ const authenticateToken = async (req, res, next) => {
     }
 
     req.user = user;
+
+    // Asynchronously update last_seen_at for online status
+    db.query('UPDATE user_profiles SET last_seen_at = NOW() WHERE user_id = $1', [user.id]).catch(() => {});
+
+    // Check system maintenance mode for non-admin users
+    const role = user.role ? String(user.role).trim().toUpperCase() : '';
+    if (role !== 'ADMIN') {
+      try {
+        const maintRes = await db.query(`SELECT maintenance_mode FROM system_settings WHERE id = 'default'`);
+        if (maintRes.rows.length > 0 && maintRes.rows[0].maintenance_mode === true) {
+          return errorResponse(
+            res,
+            'JU Connect is currently undergoing scheduled maintenance. Please check back shortly.',
+            'MAINTENANCE_MODE_ACTIVE',
+            503
+          );
+        }
+      } catch (mErr) {
+        // Fallthrough if settings table not yet initialized
+      }
+    }
+
     next();
   } catch (err) {
     console.warn('Invalid or expired JWT token:', err.message);

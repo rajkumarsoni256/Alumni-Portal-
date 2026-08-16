@@ -1,7 +1,18 @@
 const express = require('express');
 const router = express.Router();
 const settingsController = require('../controllers/settingsController');
+const adminSettingsService = require('../services/adminSettingsService');
 const { authenticateToken } = require('../middleware/authMiddleware');
+
+// Public system settings status (e.g. maintenance mode check)
+router.get('/settings/public', async (req, res, next) => {
+  try {
+    const data = await adminSettingsService.getPublicSettings();
+    return res.status(200).json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+});
 
 // General Settings
 router.get('/settings', authenticateToken, settingsController.getSettings);
