@@ -19,6 +19,7 @@ const hashtagRoutes = require('./routes/hashtagRoutes');
 const settingsRoutes = require('./routes/settingsRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const errorHandler = require('./middleware/errorHandler');
+const requestLogger = require('./middleware/requestLogger');
 
 const cookieParser = require('cookie-parser');
 const helmet = require('helmet');
@@ -101,44 +102,8 @@ app.use((req, res, next) => {
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
-// Terminal Request/Response Console Logger Middleware
-app.use((req, res, next) => {
-  const start = Date.now();
-  const timestamp = new Date().toLocaleTimeString('en-US', { hour12: false });
-  const method = req.method;
-  const url = req.originalUrl || req.url;
-  const ip = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress || '127.0.0.1';
-
-  // Listen for the finish event to log status code and response duration
-  res.on('finish', () => {
-    const duration = Date.now() - start;
-    const statusCode = res.statusCode;
-
-    // ANSI Colors for terminal output
-    const reset = '\x1b[0m';
-    const dim = '\x1b[2m';
-    const bold = '\x1b[1m';
-    let statusColor = '\x1b[32m'; // Green (2xx)
-
-    if (statusCode >= 500) {
-      statusColor = '\x1b[31m'; // Red (5xx)
-    } else if (statusCode >= 400) {
-      statusColor = '\x1b[33m'; // Yellow (4xx)
-    } else if (statusCode >= 300) {
-      statusColor = '\x1b[36m'; // Cyan (3xx)
-    }
-
-    const methodColor = method === 'GET' ? '\x1b[34m' : method === 'POST' ? '\x1b[32m' : method === 'PUT' || method === 'PATCH' ? '\x1b[33m' : '\x1b[31m';
-    const userRole = req.user?.role ? `[${req.user.role}]` : '';
-    const userEmail = req.user?.email ? `(${req.user.email})` : '';
-
-    console.log(
-      `${dim}[${timestamp}]${reset} ${bold}${methodColor}${method.padEnd(6)}${reset} ${url.padEnd(35)} ${statusColor}${bold}${statusCode}${reset} ${dim}${duration}ms${reset} ${userRole} ${userEmail}`.trim()
-    );
-  });
-
-  next();
-});
+// Centralized Request-Scoped Logger Middleware
+app.use(requestLogger);
 
 // Serve static upload directory
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));

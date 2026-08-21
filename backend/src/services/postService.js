@@ -2,6 +2,7 @@ const crypto = require('crypto');
 const db = require('../config/db');
 const storageService = require('./storageService');
 const notificationService = require('./notificationService');
+const { logger } = require('../utils/logger');
 
 const BACKEND_BASE_URL = process.env.BACKEND_URL || 'http://localhost:8080';
 
@@ -331,8 +332,18 @@ const createPost = async (user, postData, files = []) => {
     }
 
     await client.query('COMMIT');
+
+    logger.block('POST', 'POST CREATION SUCCESS', {
+      Author: user.email || user.id,
+      'Post ID': postId,
+      'Post Type': postType,
+      Category: category,
+      'Media Attached': uploadedMediaRecords.length,
+      'Primary Media URL': imageUrl || 'NONE',
+    });
   } catch (err) {
     await client.query('ROLLBACK');
+    logger.error('POST', `Post creation failed for ${user.email || user.id}`, err);
     for (const m of uploadedMediaRecords) {
       await storageService.deleteFile(m.storageKey);
     }

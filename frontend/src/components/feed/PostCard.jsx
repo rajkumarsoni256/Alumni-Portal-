@@ -5,6 +5,8 @@ import { CommentSection } from './CommentSection';
 import { ShareModal } from './FeedStates';
 import { CreatePostComposer } from './CreatePostComposer';
 import { UserAvatar } from '../common/UserAvatar';
+import { resolveMediaUrl } from '../../services/apiClient';
+import { renderFormattedContent } from '../../utils/textFormatter';
 import { 
   ThumbsUp, 
   MessageSquare, 
@@ -48,13 +50,13 @@ export const PostCard = ({ post }) => {
 
   const author = usersMap[post.authorId] || post.author || {
     id: post.authorId,
-    name: 'JECRC Member',
-    role: 'Member',
-    headline: 'JECRC Network',
-    batch: 'JECRC',
-    avatar: post.authorAvatar || null,
+    name: post.authorName || 'JECRC Member',
+    role: post.authorRole || 'Member',
+    headline: post.authorHeadline || post.authorCompany || 'JECRC Network',
+    batch: post.authorGraduationYear ? `Class of ${post.authorGraduationYear}` : 'JECRC',
+    avatar: resolveMediaUrl(post.authorAvatar) || null,
     verified: false,
-    isAlumni: false,
+    isAlumni: post.authorRole?.toUpperCase() === 'ALUMNI',
   };
 
   const isOwnPost = currentUser.id === post.authorId || currentUser.role === 'ADMIN' || currentUser.role === 'admin';
@@ -66,9 +68,10 @@ export const PostCard = ({ post }) => {
   // Media items
   const mediaList = post.media || [];
   const videoMedia = mediaList.find(m => m.type === 'VIDEO' || m.mediaType === 'VIDEO');
-  const videoUrl = post.videoUrl || (videoMedia ? videoMedia.url : null);
+  const videoUrl = resolveMediaUrl(post.videoUrl || (videoMedia ? videoMedia.url : null));
   const imageMediaList = mediaList.filter(m => m.type === 'IMAGE' || m.mediaType === 'IMAGE');
-  const imageUrl = post.image || post.imageUrl || (imageMediaList.length > 0 ? imageMediaList[0].url : null);
+  const rawImageUrl = post.image || post.imageUrl || (imageMediaList.length > 0 ? imageMediaList[0].url : null);
+  const imageUrl = resolveMediaUrl(rawImageUrl);
 
   // Job data
   const jobDetails = post.jobDetails || (post.jobTitle ? {
@@ -285,7 +288,7 @@ export const PostCard = ({ post }) => {
         <div className="px-4 pb-3 space-y-3">
           {post.content && (
             <div className="text-xs text-slate-800 leading-relaxed font-normal whitespace-pre-line">
-              {displayedContent}
+              {renderFormattedContent(displayedContent, (tag) => setSearchQuery && setSearchQuery(tag))}
               {isLongContent && (
                 <button
                   type="button"
@@ -330,7 +333,7 @@ export const PostCard = ({ post }) => {
           {imageUrl && !videoUrl && !imageError && (
             <div className="rounded-xl overflow-hidden border border-slate-200/80 bg-slate-100">
               <img
-                src={imageUrl.startsWith('http') || imageUrl.startsWith('data:') || imageUrl.startsWith('blob:') ? imageUrl : (imageUrl.startsWith('/') ? imageUrl : `/${imageUrl}`)}
+                src={imageUrl}
                 alt="Post media"
                 loading="lazy"
                 onError={() => setImageError(true)}

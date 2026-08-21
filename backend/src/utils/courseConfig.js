@@ -16,11 +16,9 @@ const ALLOWED_COURSE_CODES = ALLOWED_COURSES.map((c) => c.code);
 
 /**
  * Validate & Normalize University Roll Number
- * Treats roll number as an opaque institutional unique identifier.
- * Normalizes via trim().toUpperCase().
- * Does NOT enforce a rigid regex or reject unknown course prefixes.
+ * Enforces institutional format (e.g. 24BCON0001), valid course code, and joining year match.
  */
-const validateAndNormalizeRollNumber = (rollNumber) => {
+const validateAndNormalizeRollNumber = (rollNumber, joiningYear = null, course = null) => {
   if (!rollNumber || typeof rollNumber !== 'string' || !rollNumber.trim()) {
     const err = new Error('University Roll Number is required.');
     err.statusCode = 400;
@@ -34,6 +32,35 @@ const validateAndNormalizeRollNumber = (rollNumber) => {
     err.statusCode = 400;
     err.errorCode = 'INVALID_ROLL_NUMBER_LENGTH';
     throw err;
+  }
+
+  // Institutional format validation: e.g. 24BCON0332
+  const match = cleanRoll.match(/^(\d{2})([A-Z]+)(\d+)$/);
+  if (!match) {
+    const err = new Error('Invalid roll number format. Expected format like 24BCON0001.');
+    err.statusCode = 400;
+    err.errorCode = 'INVALID_ROLL_NUMBER_FORMAT';
+    throw err;
+  }
+
+  const rollYearPrefix = parseInt(match[1], 10);
+  const rollCourseCode = match[2];
+
+  if (!ALLOWED_COURSE_CODES.includes(rollCourseCode)) {
+    const err = new Error(`Unsupported course code '${rollCourseCode}' in roll number. Allowed: ${ALLOWED_COURSE_CODES.join(', ')}`);
+    err.statusCode = 400;
+    err.errorCode = 'UNSUPPORTED_COURSE';
+    throw err;
+  }
+
+  if (joiningYear) {
+    const expectedPrefix = parseInt(String(joiningYear).slice(-2), 10);
+    if (rollYearPrefix !== expectedPrefix) {
+      const err = new Error(`Roll number prefix '${match[1]}' does not match admission year ${joiningYear}.`);
+      err.statusCode = 400;
+      err.errorCode = 'JOINING_YEAR_MISMATCH';
+      throw err;
+    }
   }
 
   return cleanRoll;

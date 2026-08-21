@@ -4,6 +4,7 @@ const crypto = require('crypto');
 const db = require('../config/db');
 const googleAuthService = require('./googleAuthService');
 const emailService = require('../email/emailService');
+const { logger } = require('../utils/logger');
 
 const sessionService = require('./sessionService');
 
@@ -393,7 +394,7 @@ const register = async ({
   // Student Identity Validation
   if (upperRole === 'STUDENT') {
     const rawRoll = rollNumber || universityRollNumber;
-    normRollNumber = validateAndNormalizeRollNumber(rawRoll);
+    normRollNumber = validateAndNormalizeRollNumber(rawRoll, validatedJoiningYear, normCourse);
 
     // Database Uniqueness check for Roll Number
     const rollCheck = await db.query(
@@ -578,7 +579,7 @@ const resendVerificationCode = async ({ email }) => {
   return { success: true, message: 'New verification code sent to your email.' };
 };
 
-const login = async ({ email, password, req }) => {
+const login = async ({ email, password, rememberMe = true, req }) => {
   const normalizedEmail = normalizeEmail(email);
 
   const userResult = await db.query(
@@ -647,6 +648,7 @@ const login = async ({ email, password, req }) => {
     userId: user.id,
     ipAddress: req?.ip || req?.headers?.['x-forwarded-for'] || null,
     userAgent: req?.headers ? req.headers['user-agent'] : null,
+    rememberMe,
   });
 
   const token = generateToken(user.id, user.role);

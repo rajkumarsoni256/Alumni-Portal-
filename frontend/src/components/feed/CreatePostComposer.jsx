@@ -416,19 +416,21 @@ export const CreatePostComposer = ({
                 </div>
 
                 {/* Visibility Badge Dropdown */}
-                <div className="relative">
+                <div className="relative flex items-center">
                   <select
                     value={visibility}
                     onChange={(e) => setVisibility(e.target.value)}
-                    className="appearance-none text-xs font-medium text-slate-700 bg-slate-100 border border-slate-200 rounded-lg pl-7 pr-6 py-1 cursor-pointer outline-none hover:bg-slate-200/80 transition-colors"
+                    className="appearance-none text-xs font-medium text-slate-700 bg-slate-100 border border-slate-200 rounded-lg pl-7 pr-6 py-1.5 cursor-pointer outline-none hover:bg-slate-200/80 transition-colors"
                   >
                     <option value="PUBLIC">Public</option>
                     <option value="CONNECTIONS">Connections</option>
                   </select>
-                  <div className="absolute left-2 top-1.2 pointer-events-none text-slate-500">
+                  <div className="absolute left-2 inset-y-0 flex items-center pointer-events-none text-slate-500">
                     {visibility === 'PUBLIC' ? <Globe className="w-3.5 h-3.5" /> : <Users className="w-3.5 h-3.5" />}
                   </div>
-                  <ChevronDown className="w-3 h-3 text-slate-400 absolute right-2 top-1.5 pointer-events-none" />
+                  <div className="absolute right-2 inset-y-0 flex items-center pointer-events-none text-slate-400">
+                    <ChevronDown className="w-3 h-3" />
+                  </div>
                 </div>
               </div>
 

@@ -63,9 +63,7 @@ export const AdminSidebar = ({ className = '' }) => {
     {
       group: 'CONTENT',
       items: [
-        { name: 'Content Management', path: '/admin/content', icon: Layers },
-        { name: 'Jobs Management', path: '/admin/content?tab=jobs', icon: Briefcase },
-        { name: 'Events Management', path: '/admin/content?tab=events', icon: Calendar },
+        { name: 'Content Management', path: '/admin/content', icon: Layers, exact: true },
       ]
     },
     {

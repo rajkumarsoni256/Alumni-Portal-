@@ -22,6 +22,7 @@ export const LoginPage = () => {
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
@@ -60,7 +61,11 @@ export const LoginPage = () => {
       const isComplete = user && user.profileComplete !== false;
       navigate(getTargetRoute(userRole, isComplete));
     } catch (err) {
-      setErrorMessage(err.message || 'Google authentication failed.');
+      if (err.errorCode === 'EMAIL_NOT_VERIFIED') {
+        setErrorMessage('Your Google email is registered but unverified. Please check your inbox.');
+      } else {
+        setErrorMessage(err.message || 'Google sign-in failed. Please try standard login.');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -90,7 +95,7 @@ export const LoginPage = () => {
 
     setIsLoading(true);
     try {
-      const user = await loginUser({ email, password });
+      const user = await loginUser({ email: email.trim(), password, rememberMe });
       const userRole = (user && user.role) ? user.role.toLowerCase() : 'student';
       const isComplete = user && user.profileComplete !== false;
       navigate(getTargetRoute(userRole, isComplete));
@@ -273,6 +278,20 @@ export const LoginPage = () => {
                 {errors.password && (
                   <p className="text-[11px] text-rose-600 font-medium">{errors.password}</p>
                 )}
+              </div>
+
+              {/* Remember Me */}
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="rememberMe"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  className="w-3.5 h-3.5 rounded border-slate-300 text-red-700 focus:ring-red-700 cursor-pointer accent-red-700"
+                />
+                <label htmlFor="rememberMe" className="text-xs text-slate-600 font-medium cursor-pointer select-none">
+                  Remember me on this device (10 days)
+                </label>
               </div>
 
               {/* Primary CTA */}

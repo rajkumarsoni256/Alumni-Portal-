@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { UserAvatar } from '../common/UserAvatar';
 import { postService } from '../../services/postService';
+import { renderFormattedContent } from '../../utils/textFormatter';
 import { 
   Smile, 
   AtSign, 

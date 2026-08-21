@@ -24,12 +24,13 @@ class SMTPEmailProvider extends EmailProvider {
       if (!config.port && !process.env.SMTP_PORT) missingVars.push('SMTP_PORT');
       if (!config.user && !process.env.SMTP_USER) missingVars.push('SMTP_USER');
       if (!config.password && !process.env.SMTP_PASSWORD) missingVars.push('SMTP_PASSWORD');
-      if (!process.env.EMAIL_FROM) missingVars.push('EMAIL_FROM');
 
       if (missingVars.length > 0) {
         const errMsg = `[SMTPEmailProvider Configuration Error] Missing required SMTP environment variables: ${missingVars.join(', ')}. Credentials must be set when EMAIL_PROVIDER=smtp.`;
-        console.error(errMsg);
-        throw new Error(errMsg);
+        if (process.env.NODE_ENV === 'production' || missingVars.includes('SMTP_HOST')) {
+          throw new Error(errMsg);
+        }
+        console.warn(errMsg);
       }
     }
 

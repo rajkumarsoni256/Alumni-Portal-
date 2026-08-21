@@ -23,10 +23,10 @@ export const AlumniProfileModal = ({ isOpen, onClose, alumni }) => {
   if (!isOpen || !alumni) return null;
 
   const sampleAlumni = {
-    id: alumni.id || 'alm_1',
-    name: alumni.name || 'Rehan Khan',
-    roleBadge: 'Alumni',
-    currentRole: alumni.currentRole || 'Software Development Engineer',
+    id: alumni.id || alumni.userId || alumni.user_id,
+    name: alumni.name || alumni.fullName || 'JECRC Member',
+    roleBadge: (alumni.role || '').toUpperCase() === 'ALUMNI' || alumni.isAlumni ? 'Alumni' : (alumni.role || 'Member'),
+    currentRole: alumni.currentRole || alumni.designation || 'Community Member',
     company: alumni.company || 'JECRC Network',
     location: alumni.location || 'India',
     education: alumni.education || `${alumni.degree || 'B.Tech'} ${alumni.branch ? `(${alumni.branch})` : ''} ${alumni.graduationYear ? `• Class of ${alumni.graduationYear}` : ''}`.trim(),
@@ -39,7 +39,7 @@ export const AlumniProfileModal = ({ isOpen, onClose, alumni }) => {
     badgeSubtext: 'JECRC Community',
     featuredSkills: alumni.featuredSkills || (Array.isArray(alumni.skills) ? alumni.skills.slice(0, 3) : []),
     skills: alumni.skills || [],
-    about: alumni.about || alumni.bio || 'JECRC Alumni community member.'
+    about: alumni.about || alumni.bio || 'JECRC Community member.'
   };
 
   const handleViewFullProfile = () => {
