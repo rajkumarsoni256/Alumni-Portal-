@@ -97,7 +97,12 @@ export const SocketProvider = ({ children, token, user }) => {
     }
   }, []);
 
+  const lastTypingSentRef = useRef(0);
+
   const sendTypingStart = useCallback((conversationId) => {
+    const now = Date.now();
+    if (now - lastTypingSentRef.current < 2000) return; // Throttle socket typing event to 1 event per 2s
+    lastTypingSentRef.current = now;
     if (socketRef.current && conversationId) {
       socketRef.current.emit('typing:start', { conversationId });
     }

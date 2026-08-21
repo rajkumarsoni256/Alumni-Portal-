@@ -112,8 +112,23 @@ const initSocketServer = (httpServer) => {
       }
     });
 
+    // Socket Event Rate Limiter
+    let typingEventCount = 0;
+    let typingWindowReset = Date.now();
+
+    const isTypingRateLimited = () => {
+      const now = Date.now();
+      if (now - typingWindowReset > 1000) {
+        typingEventCount = 0;
+        typingWindowReset = now;
+      }
+      typingEventCount++;
+      return typingEventCount > 5;
+    };
+
     // Typing Indicators
     socket.on('typing:start', ({ conversationId }) => {
+      if (isTypingRateLimited()) return;
       if (conversationId) {
         socket.to(`conversation:${conversationId}`).emit('typing:start', {
           conversationId,
