@@ -138,8 +138,8 @@ class Logger {
 }
 
 const logger = new Logger();
+logger.logger = logger;
+logger.debug = logger.info.bind(logger);
+logger.requestStorage = requestStorage;
 
-module.exports = {
-  logger,
-  requestStorage,
-};
+module.exports = logger;

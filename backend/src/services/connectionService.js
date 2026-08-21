@@ -356,25 +356,22 @@ const getIncomingRequests = async (user) => {
 
   const result = await db.query(query, [user.id]);
 
-  const requests = await Promise.all(
-    result.rows.map(async (row) => {
-      const mutualCount = await getMutualConnectionsCount(user.id, row.user_id);
-      const userCard = formatUserCard(row);
-      userCard.mutualCount = mutualCount;
-      userCard.mutualConnectionsCount = mutualCount;
+  const requests = result.rows.map((row) => {
+    const userCard = formatUserCard(row);
+    userCard.mutualCount = 0;
+    userCard.mutualConnectionsCount = 0;
 
-      return {
-        id: row.request_id,
-        requestId: row.request_id,
-        fromUserId: row.user_id,
-        user: userCard,
-        requestedAt: row.requested_at,
-        fromUser: userCard,
-        mutualCount,
-        mutualConnectionsCount: mutualCount,
-      };
-    })
-  );
+    return {
+      id: row.request_id,
+      requestId: row.request_id,
+      fromUserId: row.user_id,
+      user: userCard,
+      requestedAt: row.requested_at,
+      fromUser: userCard,
+      mutualCount: 0,
+      mutualConnectionsCount: 0,
+    };
+  });
 
   return { requests };
 };
@@ -407,14 +404,22 @@ const getOutgoingRequests = async (user) => {
 
 const getMyConnections = async (user) => {
   const query = `
-    SELECT c.id AS connection_id, c.updated_at AS connected_at,
+    WITH user_conns AS (
+      SELECT receiver_id AS friend_id, id AS connection_id, updated_at AS connected_at
+      FROM connections
+      WHERE requester_id = $1 AND status = 'ACCEPTED'
+      UNION ALL
+      SELECT requester_id AS friend_id, id AS connection_id, updated_at AS connected_at
+      FROM connections
+      WHERE receiver_id = $1 AND status = 'ACCEPTED'
+    )
+    SELECT uc.connection_id, uc.connected_at,
            u.id AS user_id, u.email, u.role, p.full_name, p.avatar_url,
            p.degree, p.branch, p.graduation_year, p.company, p.designation, p.location
-    FROM connections c
-    JOIN users u ON (CASE WHEN c.requester_id = $1 THEN c.receiver_id ELSE c.requester_id END) = u.id
+    FROM user_conns uc
+    JOIN users u ON uc.friend_id = u.id
     LEFT JOIN user_profiles p ON u.id = p.user_id
-    WHERE (c.requester_id = $1 OR c.receiver_id = $1) AND UPPER(c.status) = 'ACCEPTED'
-    ORDER BY c.updated_at DESC;
+    ORDER BY uc.connected_at DESC;
   `;
 
   const result = await db.query(query, [user.id]);
@@ -447,7 +452,7 @@ const getConnectionsCount = async (userId) => {
   const result = await db.query(
     `SELECT COUNT(*) AS count 
      FROM connections 
-     WHERE (requester_id = $1 OR receiver_id = $1) AND UPPER(status) = 'ACCEPTED'`,
+     WHERE (requester_id = $1 OR receiver_id = $1) AND status = 'ACCEPTED'`,
     [userId]
   );
   return parseInt(result.rows[0].count, 10);
@@ -487,40 +492,35 @@ const getUserConnections = async (targetUserId, queryParams = {}, authUserId = n
     paramIdx++;
   }
 
-  const countQuery = `
-    SELECT COUNT(*) AS total
-    FROM connections c
-    JOIN users u ON (CASE WHEN c.requester_id = $1 THEN c.receiver_id ELSE c.requester_id END) = u.id
-    LEFT JOIN user_profiles p ON u.id = p.user_id
-    WHERE (c.requester_id = $1 OR c.receiver_id = $1)
-      AND UPPER(c.status) = 'ACCEPTED'
-      AND u.account_status != 'DISABLED'
-      ${searchClause};
-  `;
-
-  const countRes = await db.query(countQuery, values);
-  const total = parseInt(countRes.rows[0].total, 10);
-
   values.push(limit, offset);
   const limitIdx = paramIdx;
   const offsetIdx = paramIdx + 1;
 
   const dataQuery = `
-    SELECT c.id AS connection_id, c.updated_at AS connected_at,
+    WITH user_conns AS (
+      SELECT receiver_id AS friend_id, id AS connection_id, updated_at AS connected_at
+      FROM connections
+      WHERE requester_id = $1 AND status = 'ACCEPTED'
+      UNION ALL
+      SELECT requester_id AS friend_id, id AS connection_id, updated_at AS connected_at
+      FROM connections
+      WHERE receiver_id = $1 AND status = 'ACCEPTED'
+    )
+    SELECT uc.connection_id, uc.connected_at,
            u.id AS user_id, u.email, u.role, p.full_name, p.avatar_url,
-           p.degree, p.branch, p.graduation_year, p.company, p.designation, p.location
-    FROM connections c
-    JOIN users u ON (CASE WHEN c.requester_id = $1 THEN c.receiver_id ELSE c.requester_id END) = u.id
+           p.degree, p.branch, p.graduation_year, p.company, p.designation, p.location,
+           COUNT(*) OVER() AS total_count
+    FROM user_conns uc
+    JOIN users u ON uc.friend_id = u.id
     LEFT JOIN user_profiles p ON u.id = p.user_id
-    WHERE (c.requester_id = $1 OR c.receiver_id = $1)
-      AND UPPER(c.status) = 'ACCEPTED'
-      AND u.account_status != 'DISABLED'
+    WHERE u.account_status != 'DISABLED'
       ${searchClause}
-    ORDER BY c.updated_at DESC
+    ORDER BY uc.connected_at DESC
     LIMIT $${limitIdx} OFFSET $${offsetIdx};
   `;
 
   const dataRes = await db.query(dataQuery, values);
+  const total = dataRes.rows.length > 0 ? parseInt(dataRes.rows[0].total_count, 10) : 0;
 
   const connections = dataRes.rows.map((row) => {
     const userCard = formatUserCard(row);
@@ -564,14 +564,14 @@ const getMutualConnectionsCount = async (userAId, userBId) => {
     const res = await db.query(
       `SELECT COUNT(*) AS mutual_count
        FROM (
-         SELECT CASE WHEN requester_id = $1 THEN receiver_id ELSE requester_id END AS friend_id
-         FROM connections
-         WHERE (requester_id = $1 OR receiver_id = $1) AND UPPER(status) = 'ACCEPTED'
+         SELECT receiver_id AS friend_id FROM connections WHERE requester_id = $1 AND status = 'ACCEPTED'
+         UNION ALL
+         SELECT requester_id AS friend_id FROM connections WHERE receiver_id = $1 AND status = 'ACCEPTED'
        ) a
        JOIN (
-         SELECT CASE WHEN requester_id = $2 THEN receiver_id ELSE requester_id END AS friend_id
-         FROM connections
-         WHERE (requester_id = $2 OR receiver_id = $2) AND UPPER(status) = 'ACCEPTED'
+         SELECT receiver_id AS friend_id FROM connections WHERE requester_id = $2 AND status = 'ACCEPTED'
+         UNION ALL
+         SELECT requester_id AS friend_id FROM connections WHERE receiver_id = $2 AND status = 'ACCEPTED'
        ) b ON a.friend_id = b.friend_id
        WHERE a.friend_id != $1 AND a.friend_id != $2`,
       [userAId, userBId]

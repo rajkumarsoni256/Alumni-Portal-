@@ -335,31 +335,36 @@ const getMessages = async (authUserId, conversationId, queryParams = {}) => {
     throw err;
   }
 
-  const page = Math.max(1, parseInt(queryParams.page || 1, 10));
-  const limit = Math.min(100, Math.max(1, parseInt(queryParams.limit || 50, 10)));
-  const offset = (page - 1) * limit;
+  const { before, page: rawPage, limit: rawLimit } = queryParams;
+  const limit = Math.min(100, Math.max(1, parseInt(rawLimit || 50, 10)));
 
-  const countRes = await db.query('SELECT COUNT(*) AS total FROM messages WHERE conversation_id = $1', [conversationId]);
-  const total = parseInt(countRes.rows[0].total, 10);
-
-  const queryText = `
-    SELECT id, conversation_id, sender_id, content, created_at, updated_at
+  let dataQuery = `
+    SELECT id, conversation_id, sender_id, content, created_at, updated_at,
+           COUNT(*) OVER() AS total_count
     FROM messages
     WHERE conversation_id = $1
-    ORDER BY created_at ASC
-    LIMIT $2 OFFSET $3;
   `;
+  const queryParamsArr = [conversationId];
 
-  const result = await db.query(queryText, [conversationId, limit, offset]);
+  if (before && UUID_REGEX.test(String(before).trim())) {
+    dataQuery += ` AND created_at < (SELECT created_at FROM messages WHERE id = $2)`;
+    queryParamsArr.push(String(before).trim());
+  }
+
+  const limitIdx = queryParamsArr.length + 1;
+  dataQuery += ` ORDER BY created_at ASC LIMIT $${limitIdx}`;
+  queryParamsArr.push(limit);
+
+  const result = await db.query(dataQuery, queryParamsArr);
   const messages = result.rows.map(formatMessageDTO);
+  const total = result.rows.length > 0 ? parseInt(result.rows[0].total_count, 10) : 0;
 
   return {
     messages,
     total,
-    page,
     limit,
-    pages: Math.ceil(total / limit) || 1,
-    hasMore: offset + limit < total,
+    hasMore: result.rows.length === limit,
+    nextCursor: messages.length > 0 ? messages[0].id : null,
   };
 };
 
@@ -418,42 +423,56 @@ const sendMessage = async (user, conversationId, messageData) => {
     [msgId, conversationId, user.id, content, now]
   );
 
-  await db.query(
+  const msgDto = {
+    id: msgId,
+    conversationId,
+    senderId: user.id,
+    content,
+    text: content,
+    createdAt: now.toISOString(),
+    timestamp: now.getTime(),
+    timeAgo: 'Just now',
+  };
+
+  // Instant Socket.IO Event Emission to active conversation room and recipient user room
+  try {
+    const { emitToConversation, emitToUser } = require('../socket/socketServer');
+    emitToConversation(conversationId, 'message:new', msgDto);
+    if (recipientPart) {
+      emitToUser(recipientPart.user_id, 'message:new', msgDto);
+    }
+  } catch {
+    // Non-blocking socket error handling
+  }
+
+  // Async updates (non-blocking for HTTP latency)
+  db.query(
     `UPDATE conversations SET last_message_at = $1, updated_at = $1 WHERE id = $2`,
     [now, conversationId]
-  );
+  ).catch(() => {});
 
-  // Auto update sender's last_read_at
-  await db.query(
+  db.query(
     `UPDATE conversation_participants SET last_read_at = $1 WHERE conversation_id = $2 AND user_id = $3`,
     [now, conversationId, user.id]
-  );
+  ).catch(() => {});
 
   // Trigger Notification to Recipient
   if (recipientPart) {
-    const senderName = await getUserName(user.id);
-    await notificationService.createNotification({
-      recipientId: recipientPart.user_id,
-      actorId: user.id,
-      type: 'NEW_MESSAGE',
-      title: 'New private message',
-      message: `${senderName} sent you a new message`,
-      entityType: 'CONVERSATION',
-      entityId: conversationId,
-    });
+    getUserName(user.id).then((senderName) => {
+      notificationService.createNotification({
+        recipientId: recipientPart.user_id,
+        actorId: user.id,
+        type: 'NEW_MESSAGE',
+        title: 'New private message',
+        message: `${senderName} sent you a new message`,
+        entityType: 'CONVERSATION',
+        entityId: conversationId,
+      }).catch(() => {});
+    }).catch(() => {});
   }
 
   return {
-    message: {
-      id: msgId,
-      conversationId,
-      senderId: user.id,
-      content,
-      text: content,
-      createdAt: now.toISOString(),
-      timestamp: now.getTime(),
-      timeAgo: 'Just now',
-    },
+    message: msgDto,
   };
 };
 

@@ -108,12 +108,24 @@ const RootIndex = () => {
   );
 };
 
+import { SocketProvider } from './context/SocketContext';
+
+const SocketWrapper = ({ children }) => {
+  const { token, authUser, currentUser } = useApp();
+  return (
+    <SocketProvider token={token} user={authUser || currentUser}>
+      {children}
+    </SocketProvider>
+  );
+};
+
 export function App() {
   return (
     <Router>
       <AppProvider>
-        <ScrollToTop />
-        <Suspense fallback={<PageFallback />}>
+        <SocketWrapper>
+          <ScrollToTop />
+          <Suspense fallback={<PageFallback />}>
           <Routes>
             {/* ======================================================= */}
             {/* 1. PUBLIC & AUTHENTICATION ROUTES                        */}
@@ -455,6 +467,7 @@ export function App() {
             />
           </Routes>
         </Suspense>
+        </SocketWrapper>
       </AppProvider>
     </Router>
   );

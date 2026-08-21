@@ -766,28 +766,13 @@ const migrate = async () => {
     await db.query(`CREATE INDEX IF NOT EXISTS idx_messages_sender ON messages(sender_id);`).catch(() => {});
     await db.query(`CREATE INDEX IF NOT EXISTS idx_messages_created_at ON messages(created_at ASC);`).catch(() => {});
 
-    // Notifications indexes
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_notifications_recipient ON notifications(recipient_id);`).catch(() => {});
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_notifications_created_at ON notifications(created_at DESC);`).catch(() => {});
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_notifications_is_read ON notifications(is_read);`).catch(() => {});
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_notifications_recipient_read ON notifications(recipient_id, is_read);`).catch(() => {});
+    // Production Performance Hardening Composite & Partial Indexes
     await db.query(`CREATE INDEX IF NOT EXISTS idx_notifications_recipient_created ON notifications(recipient_id, created_at DESC);`).catch(() => {});
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_notifications_entity ON notifications(entity_type, entity_id);`).catch(() => {});
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_notifications_user_read ON notifications(user_id, is_read);`).catch(() => {});
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_notifications_user_created ON notifications(user_id, created_at DESC);`).catch(() => {});
-
-    // Events indexes
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_events_created_by ON events(created_by);`).catch(() => {});
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_events_start_at ON events(start_at);`).catch(() => {});
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_events_status ON events(status);`).catch(() => {});
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_events_category ON events(category);`).catch(() => {});
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_events_status_start_at ON events(status, start_at);`).catch(() => {});
-
-    // User Settings & Privacy indexes
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_user_settings_user_id ON user_settings(user_id);`).catch(() => {});
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_user_blocks_blocker ON user_blocks(blocker_id);`).catch(() => {});
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_user_blocks_blocked ON user_blocks(blocked_id);`).catch(() => {});
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_user_sessions_user_active ON user_sessions(user_id, is_active);`).catch(() => {});
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_notifications_recipient_unread ON notifications(recipient_id) WHERE is_read = false;`).catch(() => {});
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_connections_requester_status ON connections(requester_id, status);`).catch(() => {});
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_connections_receiver_status ON connections(receiver_id, status);`).catch(() => {});
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_user_profiles_updated_user ON user_profiles(updated_at DESC, user_id);`).catch(() => {});
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_users_role_status ON users(account_status, role);`).catch(() => {});
     await db.query(`CREATE INDEX IF NOT EXISTS idx_email_deliveries_recipient ON email_deliveries(recipient_email);`).catch(() => {});
     await db.query(`CREATE INDEX IF NOT EXISTS idx_email_deliveries_status ON email_deliveries(status);`).catch(() => {});
     await db.query(`CREATE INDEX IF NOT EXISTS idx_verification_codes_email_purpose ON verification_codes(email, purpose);`).catch(() => {});
