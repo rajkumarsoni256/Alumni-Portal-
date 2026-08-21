@@ -369,6 +369,7 @@ const getMessages = async (authUserId, conversationId, queryParams = {}) => {
 };
 
 const sendMessage = async (user, conversationId, messageData) => {
+  const startTotal = Date.now();
   if (!UUID_REGEX.test(conversationId)) {
     const err = new Error('Invalid conversation ID format');
     err.statusCode = 400;
@@ -383,11 +384,13 @@ const sendMessage = async (user, conversationId, messageData) => {
     throw err;
   }
 
+  const startAuth = Date.now();
   // Authorization & Partner lookup check
   const partCheck = await db.query(
     'SELECT user_id FROM conversation_participants WHERE conversation_id = $1',
     [conversationId]
   );
+  const authDur = Date.now() - startAuth;
 
   const isParticipant = partCheck.rows.some((r) => r.user_id === user.id);
   if (!isParticipant) {
@@ -417,11 +420,13 @@ const sendMessage = async (user, conversationId, messageData) => {
   const msgId = crypto.randomUUID();
   const now = new Date();
 
+  const startDb = Date.now();
   await db.query(
     `INSERT INTO messages (id, conversation_id, sender_id, content, created_at)
      VALUES ($1, $2, $3, $4, $5)`,
     [msgId, conversationId, user.id, content, now]
   );
+  const dbDur = Date.now() - startDb;
 
   const msgDto = {
     id: msgId,
@@ -434,6 +439,7 @@ const sendMessage = async (user, conversationId, messageData) => {
     timeAgo: 'Just now',
   };
 
+  const startSocket = Date.now();
   // Instant Socket.IO Event Emission to active conversation room and recipient user room
   try {
     const { emitToConversation, emitToUser } = require('../socket/socketServer');
@@ -444,6 +450,14 @@ const sendMessage = async (user, conversationId, messageData) => {
   } catch {
     // Non-blocking socket error handling
   }
+  const socketDur = Date.now() - startSocket;
+  const totalDur = Date.now() - startTotal;
+
+  const logger = require('../utils/logger');
+  logger.info(
+    'MESSAGE_PERF',
+    `sendMessage [id=${msgId}] total=${totalDur}ms auth=${authDur}ms db=${dbDur}ms socket=${socketDur}ms`
+  );
 
   // Async updates (non-blocking for HTTP latency)
   db.query(

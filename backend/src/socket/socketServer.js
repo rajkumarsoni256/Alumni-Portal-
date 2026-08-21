@@ -112,8 +112,23 @@ const initSocketServer = (httpServer) => {
       }
     });
 
+    // Socket Event Rate Limiter
+    let typingEventCount = 0;
+    let typingWindowReset = Date.now();
+
+    const isTypingRateLimited = () => {
+      const now = Date.now();
+      if (now - typingWindowReset > 1000) {
+        typingEventCount = 0;
+        typingWindowReset = now;
+      }
+      typingEventCount++;
+      return typingEventCount > 5;
+    };
+
     // Typing Indicators
     socket.on('typing:start', ({ conversationId }) => {
+      if (isTypingRateLimited()) return;
       if (conversationId) {
         socket.to(`conversation:${conversationId}`).emit('typing:start', {
           conversationId,
@@ -129,6 +144,35 @@ const initSocketServer = (httpServer) => {
           conversationId,
           userId,
         });
+      }
+    });
+
+    // Reconnection Missed Events Sync Handler
+    socket.on('sync:missed', async ({ lastMessageAt, lastNotificationAt }, callback) => {
+      try {
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId);
+        let unreadCount = 0;
+
+        if (isUuid) {
+          const db = require('../config/db');
+          const missedNotifsRes = await db.query(
+            `SELECT COUNT(*) AS unread FROM notifications WHERE recipient_id = $1 AND is_read = false`,
+            [userId]
+          );
+          unreadCount = parseInt(missedNotifsRes.rows[0]?.unread || '0', 10);
+        }
+
+        if (typeof callback === 'function') {
+          callback({
+            success: true,
+            unreadNotifications: unreadCount,
+            syncedAt: new Date().toISOString(),
+          });
+        }
+      } catch (err) {
+        if (typeof callback === 'function') {
+          callback({ success: false, error: err.message });
+        }
       }
     });
 

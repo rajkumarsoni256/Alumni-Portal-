@@ -443,6 +443,9 @@ const updateUserStatus = async (adminUserId, targetUserId, accountStatus) => {
       await sessionService.revokeAllUserSessions(targetUserId, 'ACCOUNT_DEACTIVATED').catch(() => {});
     }
 
+    const { invalidateUserAuthCache } = require('../middleware/authMiddleware');
+    invalidateUserAuthCache(targetUserId);
+
     return updateRes.rows[0];
   } catch (err) {
     await client.query('ROLLBACK');

@@ -138,18 +138,7 @@ const discoverUsers = async (queryParams, authUserId = null) => {
 
   const whereString = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
 
-  // Count Query
-  const countQuery = `
-    SELECT COUNT(*) AS total
-    FROM users u
-    LEFT JOIN user_profiles p ON u.id = p.user_id
-    ${whereString};
-  `;
-  const countResult = await db.query(countQuery, values);
-  const total = parseInt(countResult.rows[0].total, 10);
-  const pages = Math.ceil(total / limit) || 1;
-
-  // Data Query with Connection JOIN
+  // Data Query with Single-Pass Window Function & Connection JOIN
   let authParamIndex = null;
   let connJoinClause = '';
   if (authUserId) {
@@ -171,19 +160,21 @@ const discoverUsers = async (queryParams, authUserId = null) => {
            p.is_available_for_mentorship, p.linkedin_url, p.github_url,
            p.website_url, p.skills, p.interests, p.is_profile_complete,
            p.created_at, p.updated_at,
-           (SELECT COUNT(*) FROM connections conn WHERE (conn.requester_id = u.id OR conn.receiver_id = u.id) AND UPPER(conn.status) = 'ACCEPTED') AS connections_count
+           COUNT(*) OVER() AS total_count
            ${authUserId ? ', c.id AS conn_id, c.requester_id AS conn_requester, c.receiver_id AS conn_receiver, c.status AS conn_status' : ''}
     FROM users u
     LEFT JOIN user_profiles p ON u.id = p.user_id
     ${connJoinClause}
     ${whereString}
-    ORDER BY COALESCE(p.updated_at, u.created_at) DESC
+    ORDER BY p.updated_at DESC NULLS LAST, u.created_at DESC
     LIMIT $${paramIndex} OFFSET $${paramIndex + 1};
   `;
 
   const dataValues = [...values, limit, offset];
   const dataResult = await db.query(dataQuery, dataValues);
 
+  const total = dataResult.rows.length > 0 ? parseInt(dataResult.rows[0].total_count, 10) : 0;
+  const pages = Math.ceil(total / limit) || 1;
   const users = dataResult.rows.map((row) => formatPublicUser(row, authUserId));
 
   return {

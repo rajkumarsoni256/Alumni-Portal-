@@ -176,5 +176,35 @@ if (require.main === module) {
   startServer();
 }
 
+// Graceful Shutdown Lifecycle Handler
+const gracefulShutdown = async (signal) => {
+  console.log(`\n\x1b[33m[JU CONNECT SHUTDOWN]\x1b[0m Received ${signal}. Starting graceful shutdown...`);
+  try {
+    server.close(() => {
+      console.log('✔ [HTTP Server] Stopped accepting new connections.');
+    });
+
+    const { getIO } = require('./socket/socketServer');
+    try {
+      const io = getIO();
+      io.close(() => console.log('✔ [Socket.IO] Closed active websocket connections.'));
+    } catch {}
+
+    const db = require('./config/db');
+    if (db.pool && typeof db.pool.end === 'function') {
+      await db.pool.end();
+      console.log('✔ [PostgreSQL Pool] All database pool connections drained cleanly.');
+    }
+
+    process.exit(0);
+  } catch (err) {
+    console.error('Error during shutdown:', err);
+    process.exit(1);
+  }
+};
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
 app.server = server;
 module.exports = app;

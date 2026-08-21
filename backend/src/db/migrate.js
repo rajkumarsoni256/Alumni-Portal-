@@ -767,6 +767,7 @@ const migrate = async () => {
     await db.query(`CREATE INDEX IF NOT EXISTS idx_messages_created_at ON messages(created_at ASC);`).catch(() => {});
 
     // Production Performance Hardening Composite & Partial Indexes
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_messages_conv_created_id ON messages(conversation_id, created_at DESC, id DESC);`).catch(() => {});
     await db.query(`CREATE INDEX IF NOT EXISTS idx_notifications_recipient_created ON notifications(recipient_id, created_at DESC);`).catch(() => {});
     await db.query(`CREATE INDEX IF NOT EXISTS idx_notifications_recipient_unread ON notifications(recipient_id) WHERE is_read = false;`).catch(() => {});
     await db.query(`CREATE INDEX IF NOT EXISTS idx_connections_requester_status ON connections(requester_id, status);`).catch(() => {});

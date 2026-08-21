@@ -335,19 +335,24 @@ export const AppProvider = ({ children }) => {
             setActiveRole(normalizedRole);
             setIsAuthenticated(true);
 
-            // Parallelize initial authenticated data loading for high performance
+            // Phase 1: Core user session data
             await Promise.allSettled([
               fetchUserProfile(),
               fetchUserSettings(),
-              fetchAlumniList(),
-              fetchSuggestedPeople(),
-              fetchIncomingConnectionRequests(),
-              fetchMyConnections(),
-              fetchNotifications(),
-              fetchEvents(),
-              fetchMentorshipRequests(),
-              refreshUnreadMessagesCount(user.id),
             ]);
+
+            // Phase 2: Stagger secondary dashboard widgets & unread counts
+            setTimeout(() => {
+              Promise.allSettled([
+                fetchSuggestedPeople(),
+                fetchIncomingConnectionRequests(),
+                fetchMyConnections(),
+                fetchNotifications(),
+                fetchEvents(),
+                fetchMentorshipRequests(),
+                refreshUnreadMessagesCount(user.id),
+              ]);
+            }, 100);
 
             if (user.role?.toUpperCase() === 'ADMIN' || isComplete) {
               setAuthStatus('AUTHENTICATED');
@@ -500,18 +505,26 @@ export const AppProvider = ({ children }) => {
       setIsAuthenticated(true);
 
       await fetchUserProfile();
-      await fetchAlumniList();
-      await fetchSuggestedPeople();
-      await fetchIncomingConnectionRequests();
-      await fetchNotifications();
-      await fetchEvents();
-      await fetchMentorshipRequests();
+      fetchUserSettings();
 
       if (user.role?.toUpperCase() === 'ADMIN' || isComplete) {
         setAuthStatus('AUTHENTICATED');
       } else {
         setAuthStatus('ONBOARDING');
       }
+
+      // Background load secondary widget state asynchronously without blocking login transition
+      setTimeout(() => {
+        Promise.allSettled([
+          fetchSuggestedPeople(),
+          fetchIncomingConnectionRequests(),
+          fetchNotifications(),
+          fetchEvents(),
+          fetchMentorshipRequests(),
+          refreshUnreadMessagesCount(user.id),
+        ]);
+      }, 50);
+
       showNotification(`Welcome back, ${user.email}!`);
       return user;
     } catch (err) {
@@ -536,18 +549,25 @@ export const AppProvider = ({ children }) => {
       setIsAuthenticated(true);
 
       await fetchUserProfile();
-      await fetchAlumniList();
-      await fetchSuggestedPeople();
-      await fetchIncomingConnectionRequests();
-      await fetchNotifications();
-      await fetchEvents();
-      await fetchMentorshipRequests();
+      fetchUserSettings();
 
       if (user.role?.toUpperCase() === 'ADMIN' || isComplete) {
         setAuthStatus('AUTHENTICATED');
       } else {
         setAuthStatus('ONBOARDING');
       }
+
+      // Background load secondary widget state asynchronously
+      setTimeout(() => {
+        Promise.allSettled([
+          fetchSuggestedPeople(),
+          fetchIncomingConnectionRequests(),
+          fetchNotifications(),
+          fetchEvents(),
+          fetchMentorshipRequests(),
+          refreshUnreadMessagesCount(user.id),
+        ]);
+      }, 50);
       showNotification(`Signed in with Google as ${user.email}!`);
       return user;
     } catch (err) {
