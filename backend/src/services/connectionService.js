@@ -627,32 +627,29 @@ const getSuggestions = async (user, queryParams = {}) => {
 
   const res = await db.query(query, [user.id, selfBranch, selfGradYear, limit]);
 
-  const suggestions = await Promise.all(
-    res.rows.map(async (row) => {
-      const userCard = formatUserCard(row);
-      const mutualCount = await getMutualConnectionsCount(user.id, row.user_id);
-      return {
-        id: row.user_id,
-        userId: row.user_id,
-        name: userCard.name,
-        fullName: userCard.fullName,
-        email: userCard.email,
-        role: userCard.role,
-        avatar: userCard.avatar,
-        avatarUrl: userCard.avatarUrl,
-        headline: userCard.currentRole ? `${userCard.currentRole}${userCard.company ? ` @ ${userCard.company}` : ''}` : (userCard.degree ? `${userCard.degree} ${userCard.branch || ''}` : 'JECRC Member'),
-        company: userCard.company,
-        designation: userCard.designation,
-        branch: userCard.branch,
-        graduationYear: userCard.graduationYear,
-        batch: userCard.batch,
-        isAlumni: userCard.isAlumni,
-        connectionStatus: 'none',
-        mutualCount,
-        mutualConnectionsCount: mutualCount,
-      };
-    })
-  );
+  const suggestions = res.rows.map((row) => {
+    const userCard = formatUserCard(row);
+    return {
+      id: row.user_id,
+      userId: row.user_id,
+      name: userCard.name,
+      fullName: userCard.fullName,
+      email: userCard.email,
+      role: userCard.role,
+      avatar: userCard.avatar,
+      avatarUrl: userCard.avatarUrl,
+      headline: userCard.currentRole ? `${userCard.currentRole}${userCard.company ? ` @ ${userCard.company}` : ''}` : (userCard.degree ? `${userCard.degree} ${userCard.branch || ''}` : 'JECRC Member'),
+      company: userCard.company,
+      designation: userCard.designation,
+      branch: userCard.branch,
+      graduationYear: userCard.graduationYear,
+      batch: userCard.batch,
+      isAlumni: userCard.isAlumni,
+      connectionStatus: 'none',
+      mutualCount: 0,
+      mutualConnectionsCount: 0,
+    };
+  });
 
   return { suggestions, total: suggestions.length };
 };
