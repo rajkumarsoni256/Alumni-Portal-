@@ -319,6 +319,7 @@ const runTests = async () => {
   } finally {
     await cleanupTestUsers().catch(() => {});
     if (server) server.close();
+    process.exit(testsPassed === testsTotal ? 0 : 1);
   }
 };
 

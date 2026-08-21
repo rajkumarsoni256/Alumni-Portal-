@@ -194,6 +194,7 @@ const runTests = async () => {
     console.log('\n✅ Cleanup completed successfully.');
 
     console.log('\n=== ALL SESSION SECURITY HARDENING TESTS PASSED 100% ===');
+    process.exit(0);
   } catch (err) {
     console.error('\n❌ TEST FAILED:', err);
     process.exit(1);

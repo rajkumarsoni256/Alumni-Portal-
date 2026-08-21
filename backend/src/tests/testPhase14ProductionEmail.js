@@ -215,8 +215,10 @@ const runPhase14Tests = async () => {
 
   } catch (err) {
     console.error('Phase 14 test suite crashed:', err);
+    process.exitCode = 1;
   } finally {
     if (server) server.close();
+    process.exit(passed === total ? 0 : 1);
   }
 };
 

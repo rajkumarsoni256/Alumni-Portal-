@@ -369,15 +369,37 @@ const deleteAccount = async (user, password) => {
     console.warn('[Account Deleted Alert Warning]', err.message);
   }
 
+  const isAlumni = (userData.role || user.role || '').toUpperCase() === 'ALUMNI';
+
+  if (isAlumni) {
+    // ALUMNI ACCOUNT:
+    // Deactivate public-facing profile, clear personal info, revoke sessions, but preserve institutional verification & audit records
+    await db.query('UPDATE auth_sessions SET revoked_at = NOW() WHERE user_id = $1', [user.id]);
+    await db.query(`
+      UPDATE user_profiles
+      SET bio = NULL, phone = NULL, avatar_url = NULL, banner_url = NULL,
+          linkedin_url = NULL, github_url = NULL, is_profile_complete = false,
+          updated_at = NOW()
+      WHERE user_id = $1
+    `, [user.id]);
+    await db.query(`UPDATE users SET account_status = 'DEACTIVATED', updated_at = NOW() WHERE id = $1`, [user.id]);
+
+    return {
+      success: true,
+      message: 'Your public alumni profile and personal data have been deactivated and cleared from JU Connect.',
+    };
+  }
+
+  // STUDENT ACCOUNT:
   // Set user_id in audit_logs to null so foreign keys don't block deletion
   await db.query('UPDATE audit_logs SET user_id = NULL WHERE user_id = $1', [user.id]).catch(() => {});
 
-  // Permanently delete user record (foreign keys ON DELETE CASCADE will clean up user_profiles, auth_sessions, posts, comments, connections, registrations, etc.)
+  // Permanently delete student user record (foreign keys ON DELETE CASCADE will clean up profile, sessions, posts, comments, connections, enabling re-registration with same email)
   await db.query('DELETE FROM users WHERE id = $1', [user.id]);
 
   return {
     success: true,
-    message: 'Your account and personal data have been permanently deleted from JU Connect.',
+    message: 'Your student account and personal data have been permanently deleted from JU Connect.',
   };
 };
 

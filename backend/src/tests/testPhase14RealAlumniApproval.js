@@ -234,6 +234,7 @@ const runTests = async () => {
     if (server) {
       server.close();
     }
+    process.exit(process.exitCode || 0);
   }
 };
 

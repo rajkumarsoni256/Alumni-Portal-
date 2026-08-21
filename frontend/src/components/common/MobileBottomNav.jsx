@@ -14,13 +14,13 @@ import {
 } from 'lucide-react';
 
 export const MobileBottomNav = () => {
-  const { isAuthenticated, activeRole, notifications, unreadMessagesCount } = useApp();
+  const { isAuthenticated, activeRole, notifications, unreadNotifsCount: appUnreadNotifsCount, unreadMessagesCount } = useApp();
   const location = useLocation();
 
   if (!isAuthenticated) return null;
 
   const isAdmin = activeRole === 'admin';
-  const unreadNotifsCount = (notifications || []).filter((n) => n.unread || !n.isRead).length;
+  const unreadNotifsCount = appUnreadNotifsCount ?? (notifications || []).filter((n) => n.unread || !n.isRead).length;
 
   const communityNavItems = [
     { 

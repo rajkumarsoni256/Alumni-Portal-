@@ -4,25 +4,25 @@ const { successResponse, errorResponse } = require('../utils/response');
 
 const COOKIE_NAME = process.env.REFRESH_TOKEN_COOKIE_NAME || 'ju_connect_refresh';
 
-const getCookieOptions = () => {
+const getCookieOptions = (rememberMe = true) => {
   const isProduction = process.env.NODE_ENV === 'production';
   return {
     httpOnly: true,
     secure: isProduction || true, // Must be true for SameSite=None on cross-origin Vercel -> Render requests
     sameSite: isProduction ? 'none' : 'lax',
     path: '/',
-    maxAge: 10 * 24 * 60 * 60 * 1000, // 10 days
+    maxAge: rememberMe ? 10 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000, // 10 days if rememberMe, 24 hours otherwise
   };
 };
 
-const setRefreshCookie = (res, refreshToken) => {
+const setRefreshCookie = (res, refreshToken, rememberMe = true) => {
   if (!refreshToken) return;
-  res.cookie(COOKIE_NAME, refreshToken, getCookieOptions());
+  res.cookie(COOKIE_NAME, refreshToken, getCookieOptions(rememberMe));
 };
 
 const clearRefreshCookie = (res) => {
   res.clearCookie(COOKIE_NAME, {
-    ...getCookieOptions(),
+    ...getCookieOptions(false),
     maxAge: 0,
   });
 };
@@ -53,7 +53,7 @@ const verifyStudentRegistrationOTP = async (req, res, next) => {
   try {
     const result = await authService.verifyStudentRegistrationOTP({ ...req.body, req });
     if (result.refreshToken) {
-      setRefreshCookie(res, result.refreshToken);
+      setRefreshCookie(res, result.refreshToken, req.body?.rememberMe !== false);
       delete result.refreshToken;
     }
     return successResponse(res, result, 'Student account verified and created successfully.', 201);
@@ -84,11 +84,12 @@ const resendVerificationCode = async (req, res, next) => {
 
 const login = async (req, res, next) => {
   try {
-    const { email, password } = req.body;
-    const authResponse = await authService.login({ email, password, req });
+    const { email, password, rememberMe } = req.body;
+    const isRemember = rememberMe !== false;
+    const authResponse = await authService.login({ email, password, rememberMe: isRemember, req });
     
     if (authResponse.refreshToken) {
-      setRefreshCookie(res, authResponse.refreshToken);
+      setRefreshCookie(res, authResponse.refreshToken, isRemember);
       delete authResponse.refreshToken;
     }
 

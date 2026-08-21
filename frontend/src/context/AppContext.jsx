@@ -1,8 +1,4 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import {
-  MOCK_STUDENT,
-  MOCK_USERS,
-} from '../data/mockData';
 import { authService } from '../services/authService';
 import { userService } from '../services/userService';
 import { postService } from '../services/postService';
@@ -21,7 +17,7 @@ export const AppProvider = ({ children }) => {
   // Authentication State
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [authStatus, setAuthStatus] = useState('UNAUTHENTICATED');
+  const [authStatus, setAuthStatus] = useState('INITIALIZING');
   const [authUser, setAuthUser] = useState(null);
   const [userProfile, setUserProfile] = useState(null);
   const [pendingRegistration, setPendingRegistration] = useState({
@@ -33,14 +29,14 @@ export const AppProvider = ({ children }) => {
   });
 
   const [activeRole, setActiveRole] = useState('student');
-  const [student, setStudent] = useState(MOCK_STUDENT);
+  const [student, setStudent] = useState(null);
 
   // Real data arrays from PostgreSQL backend
   const [alumniList, setAlumniList] = useState([]);
   const [requests, setRequests] = useState([]);
   const [events, setEvents] = useState([]);
   const [posts, setPosts] = useState([]);
-  const [usersMap, setUsersMap] = useState(MOCK_USERS);
+  const [usersMap, setUsersMap] = useState({});
   const [connectionRequests, setConnectionRequests] = useState([]);
   const [suggestedPeople, setSuggestedPeople] = useState([]);
   const [notifications, setNotifications] = useState([]);
@@ -60,7 +56,7 @@ export const AppProvider = ({ children }) => {
   const [savedPostIds, setSavedPostIds] = useState([]);
   const [feedFilter, setFeedFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [savedAlumniIds, setSavedAlumniIds] = useState(MOCK_STUDENT.savedAlumniIds || []);
+  const [savedAlumniIds, setSavedAlumniIds] = useState([]);
   const [myConnections, setMyConnections] = useState([]);
   const [userSettings, setUserSettings] = useState(null);
 
@@ -313,6 +309,8 @@ export const AppProvider = ({ children }) => {
 
   useEffect(() => {
     const initializeAuthSession = async () => {
+      setAuthStatus('INITIALIZING');
+      setIsLoading(true);
       let token = authService.getToken();
 
       // If token is missing, attempt silent refresh with HttpOnly cookie first
@@ -330,23 +328,26 @@ export const AppProvider = ({ children }) => {
       if (token) {
         try {
           const user = await authService.getCurrentUser();
-          if (user) {
+          if (user && user.id) {
             const normalizedRole = (user.role || 'STUDENT').toLowerCase();
             const isComplete = user.profileComplete !== false;
             setAuthUser(user);
             setActiveRole(normalizedRole);
             setIsAuthenticated(true);
 
-            await fetchUserProfile();
-            await fetchUserSettings();
-            await fetchAlumniList();
-            await fetchSuggestedPeople();
-            await fetchIncomingConnectionRequests();
-            await fetchMyConnections();
-            await fetchNotifications();
-            await fetchEvents();
-            await fetchMentorshipRequests();
-            await refreshUnreadMessagesCount(user.id);
+            // Parallelize initial authenticated data loading for high performance
+            await Promise.allSettled([
+              fetchUserProfile(),
+              fetchUserSettings(),
+              fetchAlumniList(),
+              fetchSuggestedPeople(),
+              fetchIncomingConnectionRequests(),
+              fetchMyConnections(),
+              fetchNotifications(),
+              fetchEvents(),
+              fetchMentorshipRequests(),
+              refreshUnreadMessagesCount(user.id),
+            ]);
 
             if (user.role?.toUpperCase() === 'ADMIN' || isComplete) {
               setAuthStatus('AUTHENTICATED');
@@ -381,11 +382,13 @@ export const AppProvider = ({ children }) => {
   const [intendedReturnPath, setIntendedReturnPath] = useState(null);
 
   // Global session-expiry listener.
-  // apiClient dispatches 'auth:session-expired' whenever a 401 is received.
-  // Displays SessionExpiredModal and preserves current internal return path.
+  // Displays SessionExpiredModal only when an authenticated session genuinely expires.
   useEffect(() => {
     const handleSessionExpired = () => {
-      const hadActiveSession = !!authUser || !!authService.getToken();
+      // Do not trigger modal if app is still initializing or already logged out
+      if (authStatus === 'INITIALIZING' || authStatus === 'UNAUTHENTICATED') {
+        return;
+      }
 
       if (typeof window !== 'undefined') {
         const currentPath = window.location.pathname;
@@ -404,17 +407,15 @@ export const AppProvider = ({ children }) => {
       setIsLoading(false);
       setAuthUser(null);
       setActiveRole('student');
-      setAuthStatus('UNAUTHENTICATED');
-      if (hadActiveSession) {
-        setIsSessionExpiredModalOpen(true);
-      }
+      setAuthStatus('SESSION_EXPIRED');
+      setIsSessionExpiredModalOpen(true);
     };
 
     window.addEventListener('auth:session-expired', handleSessionExpired);
     return () => {
       window.removeEventListener('auth:session-expired', handleSessionExpired);
     };
-  }, [authUser]);
+  }, [authStatus]);
 
   const updateAdminProfileState = (updatedProfile) => {
     if (!updatedProfile) return;
@@ -454,13 +455,14 @@ export const AppProvider = ({ children }) => {
         roleUpper: 'ADMIN',
         avatar: userProfile?.avatarUrl || authUser?.avatarUrl || null,
       }
-    : {
-        id: authUser?.id || (activeRole === 'alumni' ? 'alm_1' : 'st_101'),
-        name: userProfile?.fullName || authUser?.email?.split('@')[0] || (activeRole === 'alumni' ? 'Alumni User' : 'Student User'),
-        fullName: userProfile?.fullName || '',
-        email: authUser?.email || (activeRole === 'alumni' ? 'alumni@jecrc.ac.in' : 'student@jecrc.ac.in'),
-        role: (authUser?.role || activeRole || 'student').toLowerCase(),
-        roleUpper: (authUser?.role || activeRole || 'STUDENT').toUpperCase(),
+    : authUser
+    ? {
+        id: authUser.id,
+        name: userProfile?.fullName || authUser?.fullName || authUser?.email?.split('@')[0] || 'Community Member',
+        fullName: userProfile?.fullName || authUser?.fullName || '',
+        email: authUser.email,
+        role: (authUser.role || activeRole || 'student').toLowerCase(),
+        roleUpper: (authUser.role || activeRole || 'STUDENT').toUpperCase(),
         degree: userProfile?.degree || null,
         branch: userProfile?.branch || null,
         company: userProfile?.company || null,
@@ -474,11 +476,21 @@ export const AppProvider = ({ children }) => {
         interests: userProfile?.interests || [],
         avatar: userProfile?.avatarUrl || authUser?.avatarUrl || null,
         verified: true,
+      }
+    : {
+        id: null,
+        name: 'Guest User',
+        fullName: '',
+        email: '',
+        role: activeRole || 'student',
+        roleUpper: (activeRole || 'STUDENT').toUpperCase(),
+        avatar: null,
+        verified: false,
       };
 
-  const loginUser = async ({ email, password }) => {
+  const loginUser = async ({ email, password, rememberMe = false }) => {
     try {
-      const response = await authService.login({ email, password });
+      const response = await authService.login({ email, password, rememberMe });
       const user = response.user || response;
       const normalizedRole = (user.role || 'STUDENT').toLowerCase();
       const isComplete = user.profileComplete !== false;
@@ -591,9 +603,10 @@ export const AppProvider = ({ children }) => {
   const sendForgotPasswordLink = async (email) => {
     try {
       const res = await authService.forgotPassword(email);
-      showNotification(res.message || 'Password reset link sent to your email');
+      showNotification(res?.message || 'Password reset link sent to your email');
+      return res;
     } catch (err) {
-      showNotification(err.message || 'Failed to request password reset', 'error');
+      showNotification(err?.message || 'Failed to request password reset', 'error');
       throw err;
     }
   };
@@ -601,10 +614,10 @@ export const AppProvider = ({ children }) => {
   const resetUserPassword = async ({ email, token, newPassword }) => {
     try {
       const res = await authService.resetPassword({ email, token, newPassword });
-      showNotification(res.message || 'Password reset successfully! Please log in with your new password.');
+      showNotification(res?.message || 'Password reset successfully! Please log in with your new password.');
       return res;
     } catch (err) {
-      showNotification(err.message || 'Failed to reset password', 'error');
+      showNotification(err?.message || 'Failed to reset password', 'error');
       throw err;
     }
   };
@@ -960,9 +973,8 @@ export const AppProvider = ({ children }) => {
 
   const handleSetActiveRole = (newRole) => {
     setActiveRole(newRole);
-    if (authService.getToken()) {
-      const userId = newRole === 'alumni' ? 'alm_1' : 'st_101';
-      refreshUnreadMessagesCount(userId);
+    if (authService.getToken() && authUser?.id) {
+      refreshUnreadMessagesCount(authUser.id);
     }
   };
 

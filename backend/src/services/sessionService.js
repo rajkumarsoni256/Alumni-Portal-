@@ -40,12 +40,12 @@ const parseUserAgent = (uaInput) => {
 };
 
 /**
- * Creates a server-side session with an absolute 10-day lifetime
+ * Creates a server-side session with an absolute 10-day lifetime (or 24h if not remembered)
  */
-const createSession = async ({ userId, ipAddress = null, userAgent = null }) => {
+const createSession = async ({ userId, ipAddress = null, userAgent = null, rememberMe = true }) => {
   const rawRefreshToken = crypto.randomBytes(32).toString('hex');
   const tokenHash = hashToken(rawRefreshToken);
-  const maxLifetimeMs = getSessionMaxLifetimeMs();
+  const maxLifetimeMs = rememberMe ? getSessionMaxLifetimeMs() : 24 * 60 * 60 * 1000;
   const expiresAt = new Date(Date.now() + maxLifetimeMs);
   const sessionId = crypto.randomUUID();
 

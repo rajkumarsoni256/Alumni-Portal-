@@ -29,6 +29,21 @@ export const clearAuthToken = () => {
 };
 
 /**
+ * Resolve relative media/upload path to absolute backend URL
+ * @param {string} urlStr
+ * @returns {string|null}
+ */
+export const resolveMediaUrl = (urlStr) => {
+  if (!urlStr || typeof urlStr !== 'string') return null;
+  const clean = urlStr.trim();
+  if (clean.startsWith('http://') || clean.startsWith('https://') || clean.startsWith('data:') || clean.startsWith('blob:')) {
+    return clean;
+  }
+  const cleanPath = clean.startsWith('/') ? clean : `/${clean}`;
+  return `${API_BASE_URL}${cleanPath}`;
+};
+
+/**
  * Custom Error class capturing API error responses
  */
 export class ApiError extends Error {
@@ -218,20 +233,30 @@ export const request = async (endpoint, options = {}) => {
 
   // Handle standard ApiResponse wrapper: { success: true, message: '...', data: T }
   if (data && typeof data === 'object' && 'success' in data) {
-    if (data.data !== undefined) {
+    if (data.data !== undefined && data.data !== null) {
       if (Array.isArray(data.data)) {
-        return {
-          notifications: data.data,
-          data: data.data,
-          summary: data.summary ?? undefined,
-          pagination: data.pagination ?? undefined,
-          totalCount: data.pagination?.totalCount ?? data.data.length,
-          totalPages: data.pagination?.totalPages ?? 1,
-          page: data.pagination?.page ?? 1,
-          pageSize: data.pagination?.pageSize ?? 20,
-          hasNext: data.pagination?.hasNext ?? false,
-          hasPrev: data.pagination?.hasPrev ?? false,
-        };
+        const arrayResult = data.data;
+        arrayResult.data = data.data;
+        arrayResult.notifications = data.data;
+        arrayResult.comments = data.data;
+        arrayResult.requests = data.data;
+        arrayResult.connections = data.data;
+        arrayResult.posts = data.data;
+        arrayResult.summary = data.summary;
+        arrayResult.pagination = data.pagination;
+        arrayResult.totalCount = data.pagination?.totalCount ?? data.data.length;
+        arrayResult.totalPages = data.pagination?.totalPages ?? 1;
+        arrayResult.page = data.pagination?.page ?? 1;
+        arrayResult.pageSize = data.pagination?.pageSize ?? data.data.length;
+        arrayResult.hasNext = data.pagination?.hasNext ?? false;
+        arrayResult.hasPrev = data.pagination?.hasPrev ?? false;
+        if (data.message) arrayResult.message = data.message;
+        return arrayResult;
+      }
+      if (typeof data.data === 'object') {
+        if (data.message && !data.data.message) {
+          data.data.message = data.message;
+        }
       }
       return data.data;
     }
@@ -247,4 +272,5 @@ export const apiClient = {
   put: (endpoint, body, options = {}) => request(endpoint, { ...options, method: 'PUT', body }),
   patch: (endpoint, body, options = {}) => request(endpoint, { ...options, method: 'PATCH', body }),
   delete: (endpoint, options = {}) => request(endpoint, { ...options, method: 'DELETE' }),
+  resolveMediaUrl,
 };

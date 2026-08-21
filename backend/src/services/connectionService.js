@@ -356,14 +356,25 @@ const getIncomingRequests = async (user) => {
 
   const result = await db.query(query, [user.id]);
 
-  const requests = result.rows.map((row) => ({
-    id: row.request_id,
-    requestId: row.request_id,
-    fromUserId: row.user_id,
-    user: formatUserCard(row),
-    requestedAt: row.requested_at,
-    fromUser: formatUserCard(row),
-  }));
+  const requests = await Promise.all(
+    result.rows.map(async (row) => {
+      const mutualCount = await getMutualConnectionsCount(user.id, row.user_id);
+      const userCard = formatUserCard(row);
+      userCard.mutualCount = mutualCount;
+      userCard.mutualConnectionsCount = mutualCount;
+
+      return {
+        id: row.request_id,
+        requestId: row.request_id,
+        fromUserId: row.user_id,
+        user: userCard,
+        requestedAt: row.requested_at,
+        fromUser: userCard,
+        mutualCount,
+        mutualConnectionsCount: mutualCount,
+      };
+    })
+  );
 
   return { requests };
 };
