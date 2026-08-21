@@ -124,7 +124,7 @@ app.get('/', (req, res) => {
 });
 
 // Health Check Endpoints
-app.get(['/actuator/health', '/api/v1/health', '/healthz', '/heath'], (req, res) => {
+app.get(['/health', '/api/v1/health', '/actuator/health', '/healthz', '/heath'], (req, res) => {
   res.json({
     status: 'UP',
     service: 'jecrc-community-backend',
@@ -151,14 +151,20 @@ app.use('/api/v1/admin', adminRoutes);
 // Global Error Handler
 app.use(errorHandler);
 
+const http = require('http');
+const { initSocketServer } = require('./socket/socketServer');
+
+const server = http.createServer(app);
+initSocketServer(server);
+
 // Initialize DB and start server
 const startServer = async () => {
   try {
-    console.log('\n\x1b[1m\x1b[31m[JU CONNECT]\x1b[0m \x1b[36mInitializing PostgreSQL Database & Services...\x1b[0m');
+    console.log('\n\x1b[1m\x1b[31m[JU CONNECT]\x1b[0m \x1b[36mInitializing PostgreSQL Database, Socket.IO & Services...\x1b[0m');
     await migrate();
-    app.listen(PORT, '0.0.0.0', () => {
-      console.log(`\x1b[1m\x1b[32m✔ [JECRC Backend]\x1b[0m Server listening on \x1b[4mhttp://localhost:${PORT}\x1b[0m`);
-      console.log(`\x1b[2m  API Base: http://localhost:${PORT}/api/v1 | Static Uploads: /uploads\x1b[0m\n`);
+    server.listen(PORT, '0.0.0.0', () => {
+      console.log(`\x1b[1m\x1b[32m✔ [JECRC Backend]\x1b[0m HTTP & Socket.IO Server listening on \x1b[4mhttp://localhost:${PORT}\x1b[0m`);
+      console.log(`\x1b[2m  API Base: http://localhost:${PORT}/api/v1 | WebSockets: Enabled | Static Uploads: /uploads\x1b[0m\n`);
     });
   } catch (err) {
     console.error('\x1b[31mFailed to start server:\x1b[0m', err);
@@ -170,4 +176,5 @@ if (require.main === module) {
   startServer();
 }
 
+app.server = server;
 module.exports = app;

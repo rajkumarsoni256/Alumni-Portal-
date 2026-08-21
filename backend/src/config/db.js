@@ -33,8 +33,25 @@ pool.on('error', (err) => {
   console.error('Unexpected error on idle PostgreSQL client', err);
 });
 
+const logger = require('../utils/logger');
+
 module.exports = {
-  query: (text, params) => pool.query(text, params),
+  query: async (text, params) => {
+    const start = Date.now();
+    try {
+      const res = await pool.query(text, params);
+      const duration = Date.now() - start;
+      if (duration > 50) {
+        const querySnippet = (typeof text === 'string' ? text : text.text || '').replace(/\s+/g, ' ').trim().slice(0, 100);
+        logger.debug('DB', `SLOW QUERY (${duration}ms) [rows=${res.rowCount}]: ${querySnippet}`);
+      }
+      return res;
+    } catch (err) {
+      const duration = Date.now() - start;
+      logger.error('DB', `QUERY ERROR (${duration}ms): ${err.message}`);
+      throw err;
+    }
+  },
   getClient: () => pool.connect(),
   pool,
 };

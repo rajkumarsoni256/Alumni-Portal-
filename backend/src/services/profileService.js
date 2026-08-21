@@ -285,15 +285,16 @@ const completeOnboarding = async (user, data) => {
 
 const getCurrentProfile = async (user) => {
   const connectionService = require('./connectionService');
-  const result = await db.query(
+  const profilePromise = db.query(
     `SELECT p.*, u.email, u.role
      FROM user_profiles p
      JOIN users u ON p.user_id = u.id
      WHERE p.user_id = $1`,
     [user.id]
   );
+  const connCountPromise = connectionService.getConnectionsCount(user.id);
 
-  const connCount = await connectionService.getConnectionsCount(user.id);
+  const [result, connCount] = await Promise.all([profilePromise, connCountPromise]);
 
   if (result.rows.length === 0) {
     return {

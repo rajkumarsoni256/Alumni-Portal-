@@ -77,6 +77,28 @@ const createNotification = async ({
       [notifId, recipientId, actorId, type, title, message, entityType, entityId, JSON.stringify(metadata)]
     );
 
+    // Fetch actor details to format complete Notification DTO for instant Socket.IO push
+    const actorRes = await db.query(
+      `SELECT u.email AS actor_email, u.role AS actor_role, p.full_name AS actor_name, p.avatar_url AS actor_avatar
+       FROM users u LEFT JOIN user_profiles p ON u.id = p.user_id WHERE u.id = $1`,
+      [actorId]
+    ).catch(() => ({ rows: [] }));
+
+    const notifRow = {
+      ...result.rows[0],
+      ...(actorRes.rows[0] || {}),
+    };
+
+    const dto = formatNotificationDTO(notifRow);
+
+    // Instant Real-Time Socket.IO Push Event to recipient room
+    try {
+      const { emitToUser } = require('../socket/socketServer');
+      emitToUser(recipientId, 'notification:new', dto);
+    } catch {
+      // Non-blocking socket error catch
+    }
+
     // Trigger Platform Email Dispatch (respecting recipient's Settings toggles)
     const emailService = require('../email/emailService');
     emailService.sendPlatformNotification(recipientId, type, {
@@ -98,17 +120,17 @@ const getNotifications = async (authUserId, queryParams = {}) => {
   const limit = Math.min(100, Math.max(1, parseInt(queryParams.limit || 20, 10)));
   const offset = (page - 1) * limit;
 
-  // Total count & unread count queries
-  const totalRes = await db.query('SELECT COUNT(*) AS total FROM notifications WHERE recipient_id = $1', [authUserId]);
-  const unreadRes = await db.query('SELECT COUNT(*) AS unread FROM notifications WHERE recipient_id = $1 AND is_read = false', [authUserId]);
-
-  const total = parseInt(totalRes.rows[0].total, 10);
-  const unreadCount = parseInt(unreadRes.rows[0].unread, 10);
+  // Execute unread count (leveraging partial index) and data query in parallel
+  const unreadPromise = db.query(
+    'SELECT COUNT(*) AS unread FROM notifications WHERE recipient_id = $1 AND is_read = false',
+    [authUserId]
+  );
 
   const queryText = `
     SELECT n.*,
            u_actor.email AS actor_email, u_actor.role AS actor_role,
-           p_actor.full_name AS actor_name, p_actor.avatar_url AS actor_avatar
+           p_actor.full_name AS actor_name, p_actor.avatar_url AS actor_avatar,
+           COUNT(*) OVER() AS total_count
     FROM notifications n
     LEFT JOIN users u_actor ON n.actor_id = u_actor.id
     LEFT JOIN user_profiles p_actor ON u_actor.id = p_actor.user_id
@@ -116,9 +138,13 @@ const getNotifications = async (authUserId, queryParams = {}) => {
     ORDER BY n.created_at DESC
     LIMIT $2 OFFSET $3;
   `;
+  const dataPromise = db.query(queryText, [authUserId, limit, offset]);
 
-  const result = await db.query(queryText, [authUserId, limit, offset]);
-  const notifications = result.rows.map(formatNotificationDTO);
+  const [unreadRes, dataResult] = await Promise.all([unreadPromise, dataPromise]);
+
+  const unreadCount = parseInt(unreadRes.rows[0]?.unread || '0', 10);
+  const notifications = dataResult.rows.map(formatNotificationDTO);
+  const total = dataResult.rows.length > 0 ? parseInt(dataResult.rows[0].total_count, 10) : 0;
 
   return {
     notifications,

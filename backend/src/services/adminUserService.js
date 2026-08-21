@@ -200,11 +200,11 @@ const buildUserQueryFilters = (options = {}) => {
     } else {
       const normStatus = activeStatus.toLowerCase().trim();
       if (normStatus === 'complete') {
-        whereClauses.push(`p.is_profile_complete = true AND (NOW() - COALESCE(p.updated_at, u.updated_at)) <= INTERVAL '365 days'`);
+        whereClauses.push(`p.is_profile_complete = true AND p.updated_at >= NOW() - INTERVAL '365 days'`);
       } else if (normStatus === 'incomplete') {
-        whereClauses.push(`(p.is_profile_complete IS NOT TRUE) AND (NOW() - COALESCE(p.updated_at, u.updated_at)) <= INTERVAL '365 days'`);
+        whereClauses.push(`(p.is_profile_complete IS NOT TRUE) AND p.updated_at >= NOW() - INTERVAL '365 days'`);
       } else if (normStatus === 'needs update' || normStatus === 'needs_update') {
-        whereClauses.push(`(NOW() - COALESCE(p.updated_at, u.updated_at)) > INTERVAL '365 days'`);
+        whereClauses.push(`p.updated_at < NOW() - INTERVAL '365 days'`);
       }
     }
   }
@@ -233,11 +233,11 @@ const buildUserQueryFilters = (options = {}) => {
 
   // 11. Last Updated Freshness Filter
   if (lastUpdated && lastUpdated !== 'all') {
-    if (lastUpdated === '30days') whereClauses.push(`COALESCE(p.updated_at, u.updated_at) >= NOW() - INTERVAL '30 days'`);
-    else if (lastUpdated === '3months') whereClauses.push(`COALESCE(p.updated_at, u.updated_at) >= NOW() - INTERVAL '90 days'`);
-    else if (lastUpdated === '6months') whereClauses.push(`COALESCE(p.updated_at, u.updated_at) >= NOW() - INTERVAL '180 days'`);
-    else if (lastUpdated === '1year') whereClauses.push(`COALESCE(p.updated_at, u.updated_at) >= NOW() - INTERVAL '365 days'`);
-    else if (lastUpdated === 'more1year') whereClauses.push(`COALESCE(p.updated_at, u.updated_at) < NOW() - INTERVAL '365 days'`);
+    if (lastUpdated === '30days') whereClauses.push(`p.updated_at >= NOW() - INTERVAL '30 days'`);
+    else if (lastUpdated === '3months') whereClauses.push(`p.updated_at >= NOW() - INTERVAL '90 days'`);
+    else if (lastUpdated === '6months') whereClauses.push(`p.updated_at >= NOW() - INTERVAL '180 days'`);
+    else if (lastUpdated === '1year') whereClauses.push(`p.updated_at >= NOW() - INTERVAL '365 days'`);
+    else if (lastUpdated === 'more1year') whereClauses.push(`p.updated_at < NOW() - INTERVAL '365 days'`);
   }
 
   const whereSql = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
@@ -259,15 +259,15 @@ const getUsers = async (options = {}) => {
 
   const { queryParams, whereSql } = buildUserQueryFilters(options);
 
-  // 12. Whitelisted Sorting
+  // 12. Whitelisted Sorting (Direct column B-Tree index support)
   const sortFieldMap = {
     name: 'p.full_name',
     batch: 'p.graduation_year',
-    lastupdated: 'COALESCE(p.updated_at, u.updated_at)',
+    lastupdated: 'p.updated_at',
     createdat: 'u.created_at',
   };
 
-  const safeSortBy = sortFieldMap[String(sortBy).toLowerCase()] || 'COALESCE(p.updated_at, u.updated_at)';
+  const safeSortBy = sortFieldMap[String(sortBy).toLowerCase()] || 'p.updated_at';
   const safeSortOrder = String(sortOrder).toLowerCase() === 'asc' ? 'ASC' : 'DESC';
 
   // 13. Pagination Calculation
@@ -278,18 +278,7 @@ const getUsers = async (options = {}) => {
   const validatedPageSize = !isNaN(parsedPageSize) && parsedPageSize >= 1 ? Math.min(100, parsedPageSize) : 20;
   const offset = (validatedPage - 1) * validatedPageSize;
 
-  // Execute Count Query
-  const countQuery = `
-    SELECT COUNT(*) AS total
-    FROM users u
-    LEFT JOIN user_profiles p ON u.id = p.user_id
-    ${whereSql};
-  `;
-  const countResult = await db.query(countQuery, queryParams);
-  const totalCount = parseInt(countResult.rows[0].total, 10) || 0;
-  const totalPages = Math.ceil(totalCount / validatedPageSize) || 1;
-
-  // Execute Paginated Data Query
+  // Single-pass Paginated Data + Total Count Query using Window Function
   const dataQueryParams = [...queryParams, validatedPageSize, offset];
   const limitIndex = queryParams.length + 1;
   const offsetIndex = queryParams.length + 2;
@@ -313,7 +302,8 @@ const getUsers = async (options = {}) => {
         p.location,
         p.is_profile_complete,
         COALESCE(p.updated_at, u.updated_at) AS updated_at,
-        ROUND(EXTRACT(EPOCH FROM (NOW() - COALESCE(p.updated_at, u.updated_at))) / 86400) AS last_updated_days_ago
+        ROUND(EXTRACT(EPOCH FROM (NOW() - COALESCE(p.updated_at, u.updated_at))) / 86400) AS last_updated_days_ago,
+        COUNT(*) OVER() AS full_count
     FROM users u
     LEFT JOIN user_profiles p ON u.id = p.user_id
     ${whereSql}
@@ -323,6 +313,8 @@ const getUsers = async (options = {}) => {
 
   const dataResult = await db.query(dataQuery, dataQueryParams);
   const users = dataResult.rows.map(formatAdminUserSummary);
+  const totalCount = dataResult.rows.length > 0 ? parseInt(dataResult.rows[0].full_count, 10) : 0;
+  const totalPages = Math.ceil(totalCount / validatedPageSize) || 1;
 
   return {
     users,
