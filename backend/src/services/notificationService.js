@@ -95,6 +95,10 @@ const createNotification = async ({
     try {
       const { emitToUser } = require('../socket/socketServer');
       emitToUser(recipientId, 'notification:new', dto);
+      
+      const unreadRes = await db.query('SELECT COUNT(*) AS unread FROM notifications WHERE recipient_id = $1 AND is_read = false', [recipientId]);
+      const unreadCount = parseInt(unreadRes.rows[0]?.unread || '0', 10);
+      emitToUser(recipientId, 'notification:count_updated', { unreadCount });
     } catch {
       // Non-blocking socket error catch
     }

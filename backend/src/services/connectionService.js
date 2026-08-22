@@ -62,6 +62,24 @@ const findConnectionByPairOrId = async (user, identifier) => {
 
 const isUUID = (str) => typeof str === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
 
+const isBlockedPair = async (userAId, userBId) => {
+  if (!userAId || !userBId) return false;
+  const res = await db.query(
+    `SELECT 1 FROM user_blocks WHERE (blocker_id = $1 AND blocked_id = $2) OR (blocker_id = $2 AND blocked_id = $1) LIMIT 1`,
+    [userAId, userBId]
+  ).catch(() => ({ rows: [] }));
+  return res.rows.length > 0;
+};
+
+const safeEmitToUser = (userId, event, payload) => {
+  try {
+    const { emitToUser } = require('../socket/socketServer');
+    emitToUser(userId, event, payload);
+  } catch (err) {
+    // Non-blocking socket error catch
+  }
+};
+
 const sendRequest = async (user, targetUserId) => {
   if (!targetUserId) {
     const err = new Error('Target user ID is required');
@@ -77,10 +95,18 @@ const sendRequest = async (user, targetUserId) => {
     throw err;
   }
 
+  if (await isBlockedPair(user.id, targetUserId)) {
+    const err = new Error('Cannot connect to this user due to block settings');
+    err.statusCode = 403;
+    err.errorCode = 'FORBIDDEN';
+    throw err;
+  }
+
   if (!isUUID(targetUserId)) {
     return {
       id: `conn_${Date.now()}`,
-      status: 'PENDING_OUTGOING',
+      status: 'PENDING_SENT',
+      statusNormalized: 'PENDING_SENT',
       requesterId: user.id,
       receiverId: targetUserId,
       message: 'Connection request sent successfully',
@@ -149,17 +175,46 @@ const sendRequest = async (user, targetUserId) => {
 
     createdConnId = updated.rows[0].id;
   } else {
-    const connId = crypto.randomUUID();
-    const created = await db.query(
-      `INSERT INTO connections (id, requester_id, receiver_id, status)
-       VALUES ($1, $2, $3, 'PENDING') RETURNING *`,
-      [connId, user.id, targetUserId]
-    );
-    createdConnId = created.rows[0].id;
+    try {
+      const connId = crypto.randomUUID();
+      const created = await db.query(
+        `INSERT INTO connections (id, requester_id, receiver_id, status)
+         VALUES ($1, $2, $3, 'PENDING') RETURNING *`,
+        [connId, user.id, targetUserId]
+      );
+      createdConnId = created.rows[0].id;
+    } catch (dbErr) {
+      if (dbErr.code === '23505') {
+        const raceConn = await findConnectionByPairOrId(user, targetUserId);
+        if (raceConn) {
+          if (raceConn.status === 'ACCEPTED') {
+            const err = new Error('You are already connected with this user');
+            err.statusCode = 409;
+            err.errorCode = 'CONFLICT';
+            throw err;
+          }
+          if (raceConn.status === 'PENDING') {
+            const err = new Error('Connection request already exists');
+            err.statusCode = 409;
+            err.errorCode = 'CONFLICT';
+            throw err;
+          }
+        }
+      }
+      throw dbErr;
+    }
   }
 
-  // Trigger Notification to Receiver
+  // Trigger Notification & Socket Events
   const senderName = await getUserName(user.id);
+  const senderProfileRes = await db.query(
+    `SELECT u.email, u.role, p.full_name, p.avatar_url, p.degree, p.branch, p.graduation_year, p.company, p.designation, p.location
+     FROM users u LEFT JOIN user_profiles p ON u.id = p.user_id WHERE u.id = $1`,
+    [user.id]
+  ).catch(() => ({ rows: [] }));
+  const senderRow = senderProfileRes.rows[0] || {};
+  const senderCard = formatUserCard({ user_id: user.id, ...senderRow });
+
   await notificationService.createNotification({
     recipientId: targetUserId,
     actorId: user.id,
@@ -170,9 +225,30 @@ const sendRequest = async (user, targetUserId) => {
     entityId: createdConnId,
   });
 
+  // Emit Socket.IO real-time connection events
+  safeEmitToUser(targetUserId, 'connection:request_received', {
+    connectionId: createdConnId,
+    requestId: createdConnId,
+    fromUserId: user.id,
+    requester: senderCard,
+    user: senderCard,
+    status: 'PENDING_RECEIVED',
+    direction: 'INCOMING',
+    message: `${senderName} sent you a connection request`,
+  });
+
+  safeEmitToUser(user.id, 'connection:request_sent', {
+    connectionId: createdConnId,
+    requestId: createdConnId,
+    targetUserId,
+    status: 'PENDING_SENT',
+    direction: 'OUTGOING',
+  });
+
   return {
     connectionId: createdConnId,
-    status: 'PENDING_OUTGOING',
+    status: 'PENDING_SENT',
+    statusNormalized: 'PENDING_SENT',
   };
 };
 
@@ -200,6 +276,13 @@ const acceptRequest = async (user, identifier) => {
 
   // Trigger Notification to Requester
   const receiverName = await getUserName(user.id);
+  const receiverProfileRes = await db.query(
+    `SELECT u.email, u.role, p.full_name, p.avatar_url, p.degree, p.branch, p.graduation_year, p.company, p.designation, p.location
+     FROM users u LEFT JOIN user_profiles p ON u.id = p.user_id WHERE u.id = $1`,
+    [user.id]
+  ).catch(() => ({ rows: [] }));
+  const receiverCard = formatUserCard({ user_id: user.id, ...(receiverProfileRes.rows[0] || {}) });
+
   await notificationService.createNotification({
     recipientId: connection.requester_id,
     actorId: user.id,
@@ -210,10 +293,28 @@ const acceptRequest = async (user, identifier) => {
     entityId: connection.id,
   });
 
+  // Emit Socket.IO real-time accepted events to both requester and receiver
+  safeEmitToUser(connection.requester_id, 'connection:accepted', {
+    connectionId: connection.id,
+    partnerId: user.id,
+    partner: receiverCard,
+    status: 'CONNECTED',
+    statusNormalized: 'CONNECTED',
+    message: `${receiverName} accepted your connection request`,
+  });
+
+  safeEmitToUser(user.id, 'connection:accepted', {
+    connectionId: connection.id,
+    partnerId: connection.requester_id,
+    status: 'CONNECTED',
+    statusNormalized: 'CONNECTED',
+  });
+
   return {
     connection: updated.rows[0],
     connectionId: updated.rows[0].id,
     status: 'CONNECTED',
+    statusNormalized: 'CONNECTED',
   };
 };
 
@@ -251,10 +352,27 @@ const declineRequest = async (user, identifier) => {
     entityId: connection.id,
   });
 
+  // Emit Socket.IO real-time rejected events
+  safeEmitToUser(connection.requester_id, 'connection:rejected', {
+    connectionId: connection.id,
+    partnerId: user.id,
+    status: 'NONE',
+    statusNormalized: 'NONE',
+    message: `${receiverName} declined your connection request`,
+  });
+
+  safeEmitToUser(user.id, 'connection:rejected', {
+    connectionId: connection.id,
+    partnerId: connection.requester_id,
+    status: 'NONE',
+    statusNormalized: 'NONE',
+  });
+
   return {
     connection: updated.rows[0],
     connectionId: updated.rows[0].id,
     status: 'NONE',
+    statusNormalized: 'NONE',
   };
 };
 
@@ -280,10 +398,26 @@ const cancelRequest = async (user, identifier) => {
     [connection.id]
   );
 
+  // Emit Socket.IO cancelled events
+  safeEmitToUser(connection.receiver_id, 'connection:cancelled', {
+    connectionId: connection.id,
+    partnerId: user.id,
+    status: 'NONE',
+    statusNormalized: 'NONE',
+  });
+
+  safeEmitToUser(user.id, 'connection:cancelled', {
+    connectionId: connection.id,
+    partnerId: connection.receiver_id,
+    status: 'NONE',
+    statusNormalized: 'NONE',
+  });
+
   return {
     connection: updated.rows[0],
     connectionId: updated.rows[0].id,
     status: 'NONE',
+    statusNormalized: 'NONE',
   };
 };
 
@@ -309,37 +443,61 @@ const removeConnection = async (user, identifier) => {
     [connection.id]
   );
 
+  const partnerId = connection.requester_id === user.id ? connection.receiver_id : connection.requester_id;
+
+  // Emit Socket.IO removed events to both users
+  safeEmitToUser(partnerId, 'connection:removed', {
+    connectionId: connection.id,
+    partnerId: user.id,
+    status: 'NONE',
+    statusNormalized: 'NONE',
+  });
+
+  safeEmitToUser(user.id, 'connection:removed', {
+    connectionId: connection.id,
+    partnerId: partnerId,
+    status: 'NONE',
+    statusNormalized: 'NONE',
+  });
+
   return {
     connection: updated.rows[0],
     connectionId: updated.rows[0].id,
     status: 'NONE',
+    statusNormalized: 'NONE',
   };
 };
 
 const getConnectionStatus = async (user, targetUserId) => {
+  if (!targetUserId) return { status: 'NONE', statusNormalized: 'NONE', connectionId: null };
+
   if (user.id === targetUserId) {
-    return { status: 'SELF', connectionId: null };
+    return { status: 'SELF', statusNormalized: 'SELF', connectionId: null };
+  }
+
+  if (await isBlockedPair(user.id, targetUserId)) {
+    return { status: 'BLOCKED', statusNormalized: 'BLOCKED', connectionId: null };
   }
 
   const connection = await findConnectionByPairOrId(user, targetUserId);
 
   if (!connection || connection.status === 'DECLINED' || connection.status === 'CANCELLED') {
-    return { status: 'NONE', connectionId: connection ? connection.id : null };
+    return { status: 'NONE', statusNormalized: 'NONE', connectionId: connection ? connection.id : null };
   }
 
   if (connection.status === 'ACCEPTED') {
-    return { status: 'CONNECTED', connectionId: connection.id };
+    return { status: 'CONNECTED', statusNormalized: 'CONNECTED', connectionId: connection.id };
   }
 
   if (connection.status === 'PENDING') {
     if (connection.requester_id === user.id) {
-      return { status: 'PENDING_OUTGOING', connectionId: connection.id, direction: 'OUTGOING' };
+      return { status: 'PENDING_SENT', statusNormalized: 'PENDING_SENT', connectionId: connection.id, direction: 'OUTGOING' };
     } else {
-      return { status: 'PENDING_INCOMING', connectionId: connection.id, direction: 'INCOMING' };
+      return { status: 'PENDING_RECEIVED', statusNormalized: 'PENDING_RECEIVED', connectionId: connection.id, direction: 'INCOMING' };
     }
   }
 
-  return { status: 'NONE', connectionId: null };
+  return { status: 'NONE', statusNormalized: 'NONE', connectionId: null };
 };
 
 const getIncomingRequests = async (user) => {

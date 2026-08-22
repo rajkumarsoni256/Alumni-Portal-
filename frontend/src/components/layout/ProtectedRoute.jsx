@@ -32,11 +32,21 @@ export const ProtectedRoute = ({ children, hideSidebar = false }) => {
     return <Navigate to="/admin/dashboard" replace />;
   }
 
+  const accountStatus = authUser?.accountStatus?.toUpperCase();
+
+  if (accountStatus === 'DISABLED' || accountStatus === 'SUSPENDED') {
+    return <Navigate to="/account-disabled" replace />;
+  }
+
+  if (accountStatus === 'PENDING_APPROVAL') {
+    return <Navigate to="/pending-approval" replace />;
+  }
+
   if (authStatus === 'EMAIL_UNVERIFIED') {
     return <Navigate to="/verify-email" replace />;
   }
 
-  const isProfileComplete = authUser?.profileComplete !== false;
+  const isProfileComplete = authUser?.profileComplete !== false && authUser?.onboardingCompleted !== false;
 
   if (!isProfileComplete || authStatus === 'ONBOARDING') {
     if (!location.pathname.startsWith('/onboarding')) {

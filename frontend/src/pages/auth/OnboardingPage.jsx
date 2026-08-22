@@ -23,7 +23,7 @@ export const OnboardingPage = ({ defaultRole }) => {
   }
 
   const pathRole = window.location.pathname.includes('/alumni') ? 'alumni' : (window.location.pathname.includes('/student') ? 'student' : null);
-  const rawRole = authUser?.role || currentUser?.role || activeRole || pendingRegistration?.role || pathRole || defaultRole || 'student';
+  const rawRole = authUser?.role || (currentUser?.id ? currentUser?.role : null) || activeRole || pendingRegistration?.role || pathRole || defaultRole || 'student';
   const userRole = String(rawRole).toLowerCase();
   const isStudent = userRole === 'student';
 
@@ -332,6 +332,8 @@ export const OnboardingPage = ({ defaultRole }) => {
                       className="w-full bg-slate-50 border border-slate-300 focus:border-slate-800 focus:bg-white rounded-md px-3 py-2 text-xs text-slate-900 focus:outline-none"
                     >
                       <option value="B.Tech">B.Tech</option>
+                      <option value="B.Sc. Forensic Science">B.Sc. Forensic Science (BFON)</option>
+                      <option value="B.Sc.">B.Sc.</option>
                       <option value="BCA">BCA</option>
                       <option value="MCA">MCA</option>
                       <option value="M.Tech">M.Tech</option>

@@ -124,12 +124,32 @@ app.get('/', (req, res) => {
 });
 
 // Health Check Endpoints
-app.get(['/health', '/api/v1/health', '/actuator/health', '/healthz', '/heath'], (req, res) => {
+app.get(['/health', '/api/v1/health', '/actuator/health', '/healthz', '/heath', '/health/live'], (req, res) => {
   res.json({
     status: 'UP',
     service: 'jecrc-community-backend',
     timestamp: new Date().toISOString()
   });
+});
+
+app.get(['/health/ready', '/api/v1/health/ready'], async (req, res) => {
+  try {
+    await db.query('SELECT 1');
+    res.json({
+      status: 'READY',
+      service: 'jecrc-community-backend',
+      database: 'CONNECTED',
+      timestamp: new Date().toISOString()
+    });
+  } catch (err) {
+    res.status(503).json({
+      status: 'DOWN',
+      service: 'jecrc-community-backend',
+      database: 'DISCONNECTED',
+      error: err.message,
+      timestamp: new Date().toISOString()
+    });
+  }
 });
 
 // API Routes

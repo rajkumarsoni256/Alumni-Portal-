@@ -72,6 +72,11 @@ class StorageService {
         };
       } catch (err) {
         logger.error('MEDIA', `Cloudinary upload failed for ${file.originalname}`, err);
+        if (file.path && fs.existsSync(file.path)) {
+          try {
+            fs.unlinkSync(file.path);
+          } catch (e) {}
+        }
         const uploadError = new Error(`Cloudinary file upload failed: ${err.message}`);
         uploadError.statusCode = 500;
         uploadError.errorCode = 'FILE_UPLOAD_FAILED';

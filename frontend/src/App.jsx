@@ -16,6 +16,7 @@ import { VerifyEmailPage } from './pages/auth/VerifyEmailPage';
 import { ForgotPasswordPage } from './pages/auth/ForgotPasswordPage';
 import { ResetPasswordPage } from './pages/auth/ResetPasswordPage';
 import { OnboardingPage } from './pages/auth/OnboardingPage';
+import { PendingApprovalPage, DisabledAccountPage } from './pages/auth/AccountStatusPages';
 
 // Authenticated Core Feature Pages (Lazy Loaded for Fast Initial Bundle Delivery)
 const CommunityFeed = lazy(() => import('./pages/CommunityFeed').then((m) => ({ default: m.CommunityFeed })));
@@ -109,12 +110,16 @@ const RootIndex = () => {
 };
 
 import { SocketProvider } from './context/SocketContext';
+import { ConnectionProvider } from './context/ConnectionContext';
 
 const SocketWrapper = ({ children }) => {
-  const { token, authUser, currentUser } = useApp();
+  const { token, authUser, currentUser, showNotification } = useApp();
+  const user = authUser || currentUser;
   return (
-    <SocketProvider token={token} user={authUser || currentUser}>
-      {children}
+    <SocketProvider token={token} user={user}>
+      <ConnectionProvider currentUser={user} showNotification={showNotification}>
+        {children}
+      </ConnectionProvider>
     </SocketProvider>
   );
 };
@@ -147,6 +152,8 @@ export function App() {
             <Route path="/onboarding" element={<OnboardingPage />} />
             <Route path="/onboarding/student" element={<OnboardingPage defaultRole="student" />} />
             <Route path="/onboarding/alumni" element={<OnboardingPage defaultRole="alumni" />} />
+            <Route path="/pending-approval" element={<PendingApprovalPage />} />
+            <Route path="/account-disabled" element={<DisabledAccountPage />} />
 
             {/* Module 10 Admin Login */}
             <Route path="/admin/login" element={<AdminLoginPage />} />

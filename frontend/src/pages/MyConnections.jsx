@@ -15,8 +15,11 @@ import {
   ShieldCheck
 } from 'lucide-react';
 
+import { useConnection } from '../context/ConnectionContext';
+
 export const MyConnections = () => {
   const { requests, currentUser, showNotification } = useApp();
+  const { myConnections: ctxConnections, removeConnection: ctxRemoveConnection, refreshConnections } = useConnection();
   const currentUserId = currentUser?.id;
 
   // Primary Section Tab: 'connections' | 'mentorship'
@@ -34,9 +37,10 @@ export const MyConnections = () => {
   const loadMyConnections = async () => {
     setIsLoadingConnections(true);
     try {
+      await refreshConnections();
       const connectionsList = await connectionService.getMyConnections();
       const filtered = (connectionsList || []).filter((item) => {
-        const uid = item.user?.id || item.user?.userId;
+        const uid = item.user?.id || item.user?.userId || item.id;
         return uid !== currentUserId;
       });
       setMyConnections(filtered);
@@ -47,6 +51,13 @@ export const MyConnections = () => {
       setIsLoadingConnections(false);
     }
   };
+
+  useEffect(() => {
+    if (ctxConnections && ctxConnections.length > 0) {
+      setMyConnections(ctxConnections);
+      setIsLoadingConnections(false);
+    }
+  }, [ctxConnections]);
 
   const [confirmRemoveUser, setConfirmRemoveUser] = useState(null);
   const [isRemoving, setIsRemoving] = useState(false);

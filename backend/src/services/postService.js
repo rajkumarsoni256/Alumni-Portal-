@@ -73,12 +73,16 @@ const formatPostDTO = (row, mediaRows = [], hashtagRows = [], authUserId = null)
 
   const mediaList = mediaRows.map(m => {
     const fullUrl = getFullMediaUrl(m.media_url);
+    const thumbUrl = m.thumbnail_url ? getFullMediaUrl(m.thumbnail_url) : fullUrl;
     return {
       id: m.id,
-      type: m.media_type,
-      mediaType: m.media_type,
+      type: m.media_type || 'IMAGE',
+      mediaType: m.media_type || 'IMAGE',
       url: fullUrl,
       mediaUrl: fullUrl,
+      thumbnailUrl: thumbUrl,
+      sortOrder: m.sort_order ?? 0,
+      order: m.sort_order ?? 0,
       storageKey: m.storage_key,
       originalFilename: m.original_filename,
       mimeType: m.mime_type,
@@ -117,6 +121,7 @@ const formatPostDTO = (row, mediaRows = [], hashtagRows = [], authUserId = null)
     tags: tags.length > 0 ? tags : ['#JECRC'],
     hashtags: tags.length > 0 ? tags : ['#JECRC'],
     media: mediaList,
+    images: mediaList.map(m => m.url),
 
     // Job Post Fields
     jobDetails: row.job_title ? {
@@ -247,6 +252,13 @@ const createPost = async (user, postData, files = []) => {
     throw err;
   }
 
+  if (files && files.length > 5) {
+    const err = new Error('A post can contain a maximum of 5 images');
+    err.statusCode = 400;
+    err.errorCode = 'VALIDATION_ERROR';
+    throw err;
+  }
+
   const uploadedMediaRecords = [];
   try {
     if (files && files.length > 0) {
@@ -258,6 +270,11 @@ const createPost = async (user, postData, files = []) => {
       }
     }
   } catch (uploadErr) {
+    for (const m of uploadedMediaRecords) {
+      if (m && m.storageKey) {
+        await storageService.deleteFile(m.storageKey).catch(() => {});
+      }
+    }
     throw uploadErr;
   }
 
@@ -296,11 +313,12 @@ const createPost = async (user, postData, files = []) => {
       ]
     );
 
-    for (const m of uploadedMediaRecords) {
+    for (let sortOrder = 0; sortOrder < uploadedMediaRecords.length; sortOrder++) {
+      const m = uploadedMediaRecords[sortOrder];
       await client.query(
-        `INSERT INTO post_media (post_id, media_type, storage_key, media_url, original_filename, mime_type, file_size)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-        [postId, m.mediaType, m.storageKey, m.mediaUrl, m.originalFilename, m.mimeType, m.fileSize]
+        `INSERT INTO post_media (post_id, media_type, storage_key, media_url, thumbnail_url, original_filename, mime_type, file_size, sort_order)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+        [postId, m.mediaType || 'IMAGE', m.storageKey, m.mediaUrl, m.mediaUrl, m.originalFilename, m.mimeType, m.fileSize, sortOrder]
       );
     }
 

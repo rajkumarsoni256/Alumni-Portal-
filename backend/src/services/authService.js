@@ -641,8 +641,10 @@ const login = async ({ email, password, rememberMe = true, req }) => {
     }
   }
 
-  // Device detection and new device alert
-  await detectDeviceAndSendAlert(user, req, 'PASSWORD');
+  // Device detection and new device alert (non-blocking)
+  detectDeviceAndSendAlert(user, req, 'PASSWORD').catch((err) => {
+    console.warn('[Device Detection Alert Warning]', err.message);
+  });
 
   const sessionData = await sessionService.createSession({
     userId: user.id,
@@ -859,12 +861,9 @@ const forgotPassword = async ({ email }) => {
         [crypto.randomUUID(), user.id, resetToken, expiresAt]
       );
 
-      // Trigger 6-digit OTP code & link reset email
-      try {
-        await emailService.sendPasswordResetCode(normalizedEmail, user.id, user.full_name, resetToken);
-      } catch (err) {
-        console.warn('[Password Reset Email Warning]', err.message);
-      }
+      // Trigger 6-digit OTP code & link reset email (non-blocking)
+      emailService.sendPasswordResetCode(normalizedEmail, user.id, user.full_name, resetToken)
+        .catch((err) => console.warn('[Password Reset Email Warning]', err.message));
     }
   }
 
@@ -940,19 +939,17 @@ const resetPassword = async ({ token, code, email, newPassword }) => {
   // Security Hardening: Revoke all active sessions on password change
   await sessionService.revokeAllUserSessions(targetUserId, 'PASSWORD_CHANGED').catch(() => {});
 
-  // Trigger Security Alert Email: Password Changed
+  // Trigger Security Alert Email: Password Changed (non-blocking)
   if (targetUserEmail) {
-    try {
-      await emailService.sendPasswordChangedAlert(targetUserEmail, targetUserId, { userName: targetUserName });
-    } catch (err) {
-      console.warn('[Password Changed Alert Warning]', err.message);
-    }
+    emailService.sendPasswordChangedAlert(targetUserEmail, targetUserId, { userName: targetUserName })
+      .catch((err) => console.warn('[Password Changed Alert Warning]', err.message));
   }
 };
 
 const getCurrentUser = async (user) => {
   const result = await db.query(
-    `SELECT u.id, u.email, u.role, p.full_name, p.avatar_url, p.is_profile_complete,
+    `SELECT u.id, u.email, u.role, u.email_verified, u.account_status,
+            p.full_name, p.avatar_url, p.is_profile_complete,
             p.university_roll_number, p.course, p.joining_year, p.graduation_year
      FROM users u
      LEFT JOIN user_profiles p ON u.id = p.user_id
@@ -969,6 +966,13 @@ const getCurrentUser = async (user) => {
 
   const row = result.rows[0];
 
+  if (row.account_status === 'DISABLED' || row.account_status === 'SUSPENDED') {
+    const error = new Error('Account is disabled or suspended. Please contact support.');
+    error.statusCode = 401;
+    error.errorCode = 'ACCOUNT_DISABLED';
+    throw error;
+  }
+
   let alumniVerificationStatus = null;
   const verRes = await db.query(
     `SELECT status FROM alumni_verifications WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1`,
@@ -978,13 +982,18 @@ const getCurrentUser = async (user) => {
     alumniVerificationStatus = verRes.rows[0].status;
   }
 
+  const isComplete = !!row.is_profile_complete;
+
   return {
     id: row.id,
     email: row.email,
     role: row.role,
+    accountStatus: row.account_status,
+    emailVerified: row.email_verified,
     fullName: row.full_name || null,
     avatarUrl: row.avatar_url || null,
-    profileComplete: !!row.is_profile_complete,
+    profileComplete: isComplete,
+    onboardingCompleted: isComplete,
     universityRollNumber: row.university_roll_number || null,
     course: row.course || null,
     joiningYear: row.joining_year || null,

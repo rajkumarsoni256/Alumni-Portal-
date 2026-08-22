@@ -10,7 +10,7 @@ export const RoleSelectionPage = () => {
 
   const handleContinue = () => {
     setRegistrationRole(selectedRole);
-    navigate('/onboarding');
+    navigate(`/register?role=${selectedRole}`);
   };
 
   return (

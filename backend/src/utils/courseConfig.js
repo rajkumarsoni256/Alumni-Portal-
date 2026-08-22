@@ -6,6 +6,8 @@
 const ALLOWED_COURSES = [
   { code: 'BCON', name: 'Bachelor of Construction Management / Commerce', durationYears: 3 },
   { code: 'BCS', name: 'Bachelor of Computer Science', durationYears: 3 },
+  { code: 'BFON', name: 'B.Sc. Forensic Science', durationYears: 3 },
+  { code: 'BSC', name: 'Bachelor of Science', durationYears: 3 },
   { code: 'BTECH', name: 'Bachelor of Technology', durationYears: 4 },
   { code: 'MCA', name: 'Master of Computer Applications', durationYears: 2 },
   { code: 'MBA', name: 'Master of Business Administration', durationYears: 2 },

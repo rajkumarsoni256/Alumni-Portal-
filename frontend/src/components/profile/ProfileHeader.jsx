@@ -1,23 +1,22 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useState, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   MapPin, 
   ShieldCheck, 
   MessageSquare, 
   Edit3, 
-  Check, 
-  Clock, 
   Share2,
   Camera,
   Loader2
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { UserConnectionsModal } from '../network/UserConnectionsModal';
+import { UserAvatar } from '../common/UserAvatar';
+import { ConnectionButton } from '../common/ConnectionButton';
 
 export const ProfileHeader = ({ profile, isOwnProfile, onEditClick, onUpdateAvatar, onUpdateBanner }) => {
   const navigate = useNavigate();
-  const { toggleConnectUser, showNotification, activeRole, myConnections } = useApp();
-  const [localStatus, setLocalStatus] = useState(profile?.connectionStatus || 'none');
+  const { showNotification, activeRole, myConnections } = useApp();
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [isUploadingBanner, setIsUploadingBanner] = useState(false);
   const [isConnectionsModalOpen, setIsConnectionsModalOpen] = useState(false);
@@ -25,35 +24,14 @@ export const ProfileHeader = ({ profile, isOwnProfile, onEditClick, onUpdateAvat
   const avatarInputRef = useRef(null);
   const bannerInputRef = useRef(null);
 
-  useEffect(() => {
-    let status = profile?.connectionStatus || 'none';
-    const profileIdStr = String(profile?.id || profile?.userId || profile?.user_id || '').toLowerCase();
-    const profileNameStr = String(profile?.name || profile?.fullName || '').trim().toLowerCase();
-
-    if (myConnections && myConnections.length > 0) {
-      const isAlreadyConnected = myConnections.some(c => {
-        const cId = String(c.id || c.userId || c.user_id || '').toLowerCase();
-        const cName = String(c.name || c.fullName || '').trim().toLowerCase();
-        return (
-          (profileIdStr && cId && profileIdStr === cId) ||
-          (profileNameStr && cName && profileNameStr === cName)
-        );
-      });
-      if (isAlreadyConnected) {
-        status = 'connected';
-      }
-    }
-    setLocalStatus(status);
-  }, [profile?.connectionStatus, profile?.id, profile?.userId, profile?.name, profile?.fullName, myConnections]);
-
   if (!profile) return null;
 
   const isAlumni = Boolean(profile.isAlumni || profile.role?.toLowerCase() === 'alumni');
-  const isConnected = localStatus === 'connected' || localStatus === 'CONNECTED';
-  const isPending = localStatus === 'pending' || localStatus === 'pending_outgoing' || localStatus === 'PENDING_OUTGOING';
+  const targetUserId = profile.userId || profile.user_id || profile.id;
+  const profileName = profile.name || profile.fullName || profile.full_name || 'JECRC Member';
 
-  const avatarSrc = profile.avatarUrl || profile.avatar || profile.profile?.avatarUrl;
-  const bannerSrc = profile.bannerUrl || profile.banner || profile.coverImage || profile.profile?.bannerUrl;
+  const avatarSrc = profile.avatarUrl || profile.avatar || profile.avatar_url || profile.profile?.avatarUrl;
+  const bannerSrc = profile.bannerUrl || profile.banner || profile.coverImage || profile.banner_url || profile.profile?.bannerUrl;
 
   const handleShare = () => {
     navigator.clipboard.writeText(window.location.href);
@@ -61,16 +39,7 @@ export const ProfileHeader = ({ profile, isOwnProfile, onEditClick, onUpdateAvat
   };
 
   const handleMessageClick = () => {
-    navigate(`/messages?userId=${profile.id}`);
-  };
-
-  const handleConnectClick = async () => {
-    if (isConnected || isPending) return;
-    setLocalStatus('pending_outgoing');
-    const res = await toggleConnectUser(profile.id);
-    if (!res) {
-      setLocalStatus(profile?.connectionStatus || 'none');
-    }
+    navigate(`/messages?userId=${targetUserId}`);
   };
 
   const compressImage = (file, maxWidth = 1200, maxHeight = 800, quality = 0.82) => {
@@ -115,7 +84,6 @@ export const ProfileHeader = ({ profile, isOwnProfile, onEditClick, onUpdateAvat
 
     setIsUploadingAvatar(true);
     try {
-      // Compress avatar to 400x400 max (~50KB)
       const compressedBase64 = await compressImage(file, 400, 400, 0.85);
       if (onUpdateAvatar) {
         await onUpdateAvatar(compressedBase64);
@@ -133,7 +101,6 @@ export const ProfileHeader = ({ profile, isOwnProfile, onEditClick, onUpdateAvat
 
     setIsUploadingBanner(true);
     try {
-      // Compress banner to 1400x600 max (~150KB)
       const compressedBase64 = await compressImage(file, 1400, 600, 0.82);
       if (onUpdateBanner) {
         await onUpdateBanner(compressedBase64);
@@ -213,17 +180,11 @@ export const ProfileHeader = ({ profile, isOwnProfile, onEditClick, onUpdateAvat
           
           {/* Avatar with status */}
           <div className="relative inline-block group">
-            {avatarSrc ? (
-              <img
-                src={avatarSrc}
-                alt={profile.name || profile.fullName}
-                className="w-24 h-24 sm:w-28 sm:h-28 rounded-full object-cover border-4 border-white bg-white shadow-xs"
-              />
-            ) : (
-              <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full border-4 border-white bg-red-700 text-white flex items-center justify-center font-bold text-2xl shadow-xs">
-                {(profile.name || profile.fullName || 'U').charAt(0).toUpperCase()}
-              </div>
-            )}
+            <UserAvatar
+              src={avatarSrc}
+              name={profileName}
+              className="w-24 h-24 sm:w-28 sm:h-28 border-4 border-white shadow-xs"
+            />
 
             {isAlumni && (
               <span 
@@ -263,36 +224,12 @@ export const ProfileHeader = ({ profile, isOwnProfile, onEditClick, onUpdateAvat
               </button>
             ) : (
               <>
-                <button
-                  type="button"
-                  onClick={handleConnectClick}
-                  className={`px-4 py-2 rounded-lg text-xs font-semibold transition-colors inline-flex items-center gap-1.5 shadow-2xs cursor-pointer ${
-                    isConnected
-                      ? 'bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200'
-                      : isPending
-                      ? 'bg-amber-50 text-amber-800 border border-amber-200'
-                      : 'bg-red-700 text-white hover:bg-red-800'
-                  }`}
-                >
-                  {isConnected ? (
-                    <>
-                      <Check className="w-3.5 h-3.5" />
-                      <span>Connected</span>
-                    </>
-                  ) : isPending ? (
-                    <>
-                      <Clock className="w-3.5 h-3.5" />
-                      <span>Request Sent</span>
-                    </>
-                  ) : (
-                    <span>Connect</span>
-                  )}
-                </button>
+                <ConnectionButton userId={targetUserId} targetUser={profile} size="md" />
 
                 {activeRole === 'student' && isAlumni && (
                   <button
                     type="button"
-                    onClick={() => navigate(`/request-mentorship/${profile.id}`)}
+                    onClick={() => navigate(`/request-mentorship/${targetUserId}`)}
                     className="px-4 py-2 rounded-lg text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 transition-colors inline-flex items-center gap-1.5 shadow-2xs cursor-pointer"
                   >
                     <span>Request Mentorship</span>

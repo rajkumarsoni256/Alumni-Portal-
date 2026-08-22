@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { UserConnectionsModal } from '../components/network/UserConnectionsModal';
+import { UserAvatar } from '../components/common/UserAvatar';
+import { ConnectionButton } from '../components/common/ConnectionButton';
 import { 
   GraduationCap, 
   MapPin, 
@@ -419,26 +421,30 @@ Actively preparing for upcoming 2026 software engineering internships and tech p
 
               <div className="space-y-3 divide-y divide-slate-100">
                 {recommendedAlumni.map((alum) => (
-                  <div key={alum.id} className="pt-3 first:pt-0 flex items-start gap-2.5">
-                    <img
-                      src={alum.avatar}
-                      alt={alum.name}
-                      className="w-9 h-9 rounded-full object-cover border border-slate-200 shrink-0"
-                    />
-                    <div className="min-w-0 flex-1 space-y-0.5">
-                      <Link
-                        to={`/alumni/${alum.id}`}
-                        className="text-xs font-bold text-slate-900 hover:text-red-700 hover:underline block truncate"
-                      >
-                        {alum.name}
-                      </Link>
-                      <p className="text-[11px] text-slate-500 truncate">
-                        {alum.currentRole} @ {alum.company}
-                      </p>
-                      <span className="text-[10px] text-slate-400 block">
-                        JECRC Class of {alum.graduationYear}
-                      </span>
+                  <div key={alum.id} className="pt-3 first:pt-0 flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                      <UserAvatar
+                        src={alum.avatar || alum.avatarUrl}
+                        name={alum.name}
+                        className="w-9 h-9 shrink-0"
+                      />
+                      <div className="min-w-0 flex-1 space-y-0.5">
+                        <Link
+                          to={`/alumni/${alum.id}`}
+                          className="text-xs font-bold text-slate-900 hover:text-red-700 hover:underline block truncate"
+                        >
+                          {alum.name}
+                        </Link>
+                        <p className="text-[11px] text-slate-500 truncate">
+                          {alum.currentRole} @ {alum.company}
+                        </p>
+                        <span className="text-[10px] text-slate-400 block">
+                          JECRC Class of {alum.graduationYear}
+                        </span>
+                      </div>
                     </div>
+
+                    <ConnectionButton userId={alum.id} targetUser={alum} size="sm" />
                   </div>
                 ))}
               </div>

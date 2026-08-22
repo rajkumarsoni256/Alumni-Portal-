@@ -46,6 +46,7 @@ export const PostCard = ({ post }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [imageError, setImageError] = useState(false);
+  const [activeLightboxImg, setActiveLightboxImg] = useState(null);
   const menuRef = useRef(null);
 
   const author = usersMap[post.authorId] || post.author || {
@@ -329,18 +330,153 @@ export const PostCard = ({ post }) => {
             </div>
           )}
 
-          {/* Image Attachment */}
-          {imageUrl && !videoUrl && !imageError && (
-            <div className="rounded-xl overflow-hidden border border-slate-200/80 bg-slate-100">
-              <img
-                src={imageUrl}
-                alt="Post media"
-                loading="lazy"
-                onError={() => setImageError(true)}
-                className="w-full h-auto max-h-[450px] object-cover"
-              />
-            </div>
-          )}
+          {/* Multi-Image Gallery Attachment (1 to 5 photos) */}
+          {!videoUrl && !imageError && (() => {
+            const imageMediaList = Array.isArray(post.media) && post.media.length > 0
+              ? post.media.filter(m => m.type === 'IMAGE' || m.mediaType === 'IMAGE')
+              : (Array.isArray(post.images) && post.images.length > 0
+                  ? post.images.map((url, idx) => ({ id: idx, url, thumbnailUrl: url, sortOrder: idx }))
+                  : (imageUrl ? [{ id: 'single', url: imageUrl, thumbnailUrl: imageUrl, sortOrder: 0 }] : []));
+
+            if (imageMediaList.length === 0) return null;
+
+            if (imageMediaList.length === 1) {
+              const img = imageMediaList[0];
+              return (
+                <div 
+                  className="rounded-xl overflow-hidden border border-slate-200/80 bg-slate-100 cursor-pointer"
+                  onClick={() => setActiveLightboxImg(img.url || img.mediaUrl)}
+                >
+                  <img
+                    src={img.url || img.mediaUrl}
+                    alt="Post media"
+                    loading="lazy"
+                    decoding="async"
+                    onError={() => setImageError(true)}
+                    className="w-full h-auto max-h-[450px] object-cover hover:opacity-95 transition-opacity"
+                  />
+                </div>
+              );
+            }
+
+            if (imageMediaList.length === 2) {
+              return (
+                <div className="grid grid-cols-2 gap-1.5 rounded-xl overflow-hidden border border-slate-200/80 bg-slate-100 max-h-[360px]">
+                  {imageMediaList.map((img, idx) => (
+                    <div 
+                      key={img.id || idx} 
+                      className="overflow-hidden cursor-pointer h-64 bg-slate-200"
+                      onClick={() => setActiveLightboxImg(img.url || img.mediaUrl)}
+                    >
+                      <img
+                        src={img.thumbnailUrl || img.url || img.mediaUrl}
+                        alt={`Post photo ${idx + 1}`}
+                        loading="lazy"
+                        decoding="async"
+                        className="w-full h-full object-cover hover:scale-102 transition-transform duration-200"
+                      />
+                    </div>
+                  ))}
+                </div>
+              );
+            }
+
+            if (imageMediaList.length === 3) {
+              return (
+                <div className="grid grid-cols-2 gap-1.5 rounded-xl overflow-hidden border border-slate-200/80 bg-slate-100 max-h-[380px]">
+                  <div 
+                    className="col-span-1 h-72 overflow-hidden cursor-pointer bg-slate-200"
+                    onClick={() => setActiveLightboxImg(imageMediaList[0].url || imageMediaList[0].mediaUrl)}
+                  >
+                    <img
+                      src={imageMediaList[0].thumbnailUrl || imageMediaList[0].url || imageMediaList[0].mediaUrl}
+                      alt="Post photo 1"
+                      loading="lazy"
+                      decoding="async"
+                      className="w-full h-full object-cover hover:scale-102 transition-transform duration-200"
+                    />
+                  </div>
+
+                  <div className="col-span-1 grid grid-rows-2 gap-1.5 h-72">
+                    {imageMediaList.slice(1, 3).map((img, idx) => (
+                      <div 
+                        key={img.id || idx} 
+                        className="overflow-hidden cursor-pointer h-full bg-slate-200"
+                        onClick={() => setActiveLightboxImg(img.url || img.mediaUrl)}
+                      >
+                        <img
+                          src={img.thumbnailUrl || img.url || img.mediaUrl}
+                          alt={`Post photo ${idx + 2}`}
+                          loading="lazy"
+                          decoding="async"
+                          className="w-full h-full object-cover hover:scale-102 transition-transform duration-200"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            }
+
+            if (imageMediaList.length === 4) {
+              return (
+                <div className="grid grid-cols-2 gap-1.5 rounded-xl overflow-hidden border border-slate-200/80 bg-slate-100 max-h-[380px]">
+                  {imageMediaList.map((img, idx) => (
+                    <div 
+                      key={img.id || idx} 
+                      className="overflow-hidden cursor-pointer h-44 bg-slate-200"
+                      onClick={() => setActiveLightboxImg(img.url || img.mediaUrl)}
+                    >
+                      <img
+                        src={img.thumbnailUrl || img.url || img.mediaUrl}
+                        alt={`Post photo ${idx + 1}`}
+                        loading="lazy"
+                        decoding="async"
+                        className="w-full h-full object-cover hover:scale-102 transition-transform duration-200"
+                      />
+                    </div>
+                  ))}
+                </div>
+              );
+            }
+
+            // 5 Images Grid Layout
+            return (
+              <div className="grid grid-cols-6 gap-1.5 rounded-xl overflow-hidden border border-slate-200/80 bg-slate-100">
+                {imageMediaList.slice(0, 2).map((img, idx) => (
+                  <div 
+                    key={img.id || idx} 
+                    className="col-span-3 h-44 overflow-hidden cursor-pointer bg-slate-200"
+                    onClick={() => setActiveLightboxImg(img.url || img.mediaUrl)}
+                  >
+                    <img
+                      src={img.thumbnailUrl || img.url || img.mediaUrl}
+                      alt={`Post photo ${idx + 1}`}
+                      loading="lazy"
+                      decoding="async"
+                      className="w-full h-full object-cover hover:scale-102 transition-transform duration-200"
+                    />
+                  </div>
+                ))}
+
+                {imageMediaList.slice(2, 5).map((img, idx) => (
+                  <div 
+                    key={img.id || idx} 
+                    className="col-span-2 h-36 overflow-hidden cursor-pointer bg-slate-200"
+                    onClick={() => setActiveLightboxImg(img.url || img.mediaUrl)}
+                  >
+                    <img
+                      src={img.thumbnailUrl || img.url || img.mediaUrl}
+                      alt={`Post photo ${idx + 3}`}
+                      loading="lazy"
+                      decoding="async"
+                      className="w-full h-full object-cover hover:scale-102 transition-transform duration-200"
+                    />
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
 
           {/* JOB Post Card */}
           {postType === 'JOB' && jobDetails && (
@@ -557,6 +693,33 @@ export const PostCard = ({ post }) => {
                 Delete
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Lightbox Full Size Image Modal */}
+      {activeLightboxImg && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-sm animate-in fade-in duration-150 cursor-pointer"
+          onClick={() => setActiveLightboxImg(null)}
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="relative max-w-4xl max-h-[92vh] w-full flex items-center justify-center">
+            <button
+              type="button"
+              onClick={() => setActiveLightboxImg(null)}
+              className="absolute -top-10 right-0 p-2 text-white hover:text-red-400 transition-colors cursor-pointer"
+              aria-label="Close photo"
+            >
+              <X className="w-6 h-6" />
+            </button>
+            <img
+              src={activeLightboxImg}
+              alt="Enlarged photo"
+              className="max-h-[85vh] max-w-full object-contain rounded-lg shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            />
           </div>
         </div>
       )}
