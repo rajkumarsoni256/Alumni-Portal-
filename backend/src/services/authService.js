@@ -851,7 +851,7 @@ const forgotPassword = async ({ email }) => {
     `SELECT u.id, u.email, u.account_status, p.full_name
      FROM users u
      LEFT JOIN user_profiles p ON u.id = p.user_id
-     WHERE LOWER(u.email) = $1 LIMIT 1`,
+     WHERE LOWER(u.email) = $1 OR LOWER(u.institutional_email) = $1 LIMIT 1`,
     [normalizedEmail]
   );
 
@@ -861,7 +861,11 @@ const forgotPassword = async ({ email }) => {
       // Dispatch 6-digit OTP password reset email (non-blocking)
       emailService.sendPasswordResetCode(normalizedEmail, user.id, user.full_name)
         .catch((err) => console.warn('[Password Reset Email Warning]', err.message));
+    } else {
+      logger.info('AUTH', `Password reset OTP skipped for ${normalizedEmail} - Account status is '${user.account_status}'`);
     }
+  } else {
+    logger.info('AUTH', `Password reset OTP skipped for ${normalizedEmail} - User email not found in database`);
   }
 
   return 'If an account exists with this email, a verification code has been sent.';
@@ -914,7 +918,7 @@ const resendResetOTP = async ({ email }) => {
     `SELECT u.id, u.email, u.account_status, p.full_name
      FROM users u
      LEFT JOIN user_profiles p ON u.id = p.user_id
-     WHERE LOWER(u.email) = $1 LIMIT 1`,
+     WHERE LOWER(u.email) = $1 OR LOWER(u.institutional_email) = $1 LIMIT 1`,
     [normalizedEmail]
   );
 
@@ -922,7 +926,11 @@ const resendResetOTP = async ({ email }) => {
     const user = userResult.rows[0];
     if (user.account_status === 'ACTIVE') {
       await emailService.sendPasswordResetCode(normalizedEmail, user.id, user.full_name);
+    } else {
+      logger.info('AUTH', `Resend reset OTP skipped for ${normalizedEmail} - Account status is '${user.account_status}'`);
     }
+  } else {
+    logger.info('AUTH', `Resend reset OTP skipped for ${normalizedEmail} - User email not found in database`);
   }
 
   return 'If an account exists with this email, a new verification code has been sent.';
