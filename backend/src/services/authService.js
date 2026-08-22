@@ -855,20 +855,28 @@ const forgotPassword = async ({ email }) => {
     [normalizedEmail]
   );
 
-  if (userResult.rows.length > 0) {
-    const user = userResult.rows[0];
-    if (user.account_status === 'ACTIVE') {
-      // Dispatch 6-digit OTP password reset email (non-blocking)
-      emailService.sendPasswordResetCode(normalizedEmail, user.id, user.full_name)
-        .catch((err) => console.warn('[Password Reset Email Warning]', err.message));
-    } else {
-      logger.info('AUTH', `Password reset OTP skipped for ${normalizedEmail} - Account status is '${user.account_status}'`);
-    }
-  } else {
-    logger.info('AUTH', `Password reset OTP skipped for ${normalizedEmail} - User email not found in database`);
+  if (userResult.rows.length === 0) {
+    logger.info('AUTH', `Password reset requested for ${normalizedEmail} - User email not found in database`);
+    const error = new Error(`No registered account found with email '${normalizedEmail}'. Please check your email or create an account.`);
+    error.statusCode = 404;
+    error.errorCode = 'USER_NOT_FOUND';
+    throw error;
   }
 
-  return 'If an account exists with this email, a verification code has been sent.';
+  const user = userResult.rows[0];
+  if (user.account_status !== 'ACTIVE') {
+    logger.info('AUTH', `Password reset requested for ${normalizedEmail} - Account status is '${user.account_status}'`);
+    const error = new Error(`Your account is currently pending approval or inactive. Password reset is not available.`);
+    error.statusCode = 403;
+    error.errorCode = 'ACCOUNT_NOT_ACTIVE';
+    throw error;
+  }
+
+  // Dispatch 6-digit OTP password reset email (non-blocking)
+  emailService.sendPasswordResetCode(normalizedEmail, user.id, user.full_name)
+    .catch((err) => console.warn('[Password Reset Email Warning]', err.message));
+
+  return 'Verification code sent to your email.';
 };
 
 const verifyResetOTP = async ({ email, otp }) => {
@@ -922,18 +930,23 @@ const resendResetOTP = async ({ email }) => {
     [normalizedEmail]
   );
 
-  if (userResult.rows.length > 0) {
-    const user = userResult.rows[0];
-    if (user.account_status === 'ACTIVE') {
-      await emailService.sendPasswordResetCode(normalizedEmail, user.id, user.full_name);
-    } else {
-      logger.info('AUTH', `Resend reset OTP skipped for ${normalizedEmail} - Account status is '${user.account_status}'`);
-    }
-  } else {
-    logger.info('AUTH', `Resend reset OTP skipped for ${normalizedEmail} - User email not found in database`);
+  if (userResult.rows.length === 0) {
+    const error = new Error(`No registered account found with email '${normalizedEmail}'.`);
+    error.statusCode = 404;
+    error.errorCode = 'USER_NOT_FOUND';
+    throw error;
   }
 
-  return 'If an account exists with this email, a new verification code has been sent.';
+  const user = userResult.rows[0];
+  if (user.account_status !== 'ACTIVE') {
+    const error = new Error(`Your account is currently pending approval or inactive.`);
+    error.statusCode = 403;
+    error.errorCode = 'ACCOUNT_NOT_ACTIVE';
+    throw error;
+  }
+
+  await emailService.sendPasswordResetCode(normalizedEmail, user.id, user.full_name);
+  return 'A new verification code has been sent to your email.';
 };
 
 const resetPassword = async ({ resetToken, newPassword }) => {

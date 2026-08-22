@@ -86,16 +86,16 @@ const runTests = async () => {
     );
     console.log('  [PASS] Test user created and activated in PostgreSQL cleanly.');
 
-    // TEST 1: Generic non-enumerating response for unregistered email
-    console.log('\n--- TEST 1: Non-Enumerating Response for Unregistered Email ---');
+    // TEST 1: Rejection & Error Response for Unregistered Email
+    console.log('\n--- TEST 1: Rejection Response for Unregistered Email ---');
     const unregRes = await request('POST', '/api/v1/auth/forgot-password', {
       email: 'nonexistent_user_999999@jecrc.ac.in',
     });
 
-    if (unregRes.status !== 200 || !unregRes.body.success) {
-      throw new Error(`Expected status 200 generic success, got: ${JSON.stringify(unregRes.body)}`);
+    if (unregRes.status !== 404) {
+      throw new Error(`Expected status 404 for unregistered email, got: ${unregRes.status}`);
     }
-    console.log('  [PASS] Unregistered email request returned generic non-enumerating success response.');
+    console.log('  [PASS] Unregistered email request rejected with status 404 cleanly.');
 
     // TEST 2: Forgot Password Request for Registered User
     console.log('\n--- TEST 2: Forgot Password OTP Dispatch for Registered User ---');
