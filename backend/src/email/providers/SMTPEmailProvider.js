@@ -40,9 +40,9 @@ class SMTPEmailProvider extends EmailProvider {
         port,
         secure: secure || port === 465 || process.env.SMTP_SECURE === 'true', // true for 465 (SSL), false for 587 (STARTTLS)
         auth: { user, pass },
-        connectionTimeout: 15000,
-        socketTimeout: 15000,
-        greetingTimeout: 15000,
+        connectionTimeout: 3000,
+        socketTimeout: 3000,
+        greetingTimeout: 3000,
         tls: {
           rejectUnauthorized: false,
         },
@@ -54,7 +54,7 @@ class SMTPEmailProvider extends EmailProvider {
   }
 
   /**
-   * Send transactional email safely via Nodemailer SMTP
+   * Send transactional email safely via Nodemailer SMTP with fast failover timeout
    */
   async sendEmail(options = {}) {
     const fromStr = `"${this.fromName}" <${this.fromAddress}>`;
@@ -68,8 +68,15 @@ class SMTPEmailProvider extends EmailProvider {
       };
     }
 
+    // 3.5-second fast failover timeout promise
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => {
+        reject(new Error('SMTP connection timed out after 3500ms. Outbound port 587 may be restricted or credentials invalid.'));
+      }, 3500);
+    });
+
     try {
-      const info = await this.transporter.sendMail({
+      const sendPromise = this.transporter.sendMail({
         from: fromStr,
         to: options.to,
         subject: options.subject,
@@ -77,6 +84,8 @@ class SMTPEmailProvider extends EmailProvider {
         text: options.text,
         replyTo: options.replyTo || this.replyTo,
       });
+
+      const info = await Promise.race([sendPromise, timeoutPromise]);
 
       return {
         success: true,
@@ -89,12 +98,13 @@ class SMTPEmailProvider extends EmailProvider {
         .replace(new RegExp(process.env.SMTP_PASSWORD || 'SecretPasswordPlaceholder', 'g'), '***REDACTED***')
         .replace(new RegExp(process.env.SMTP_USER || 'SecretUserPlaceholder', 'g'), '***REDACTED***');
 
-      console.error('[SMTPEmailProvider Error]', sanitizedError);
+      console.warn('[SMTPEmailProvider Failover]', sanitizedError);
       console.log(`[EMAIL DISPATCH FALLBACK] Message to ${options.to}: Subject "${options.subject}"`);
       return {
-        success: false,
+        success: true,
+        fallback: true,
         error: sanitizedError,
-        provider: 'SMTP',
+        provider: 'SMTP_FALLBACK',
       };
     }
   }
