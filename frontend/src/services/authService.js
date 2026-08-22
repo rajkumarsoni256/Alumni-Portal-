@@ -60,11 +60,22 @@ export const authService = {
     });
   },
 
-  resetPassword: async ({ token, code, email, newPassword }) => {
+  verifyResetOTP: async ({ email, otp }) => {
+    return apiClient.post('/api/v1/auth/verify-reset-otp', {
+      email: email.trim().toLowerCase(),
+      otp: String(otp).trim(),
+    });
+  },
+
+  resendResetOTP: async (email) => {
+    return apiClient.post('/api/v1/auth/resend-reset-otp', {
+      email: email.trim().toLowerCase(),
+    });
+  },
+
+  resetPassword: async ({ resetToken, newPassword }) => {
     return apiClient.post('/api/v1/auth/reset-password', {
-      token,
-      code,
-      email,
+      resetToken,
       newPassword,
     });
   },
