@@ -21,9 +21,8 @@ import {
 } from 'lucide-react';
 
 export const AdminUserDetailsPage = () => {
-  // IMPORTANT: App.jsx registers this route as /admin/users/:userId.
-  // Keep the parameter name aligned with the route so the detail API receives the UUID.
-  const { userId } = useParams();
+  const params = useParams();
+  const userId = params.userId || params.id;
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -32,6 +31,12 @@ export const AdminUserDetailsPage = () => {
   useEffect(() => {
     let isMounted = true;
     const fetchUser = async () => {
+      if (!userId) {
+        setIsLoading(false);
+        setError('Missing user ID parameter');
+        return;
+      }
+
       setIsLoading(true);
       setError(null);
       try {
@@ -48,13 +53,7 @@ export const AdminUserDetailsPage = () => {
       }
     };
 
-    if (userId) {
-      fetchUser();
-    } else {
-      setError('Missing user ID in admin profile route.');
-      setIsLoading(false);
-    }
-
+    fetchUser();
     return () => {
       isMounted = false;
     };
