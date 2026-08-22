@@ -221,7 +221,8 @@ export const AppProvider = ({ children }) => {
   const fetchMentorshipRequests = async () => {
     try {
       const data = await mentorshipService.getMyRequests();
-      setRequests(data || []);
+      const list = Array.isArray(data) ? data : (data?.requests || data?.data || []);
+      setRequests(list);
     } catch (err) {
       console.warn('Failed to load mentorship requests:', err);
       setRequests([]);
