@@ -1,16 +1,17 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
+import { useConnection } from '../../context/ConnectionContext';
 import { UserAvatar } from '../common/UserAvatar';
+import { ConnectionButton } from '../common/ConnectionButton';
 
 export const ConnectionRequestsSection = () => {
-  const { 
-    connectionRequests = [], 
-    acceptConnectionRequest, 
-    ignoreConnectionRequest 
-  } = useApp();
+  const { connectionRequests: appReqs = [] } = useApp();
+  const { incomingRequests = [], acceptRequest, declineRequest } = useConnection();
 
-  if (!connectionRequests || connectionRequests.length === 0) {
+  const requests = incomingRequests.length > 0 ? incomingRequests : appReqs;
+
+  if (!requests || requests.length === 0) {
     return null;
   }
 
@@ -22,17 +23,17 @@ export const ConnectionRequestsSection = () => {
             Connection Requests
           </h2>
           <span className="text-[11px] font-bold px-2 py-0.2 rounded-full bg-red-100 text-red-800">
-            {connectionRequests.length}
+            {requests.length}
           </span>
         </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-3">
-        {connectionRequests.map((req) => {
+        {requests.map((req) => {
           const user = req.fromUser || req.user || req;
-          const userId = req.fromUserId || user.id || user.userId;
-          const name = user.name || user.fullName || 'JECRC Member';
-          const avatar = user.avatar || user.avatarUrl || null;
+          const userId = req.fromUserId || user.id || user.userId || user.user_id;
+          const name = user.name || user.fullName || user.full_name || 'JECRC Member';
+          const avatar = user.avatar || user.avatarUrl || user.avatar_url || null;
           const headline = user.headline || user.company || user.designation || user.currentRole || (user.branch ? `${user.role || 'Member'} • ${user.branch}` : 'Community Member');
           const batch = user.batch || (user.graduationYear ? `Class of ${user.graduationYear}` : '');
           const mutualCount = req.mutualCount || user.mutualCount || user.mutualConnectionsCount || 0;
@@ -41,7 +42,7 @@ export const ConnectionRequestsSection = () => {
 
           return (
             <div 
-              key={req.id} 
+              key={req.id || req.requestId || userId} 
               className="p-3 rounded-lg border border-slate-200/80 bg-slate-50/50 flex flex-col justify-between space-y-2.5"
             >
               <div className="flex items-start gap-3">
@@ -74,23 +75,14 @@ export const ConnectionRequestsSection = () => {
                 </div>
               </div>
 
-              {/* Action Buttons */}
-              <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-200/60">
-                <button
-                  type="button"
-                  onClick={() => ignoreConnectionRequest(req.id)}
-                  className="py-1 rounded-md text-xs font-semibold text-slate-700 bg-white border border-slate-300 hover:bg-slate-100 transition-colors cursor-pointer"
-                >
-                  Ignore
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => acceptConnectionRequest(req.id, userId)}
-                  className="py-1 rounded-md text-xs font-semibold text-white bg-red-700 hover:bg-red-800 transition-colors cursor-pointer"
-                >
-                  Accept
-                </button>
+              {/* Action Buttons via ConnectionButton or Direct Handlers */}
+              <div className="flex items-center justify-end pt-1 border-t border-slate-200/60">
+                <ConnectionButton
+                  userId={userId}
+                  targetUser={user}
+                  initialStatus="PENDING_RECEIVED"
+                  size="sm"
+                />
               </div>
             </div>
           );

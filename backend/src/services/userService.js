@@ -212,7 +212,7 @@ const getPublicUserById = async (targetUserId, authUserId = null) => {
            p.location, p.is_available_for_mentorship, p.linkedin_url,
            p.github_url, p.website_url, p.skills, p.interests,
            p.is_profile_complete, p.created_at, p.updated_at,
-           (SELECT COUNT(*) FROM connections conn WHERE (conn.requester_id = u.id OR conn.receiver_id = u.id) AND UPPER(conn.status) = 'ACCEPTED') AS connections_count
+           ((SELECT COUNT(*) FROM connections WHERE requester_id = u.id AND status = 'ACCEPTED') + (SELECT COUNT(*) FROM connections WHERE receiver_id = u.id AND status = 'ACCEPTED')) AS connections_count
            ${connSelect}
     FROM users u
     LEFT JOIN user_profiles p ON u.id = p.user_id

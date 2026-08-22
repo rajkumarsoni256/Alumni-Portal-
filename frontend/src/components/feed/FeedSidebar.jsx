@@ -14,10 +14,11 @@ import {
   RefreshCw
 } from 'lucide-react';
 
+import { ConnectionButton } from '../common/ConnectionButton';
+
 export const FeedSidebar = () => {
   const { 
     suggestedPeople, 
-    toggleConnectUser, 
     setSearchQuery 
   } = useApp();
 
@@ -120,13 +121,7 @@ export const FeedSidebar = () => {
                   </div>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => toggleConnectUser(person.id)}
-                  className="px-3 py-1 rounded-md text-xs font-semibold border border-slate-300 text-slate-700 hover:bg-slate-50 transition-colors shrink-0 cursor-pointer shadow-2xs"
-                >
-                  Connect
-                </button>
+                <ConnectionButton userId={person.id || person.userId} targetUser={person} size="sm" />
               </div>
             ))}
           </div>

@@ -32,51 +32,18 @@ export const CreatePostComposer = ({
   const [showMentionDropdown, setShowMentionDropdown] = useState(false);
 
   // Media files & preview
+  const [mediaFiles, setMediaFiles] = useState([]);
   const [mediaFile, setMediaFile] = useState(null);
   const [mediaPreview, setMediaPreview] = useState(editingPost ? (editingPost.image || editingPost.imageUrl || editingPost.videoUrl) : null);
   const [mediaType, setMediaType] = useState(null); // 'IMAGE' or 'VIDEO'
 
-  // Job post fields
-  const [jobTitle, setJobTitle] = useState(editingPost?.jobDetails?.title || editingPost?.jobTitle || '');
-  const [companyName, setCompanyName] = useState(editingPost?.jobDetails?.company || editingPost?.companyName || '');
-  const [jobLocation, setJobLocation] = useState(editingPost?.jobDetails?.location || editingPost?.jobLocation || '');
-  const [employmentType, setEmploymentType] = useState(editingPost?.jobDetails?.employmentType || editingPost?.employmentType || 'Full-time');
-  const [jobDescription, setJobDescription] = useState(editingPost?.jobDetails?.description || editingPost?.jobDescription || '');
-  const [jobUrl, setJobUrl] = useState(editingPost?.jobDetails?.applicationUrl || editingPost?.jobUrl || '');
-
-  // Achievement post fields
-  const [achievementTitle, setAchievementTitle] = useState(editingPost?.achievementDetails?.title || editingPost?.achievementTitle || '');
-  const [achievementOrg, setAchievementOrg] = useState(editingPost?.achievementDetails?.organization || editingPost?.achievementOrganization || '');
-  const [achievementDate, setAchievementDate] = useState(editingPost?.achievementDetails?.date || editingPost?.achievementDate || '');
-  const [achievementDesc, setAchievementDesc] = useState(editingPost?.achievementDetails?.description || editingPost?.achievementDescription || '');
-
-  const textareaRef = useRef(null);
-  const photoInputRef = useRef(null);
-  const videoInputRef = useRef(null);
-
-  const quickTags = ['#JECRC', '#Placements2026', '#Internships', '#AIandML', '#StudentProject'];
-
-  const isAlumni = currentUser.isAlumni || currentUser.role === 'Alumni' || currentUser.role === 'alumni';
-  const roleSubtitle = isAlumni ? 'Alumni • JECRC' : 'Student • JECRC';
-  const firstName = (currentUser.name || 'User').split(' ')[0];
-
-  useEffect(() => {
-    if (initialExpanded || editingPost) {
-      setIsOpen(true);
-    }
-  }, [initialExpanded, editingPost]);
-
-  useEffect(() => {
-    if (isOpen && textareaRef.current) {
-      textareaRef.current.focus();
-    }
-  }, [isOpen]);
-
+  // Reset Form
   const resetForm = () => {
     setContent('');
     setPostType('TEXT');
     setVisibility('PUBLIC');
     setSelectedTags(['#JECRC']);
+    setMediaFiles([]);
     setMediaFile(null);
     setMediaPreview(null);
     setMediaType(null);
@@ -146,22 +113,48 @@ export const CreatePostComposer = ({
     );
   };
 
-  // Handle Photo selection
+  // Handle Photo selection (Max 5 images)
+  const MAX_IMAGES = 5;
   const handlePhotoSelect = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
 
-    if (file.size > 10 * 1024 * 1024) {
-      showNotification('Image size must be less than 10 MB.', 'error');
+    if (mediaFiles.length + files.length > MAX_IMAGES) {
+      showNotification(`You can upload a maximum of ${MAX_IMAGES} images per post.`, 'error');
       return;
     }
 
-    setMediaFile(file);
-    setMediaType('IMAGE');
-    setPostType('PHOTO');
-    const previewUrl = URL.createObjectURL(file);
-    setMediaPreview(previewUrl);
-    setIsOpen(true);
+    const validFiles = [];
+    for (const f of files) {
+      if (!f.type.startsWith('image/')) {
+        showNotification(`File ${f.name} is not a valid image format.`, 'error');
+        continue;
+      }
+      if (f.size > 10 * 1024 * 1024) {
+        showNotification(`Image ${f.name} exceeds 10 MB limit.`, 'error');
+        continue;
+      }
+      validFiles.push(f);
+    }
+
+    if (validFiles.length > 0) {
+      const updatedFiles = [...mediaFiles, ...validFiles];
+      setMediaFiles(updatedFiles);
+      setMediaType('IMAGE');
+      setPostType('PHOTO');
+      setIsOpen(true);
+    }
+    // reset file input
+    if (e.target) e.target.value = '';
+  };
+
+  const handleRemoveSingleImage = (indexToRemove) => {
+    const updated = mediaFiles.filter((_, idx) => idx !== indexToRemove);
+    setMediaFiles(updated);
+    if (updated.length === 0) {
+      setMediaType(null);
+      if (postType === 'PHOTO') setPostType('TEXT');
+    }
   };
 
   // Handle Video selection
@@ -180,9 +173,11 @@ export const CreatePostComposer = ({
     const previewUrl = URL.createObjectURL(file);
     setMediaPreview(previewUrl);
     setIsOpen(true);
+    if (e.target) e.target.value = '';
   };
 
   const handleRemoveMedia = () => {
+    setMediaFiles([]);
     setMediaFile(null);
     setMediaPreview(null);
     setMediaType(null);
@@ -211,7 +206,7 @@ export const CreatePostComposer = ({
         return;
       }
     } else {
-      if (!content.trim() && !mediaFile && !mediaPreview) {
+      if (!content.trim() && mediaFiles.length === 0 && !mediaFile && !mediaPreview) {
         showNotification('Please add text content or media to your post.', 'error');
         return;
       }
@@ -227,7 +222,8 @@ export const CreatePostComposer = ({
         visibility,
         tags: selectedTags,
         hashtags: selectedTags,
-        mediaFile,
+        mediaFiles,
+        mediaFile: mediaFiles.length > 0 ? mediaFiles[0] : mediaFile,
         // Job fields
         jobTitle: jobTitle.trim(),
         companyName: companyName.trim(),
@@ -272,6 +268,7 @@ export const CreatePostComposer = ({
         ref={photoInputRef}
         onChange={handlePhotoSelect}
         accept="image/jpeg,image/png,image/webp"
+        multiple
         className="hidden"
       />
       <input
@@ -308,8 +305,8 @@ export const CreatePostComposer = ({
                 onClick={() => photoInputRef.current?.click()}
                 className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer group"
               >
-                <Image className="w-4 h-4 text-emerald-600 group-hover:scale-105 transition-transform" />
-                <span>Photo</span>
+                <Image className="w-4 h-4 text-emerald-600 group-hover:scale-110 transition-transform" />
+                <span>Photos</span>
               </button>
 
               <button
@@ -317,21 +314,23 @@ export const CreatePostComposer = ({
                 onClick={() => videoInputRef.current?.click()}
                 className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer group"
               >
-                <Video className="w-4 h-4 text-blue-600 group-hover:scale-105 transition-transform" />
+                <Video className="w-4 h-4 text-blue-600 group-hover:scale-110 transition-transform" />
                 <span>Video</span>
               </button>
 
-              <button
-                type="button"
-                onClick={() => {
-                  setPostType('JOB');
-                  setIsOpen(true);
-                }}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer group"
-              >
-                <Briefcase className="w-4 h-4 text-purple-600 group-hover:scale-105 transition-transform" />
-                <span>Job</span>
-              </button>
+              {isAlumni && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPostType('JOB');
+                    setIsOpen(true);
+                  }}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer group"
+                >
+                  <Briefcase className="w-4 h-4 text-purple-600 group-hover:scale-110 transition-transform" />
+                  <span>Job Opportunity</span>
+                </button>
+              )}
 
               <button
                 type="button"
@@ -341,7 +340,7 @@ export const CreatePostComposer = ({
                 }}
                 className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer group"
               >
-                <Award className="w-4 h-4 text-amber-600 group-hover:scale-105 transition-transform" />
+                <Award className="w-4 h-4 text-amber-600 group-hover:scale-110 transition-transform" />
                 <span>Achievement</span>
               </button>
             </div>
@@ -369,79 +368,64 @@ export const CreatePostComposer = ({
         </div>
       )}
 
-      {/* 2. Expanded Composer Modal */}
+      {/* 2. Expanded Composer Modal Dialog */}
       {isOpen && (
         <div 
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs transition-opacity"
+          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150"
+          onClick={handleClose}
           role="dialog"
           aria-modal="true"
         >
           <div 
-            className="bg-white rounded-xl border border-slate-200 shadow-xl max-w-lg w-full overflow-hidden relative flex flex-col max-h-[92vh] animate-in fade-in zoom-in-95 duration-150"
+            className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-lg w-full overflow-hidden relative flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-150"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
-            <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
-              <h3 className="text-sm font-bold text-slate-900">
-                {editingPost ? 'Edit post' : 'Create a post'}
+            <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between bg-white shrink-0">
+              <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                <span>{editingPost ? 'Edit Post' : 'Create Post'}</span>
               </h3>
+
               <button
                 type="button"
                 onClick={handleClose}
-                disabled={isSubmitting}
-                className="p-1 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+                className="p-1.5 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            {/* Modal Form */}
-            <form onSubmit={handleSubmit} className="p-4 space-y-3.5 overflow-y-auto flex-1">
-              {/* Author Info & Visibility Selector */}
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <UserAvatar
-                    src={currentUser.avatar}
-                    name={currentUser.name}
-                    className="w-10 h-10 shrink-0"
-                  />
+            {/* Modal Scrollable Body */}
+            <form onSubmit={handleSubmit} className="p-4 overflow-y-auto space-y-4 flex-1">
+              {/* Author Identity & Post Visibility Header */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <UserAvatar src={currentUser.avatar} name={currentUser.name} className="w-9 h-9" />
                   <div>
-                    <span className="text-xs font-bold text-slate-900 block">
-                      {currentUser.name}
-                    </span>
-                    <span className="text-[11px] text-slate-500 font-medium block">
-                      {roleSubtitle}
-                    </span>
+                    <span className="text-xs font-bold text-slate-900 block leading-tight">{currentUser.name}</span>
+                    <span className="text-[10px] text-slate-500 font-medium">{roleSubtitle}</span>
                   </div>
                 </div>
 
-                {/* Visibility Badge Dropdown */}
-                <div className="relative flex items-center">
+                <div className="flex items-center gap-2">
                   <select
                     value={visibility}
                     onChange={(e) => setVisibility(e.target.value)}
-                    className="appearance-none text-xs font-medium text-slate-700 bg-slate-100 border border-slate-200 rounded-lg pl-7 pr-6 py-1.5 cursor-pointer outline-none hover:bg-slate-200/80 transition-colors"
+                    className="text-[11px] font-semibold bg-slate-100 border border-slate-200 text-slate-700 rounded-lg px-2.5 py-1 focus:outline-none cursor-pointer"
                   >
-                    <option value="PUBLIC">Public</option>
-                    <option value="CONNECTIONS">Connections</option>
+                    <option value="PUBLIC">🌐 Anyone</option>
+                    <option value="CONNECTIONS">👥 Connections</option>
                   </select>
-                  <div className="absolute left-2 inset-y-0 flex items-center pointer-events-none text-slate-500">
-                    {visibility === 'PUBLIC' ? <Globe className="w-3.5 h-3.5" /> : <Users className="w-3.5 h-3.5" />}
-                  </div>
-                  <div className="absolute right-2 inset-y-0 flex items-center pointer-events-none text-slate-400">
-                    <ChevronDown className="w-3 h-3" />
-                  </div>
                 </div>
               </div>
 
-              {/* Main Content Text Area with Mention Dropdown */}
+              {/* Main Content Text Area with @Mentions */}
               <div className="relative">
                 <textarea
                   ref={textareaRef}
-                  rows={4}
                   value={content}
                   onChange={handleContentChange}
-                  placeholder="What's on your mind? (Type @ to mention community members)"
+                  placeholder={`Share an update, announcement, or request with JECRC...`}
                   className="w-full text-xs text-slate-800 placeholder-slate-400 outline-none resize-none min-h-[90px] leading-relaxed"
                   aria-label="Post content"
                 />
@@ -467,8 +451,55 @@ export const CreatePostComposer = ({
                 )}
               </div>
 
-              {/* Media Preview Box */}
-              {mediaPreview && (
+              {/* Multi-Image Preview Grid (Up to 5 Photos) */}
+              {mediaFiles.length > 0 && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-slate-700">
+                      Attached Photos ({mediaFiles.length} / {MAX_IMAGES})
+                    </span>
+                    {mediaFiles.length < MAX_IMAGES && (
+                      <button
+                        type="button"
+                        onClick={() => photoInputRef.current?.click()}
+                        className="text-[11px] font-semibold text-red-700 hover:underline cursor-pointer"
+                      >
+                        + Add photo
+                      </button>
+                    )}
+                  </div>
+
+                  <div className={`grid gap-2 ${
+                    mediaFiles.length === 1 ? 'grid-cols-1' :
+                    mediaFiles.length === 2 ? 'grid-cols-2' :
+                    mediaFiles.length === 3 ? 'grid-cols-3' : 'grid-cols-4 sm:grid-cols-5'
+                  }`}>
+                    {mediaFiles.map((file, idx) => (
+                      <div key={idx} className="relative group rounded-lg overflow-hidden border border-slate-200 aspect-square bg-slate-100">
+                        <img
+                          src={URL.createObjectURL(file)}
+                          alt={`Upload preview ${idx + 1}`}
+                          className="w-full h-full object-cover"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveSingleImage(idx)}
+                          className="absolute top-1 right-1 p-1 bg-black/70 hover:bg-black text-white rounded-full transition-colors cursor-pointer shadow-md"
+                          title="Remove photo"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                        <span className="absolute bottom-1 left-1 bg-black/60 text-white text-[9px] px-1 rounded">
+                          #{idx + 1}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Video or Legacy Media Preview */}
+              {mediaPreview && mediaFiles.length === 0 && (
                 <div className="relative border border-slate-200 rounded-lg p-2 bg-slate-50 flex items-center justify-center overflow-hidden max-h-56">
                   {mediaType === 'VIDEO' || (mediaFile && mediaFile.type.startsWith('video/')) ? (
                     <video
@@ -491,11 +522,6 @@ export const CreatePostComposer = ({
                   >
                     <X className="w-4 h-4" />
                   </button>
-                  {mediaFile && (
-                    <div className="absolute bottom-3 left-3 bg-slate-900/75 text-white text-[10px] px-2 py-0.5 rounded font-mono">
-                      {mediaFile.name} ({(mediaFile.size / (1024 * 1024)).toFixed(1)} MB)
-                    </div>
-                  )}
                 </div>
               )}
 

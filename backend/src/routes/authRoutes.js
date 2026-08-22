@@ -5,6 +5,8 @@ const { authenticateToken } = require('../middleware/authMiddleware');
 const { authRateLimiter } = require('../middleware/rateLimiter');
 
 router.post('/register', authRateLimiter, authController.register);
+router.post('/register/student', authRateLimiter, authController.registerStudent);
+router.post('/register/alumni', authRateLimiter, authController.registerAlumni);
 router.post('/student/register-init', authRateLimiter, authController.initiateStudentRegistration);
 router.post('/student/verify-otp', authRateLimiter, authController.verifyStudentRegistrationOTP);
 router.post('/verify-email', authRateLimiter, authController.verifyEmail);

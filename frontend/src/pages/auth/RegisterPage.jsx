@@ -23,7 +23,14 @@ export const RegisterPage = () => {
   const { registerUser, loginWithGoogle, setAuthUser } = useApp();
 
   const [name, setName] = useState('');
-  const [role, setRole] = useState('student'); // 'student' | 'alumni'
+  const [role, setRole] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const r = params.get('role');
+      if (r === 'alumni' || r === 'student') return r;
+    }
+    return 'student';
+  });
   const [isAlumniSubmitted, setIsAlumniSubmitted] = useState(false);
 
   // Student 2-Step Registration State
@@ -536,6 +543,8 @@ export const RegisterPage = () => {
                         className="w-full bg-slate-50 border border-slate-300 focus:border-slate-600 focus:bg-white rounded-md px-3 py-2 text-xs text-slate-900 focus:outline-none transition-colors cursor-pointer"
                       >
                         <option value="BTECH">BTECH (B.Technology)</option>
+                        <option value="BFON">BFON (B.Sc. Forensic Science)</option>
+                        <option value="BSC">BSC (B.Science)</option>
                         <option value="BCON">BCON (B.Commerce / Construction)</option>
                         <option value="BCS">BCS (B.Computer Science)</option>
                         <option value="MCA">MCA (Master of Computer App)</option>

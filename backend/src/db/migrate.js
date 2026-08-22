@@ -265,6 +265,9 @@ const migrate = async () => {
           updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
           CONSTRAINT chk_no_self_connection CHECK (requester_id <> receiver_id)
       );
+
+      CREATE UNIQUE INDEX IF NOT EXISTS uq_connection_pair 
+      ON connections (LEAST(requester_id, receiver_id), GREATEST(requester_id, receiver_id));
     `);
 
     // 12. posts table (Phase 5)
@@ -316,18 +319,44 @@ const migrate = async () => {
       CREATE TABLE IF NOT EXISTS post_media (
           id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
           post_id UUID NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
-          media_type VARCHAR(20) NOT NULL,
+          media_type VARCHAR(20) NOT NULL DEFAULT 'IMAGE',
           storage_key TEXT,
           media_url TEXT NOT NULL,
+          thumbnail_url TEXT,
           original_filename TEXT,
           mime_type VARCHAR(100),
           file_size BIGINT,
           width INTEGER,
           height INTEGER,
           duration INTEGER,
+          sort_order SMALLINT NOT NULL DEFAULT 0,
           created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
     `);
+
+    try {
+      await db.query(`ALTER TABLE post_media ADD COLUMN IF NOT EXISTS thumbnail_url TEXT;`);
+      await db.query(`ALTER TABLE post_media ADD COLUMN IF NOT EXISTS sort_order SMALLINT NOT NULL DEFAULT 0;`);
+      await db.query(`
+        DO $$
+        BEGIN
+          IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chk_post_media_sort_order') THEN
+            ALTER TABLE post_media ADD CONSTRAINT chk_post_media_sort_order CHECK (sort_order BETWEEN 0 AND 4);
+          END IF;
+        END $$;
+      `);
+      await db.query(`
+        DO $$
+        BEGIN
+          IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'uq_post_media_order') THEN
+            ALTER TABLE post_media ADD CONSTRAINT uq_post_media_order UNIQUE (post_id, sort_order);
+          END IF;
+        END $$;
+      `);
+      await db.query(`CREATE INDEX IF NOT EXISTS idx_post_media_post_order ON post_media(post_id, sort_order ASC);`);
+    } catch (e) {
+      console.warn('[MIGRATION] post_media schema alteration warning:', e.message);
+    }
 
     // 12c. hashtags table
     await db.query(`
@@ -770,9 +799,13 @@ const migrate = async () => {
     await db.query(`CREATE INDEX IF NOT EXISTS idx_messages_conv_created_id ON messages(conversation_id, created_at DESC, id DESC);`).catch(() => {});
     await db.query(`CREATE INDEX IF NOT EXISTS idx_notifications_recipient_created ON notifications(recipient_id, created_at DESC);`).catch(() => {});
     await db.query(`CREATE INDEX IF NOT EXISTS idx_notifications_recipient_unread ON notifications(recipient_id) WHERE is_read = false;`).catch(() => {});
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_notifications_recipient_unread_created ON notifications(recipient_id, is_read, created_at DESC);`).catch(() => {});
     await db.query(`CREATE INDEX IF NOT EXISTS idx_connections_requester_status ON connections(requester_id, status);`).catch(() => {});
     await db.query(`CREATE INDEX IF NOT EXISTS idx_connections_receiver_status ON connections(receiver_id, status);`).catch(() => {});
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_connections_accepted_pair ON connections(requester_id, receiver_id) WHERE status = 'ACCEPTED';`).catch(() => {});
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_connections_accepted_rev ON connections(receiver_id, requester_id) WHERE status = 'ACCEPTED';`).catch(() => {});
     await db.query(`CREATE INDEX IF NOT EXISTS idx_user_profiles_updated_user ON user_profiles(updated_at DESC, user_id);`).catch(() => {});
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_user_profiles_search_composite ON user_profiles(user_id, company, branch, graduation_year);`).catch(() => {});
     await db.query(`CREATE INDEX IF NOT EXISTS idx_users_role_status ON users(account_status, role);`).catch(() => {});
     await db.query(`CREATE INDEX IF NOT EXISTS idx_email_deliveries_recipient ON email_deliveries(recipient_email);`).catch(() => {});
     await db.query(`CREATE INDEX IF NOT EXISTS idx_email_deliveries_status ON email_deliveries(status);`).catch(() => {});

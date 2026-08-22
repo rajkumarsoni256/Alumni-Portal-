@@ -17,6 +17,8 @@ import {
   UserCheck 
 } from 'lucide-react';
 
+import { ConnectionButton } from '../common/ConnectionButton';
+
 export const AlumniProfileModal = ({ isOpen, onClose, alumni }) => {
   const navigate = useNavigate();
 
@@ -227,41 +229,27 @@ export const AlumniProfileModal = ({ isOpen, onClose, alumni }) => {
         </div>
 
         {/* 3. Action Buttons Bar matching Image 4 */}
-        <div className="p-4 border-t border-slate-100 bg-white grid grid-cols-4 gap-2">
-          <button
-            type="button"
-            onClick={handleMessageClick}
-            className="p-2.5 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50 flex items-center justify-center transition-colors cursor-pointer shadow-2xs"
-            title="Chat"
-          >
-            <MessageSquare className="w-4.5 h-4.5" />
-          </button>
+        <div className="p-4 border-t border-slate-100 bg-white flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 flex-1">
+            <button
+              type="button"
+              onClick={handleMessageClick}
+              className="p-2.5 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50 flex items-center justify-center transition-colors cursor-pointer shadow-2xs"
+              title="Chat"
+            >
+              <MessageSquare className="w-4.5 h-4.5" />
+            </button>
 
-          <button
-            type="button"
-            onClick={() => window.location.href = `mailto:${alumni.email || 'rehan@example.com'}`}
-            className="p-2.5 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50 flex items-center justify-center transition-colors cursor-pointer shadow-2xs"
-            title="Email"
-          >
-            <Mail className="w-4.5 h-4.5" />
-          </button>
+            <button
+              type="button"
+              onClick={handleViewFullProfile}
+              className="py-2.5 px-3 flex-1 rounded-xl border border-red-600 text-red-700 hover:bg-red-50 text-xs font-bold transition-colors cursor-pointer shadow-2xs text-center"
+            >
+              View Profile
+            </button>
+          </div>
 
-          <button
-            type="button"
-            onClick={handleViewFullProfile}
-            className="py-2.5 px-3 rounded-xl border border-red-600 text-red-700 hover:bg-red-50 text-xs font-bold transition-colors cursor-pointer shadow-2xs col-span-1 text-center"
-          >
-            View Profile
-          </button>
-
-          <button
-            type="button"
-            onClick={handleMentorshipClick}
-            className="py-2.5 px-3 rounded-xl bg-red-700 hover:bg-red-800 text-white text-xs font-bold transition-colors inline-flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs col-span-1"
-          >
-            <UserCheck className="w-4 h-4" />
-            <span>Mentorship</span>
-          </button>
+          <ConnectionButton userId={sampleAlumni.id} targetUser={alumni} size="md" />
         </div>
 
       </div>

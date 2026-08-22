@@ -28,28 +28,43 @@ const formatProfileResponse = (row) => {
   const currentAcademicYear = row.current_year ? parseInt(row.current_year, 10) : null;
   const avatar = row.avatar_url || null;
   const banner = row.banner_url || null;
+  const fullName = row.full_name || (row.email ? row.email.split('@')[0] : 'JECRC Member');
+  const isAlumni = (row.role || '').toUpperCase() === 'ALUMNI';
+  const gradYr = row.graduation_year ? parseInt(row.graduation_year, 10) : null;
+  const headline = row.designation ? `${row.designation}${row.company ? ` @ ${row.company}` : ''}` : (row.degree ? `${row.degree} ${row.branch || ''}` : 'JECRC Member');
+  const batchDisplay = gradYr ? `JECRC ${row.branch || 'Engineering'} • Class of ${gradYr}` : (isAlumni ? 'Alumni' : 'Student Member');
 
-  return {
+  const baseObject = {
     id: row.id,
     userId: row.user_id,
+    user_id: row.user_id,
     email: row.email,
     role: row.role,
-    fullName: row.full_name,
+    name: fullName,
+    fullName: fullName,
+    full_name: fullName,
     phone: row.phone || null,
     avatarUrl: avatar,
     avatar: avatar,
+    avatar_url: avatar,
     bannerUrl: banner,
     banner: banner,
     coverImage: banner,
+    banner_url: banner,
     bio: row.bio || null,
     degree: row.degree || null,
     branch: row.branch || null,
-    graduationYear: row.graduation_year || null,
+    graduationYear: gradYr,
+    graduation_year: gradYr,
     currentYear: currentAcademicYear,
     currentAcademicYear: currentAcademicYear,
     company: row.company || null,
     designation: row.designation || null,
+    currentRole: row.designation || null,
+    headline: headline,
+    batchDisplay: batchDisplay,
     location: row.location || null,
+    isAlumni: isAlumni,
     isAvailableForMentorship: row.is_available_for_mentorship !== false,
     linkedinUrl: row.linkedin_url || null,
     githubUrl: row.github_url || null,
@@ -58,28 +73,12 @@ const formatProfileResponse = (row) => {
     interests: parseList(row.interests),
     profileCompleted: isComplete,
     isProfileComplete: isComplete,
+  };
+
+  return {
+    ...baseObject,
     profile: {
-      userId: row.user_id,
-      fullName: row.full_name,
-      phone: row.phone || null,
-      degree: row.degree || null,
-      branch: row.branch || null,
-      graduationYear: row.graduation_year || null,
-      currentAcademicYear: currentAcademicYear,
-      company: row.company || null,
-      designation: row.designation || null,
-      location: row.location || null,
-      linkedinUrl: row.linkedin_url || null,
-      githubUrl: row.github_url || null,
-      bio: row.bio || null,
-      skills: parseList(row.skills),
-      interests: parseList(row.interests),
-      avatarUrl: avatar,
-      avatar: avatar,
-      bannerUrl: banner,
-      banner: banner,
-      coverImage: banner,
-      profileCompleted: isComplete,
+      ...baseObject,
     }
   };
 };
@@ -463,33 +462,12 @@ const getProfileById = async (targetUserId, authUser = null) => {
 
   // Compute relationship status relative to authUser
   if (authUser && authUser.id) {
-    if (authUser.id === targetUserId) {
-      profile.connectionStatus = 'self';
-    } else {
-      const connRes = await db.query(
-        `SELECT * FROM connections 
-         WHERE (requester_id = $1 AND receiver_id = $2) OR (requester_id = $2 AND receiver_id = $1)`,
-        [authUser.id, targetUserId]
-      );
-      if (connRes.rows.length > 0) {
-        const conn = connRes.rows[0];
-        if (conn.status === 'ACCEPTED') {
-          profile.connectionStatus = 'connected';
-          profile.connectionId = conn.id;
-        } else if (conn.status === 'PENDING') {
-          profile.connectionId = conn.id;
-          if (conn.requester_id === authUser.id) {
-            profile.connectionStatus = 'pending_outgoing';
-          } else {
-            profile.connectionStatus = 'pending_incoming';
-          }
-        }
-      } else {
-        profile.connectionStatus = 'none';
-      }
-    }
+    const statusObj = await connectionService.getConnectionStatus(authUser, targetUserId);
+    profile.connectionStatus = statusObj.status;
+    profile.connectionId = statusObj.connectionId;
   } else {
-    profile.connectionStatus = 'none';
+    profile.connectionStatus = 'NONE';
+    profile.connectionId = null;
   }
 
   return profile;

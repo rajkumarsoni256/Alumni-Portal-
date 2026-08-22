@@ -5,6 +5,8 @@ import { UserAvatar } from '../common/UserAvatar';
 import { connectionService } from '../../services/connectionService';
 import { useApp } from '../../context/AppContext';
 
+import { ConnectionButton } from '../common/ConnectionButton';
+
 export const UserConnectionsModal = ({ isOpen, onClose, userId, userName, totalCount = 0 }) => {
   const navigate = useNavigate();
   const { currentUser, toggleConnectUser } = useApp();
@@ -251,10 +253,12 @@ export const UserConnectionsModal = ({ isOpen, onClose, userId, userName, totalC
                           You
                         </span>
                       ) : (
-                        <span className="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200/80 text-xs font-semibold inline-flex items-center gap-1">
-                          <Check className="w-3 h-3" />
-                          <span>Connected</span>
-                        </span>
+                        <ConnectionButton
+                          userId={connUserId}
+                          targetUser={conn}
+                          initialStatus="CONNECTED"
+                          size="sm"
+                        />
                       )}
                     </div>
                   </div>

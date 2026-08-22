@@ -1,15 +1,18 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { MapPin, Briefcase, GraduationCap, Star, ShieldCheck, Bookmark, MessageSquare, Sparkles } from 'lucide-react';
+import { Star, Bookmark, MessageSquare } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { AlumniProfileModal } from '../profile/AlumniProfileModal';
 import { UserAvatar } from './UserAvatar';
+import { ConnectionButton } from './ConnectionButton';
 
 export const AlumniCard = ({ alumni, showMatchReasons = false }) => {
   const navigate = useNavigate();
   const { savedAlumniIds, toggleSaveAlumni, activeRole } = useApp();
   const [showModal, setShowModal] = useState(false);
-  const isSaved = savedAlumniIds.includes(alumni.id);
+  const alumniId = alumni.id || alumni.userId || alumni.user_id;
+  const alumniName = alumni.name || alumni.fullName || alumni.full_name || 'JECRC Alumnus';
+  const isSaved = savedAlumniIds.includes(alumniId);
 
   return (
     <>
@@ -26,7 +29,7 @@ export const AlumniCard = ({ alumni, showMatchReasons = false }) => {
             <button
               onClick={(e) => {
                 e.preventDefault();
-                toggleSaveAlumni(alumni.id);
+                toggleSaveAlumni(alumniId);
               }}
               className={`p-1.5 rounded-full transition-colors cursor-pointer ${
                 isSaved ? 'bg-white text-red-700' : 'bg-black/30 text-white hover:bg-black/50'
@@ -43,8 +46,8 @@ export const AlumniCard = ({ alumni, showMatchReasons = false }) => {
             <div className="-mt-8 mb-2.5 flex items-end justify-between">
               <div onClick={() => setShowModal(true)} className="relative inline-block cursor-pointer">
                 <UserAvatar
-                  src={alumni.avatar}
-                  name={alumni.name}
+                  src={alumni.avatar || alumni.avatarUrl || alumni.avatar_url}
+                  name={alumniName}
                   className="w-14 h-14 border-2 border-white bg-white shadow-2xs"
                 />
                 <span
@@ -55,11 +58,15 @@ export const AlumniCard = ({ alumni, showMatchReasons = false }) => {
                 />
               </div>
 
-              <div className="flex items-center gap-1 text-[11px] font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded">
-                <Star className="w-3 h-3 fill-amber-400 text-amber-500" />
-                <span>{alumni.rating}</span>
-                <span className="text-slate-400 font-normal">({alumni.reviewsCount})</span>
-              </div>
+              {alumni.rating ? (
+                <div className="flex items-center gap-1 text-[11px] font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded">
+                  <Star className="w-3 h-3 fill-amber-400 text-amber-500" />
+                  <span>{alumni.rating}</span>
+                  {alumni.reviewsCount !== undefined && (
+                    <span className="text-slate-400 font-normal">({alumni.reviewsCount})</span>
+                  )}
+                </div>
+              ) : null}
             </div>
 
             {/* Name & Headline */}
@@ -70,7 +77,7 @@ export const AlumniCard = ({ alumni, showMatchReasons = false }) => {
                   onClick={() => setShowModal(true)}
                   className="text-xs font-bold text-slate-900 hover:text-red-700 hover:underline truncate text-left cursor-pointer"
                 >
-                  {alumni.name}
+                  {alumniName}
                 </button>
                 <span className="text-[10px] font-semibold text-red-700 bg-red-50 px-1 rounded">
                   Alum
@@ -78,15 +85,15 @@ export const AlumniCard = ({ alumni, showMatchReasons = false }) => {
               </div>
 
               <p className="text-xs text-slate-700 font-medium line-clamp-1">
-                {alumni.currentRole}
+                {alumni.currentRole || alumni.headline || alumni.designation || 'JECRC Alumnus'}
               </p>
 
               <p className="text-[11px] text-slate-500 line-clamp-1">
-                {alumni.company} • {alumni.location}
+                {alumni.company || 'JECRC Network'} • {alumni.location || 'India'}
               </p>
 
               <p className="text-[10px] text-slate-400 pt-0.5">
-                JECRC {alumni.degree?.split(' ')[0] || 'B.Tech'} • Class of {alumni.graduationYear}
+                JECRC {alumni.degree?.split(' ')[0] || alumni.branch || 'B.Tech'} {alumni.graduationYear ? `• Class of ${alumni.graduationYear}` : ''}
               </p>
             </div>
 
@@ -120,38 +127,35 @@ export const AlumniCard = ({ alumni, showMatchReasons = false }) => {
         </div>
 
         {/* Action Footer */}
-        <div className="p-3 border-t border-slate-100 bg-slate-50/50 grid grid-cols-2 gap-2">
-          <button
-            type="button"
-            onClick={() => setShowModal(true)}
-            className="w-full text-center py-1.5 rounded-md text-xs font-semibold text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 transition-colors cursor-pointer"
-          >
-            Profile
-          </button>
-
-          {activeRole === 'alumni' ? (
-            <Link
-              to={`/messages?userId=${alumni.id}`}
-              className="w-full text-center py-1.5 rounded-md text-xs font-semibold text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 transition-colors inline-flex items-center justify-center gap-1"
-            >
-              <MessageSquare className="w-3 h-3 text-slate-500" />
-              <span>Message</span>
-            </Link>
-          ) : alumni.isAvailableForMentorship ? (
+        <div className="p-3 border-t border-slate-100 bg-slate-50/50 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5 flex-1">
             <button
-              onClick={() => navigate(`/request-mentorship/${alumni.id}`)}
-              className="w-full text-center py-1.5 rounded-md text-xs font-semibold text-white bg-red-700 hover:bg-red-800 transition-colors cursor-pointer"
-            >
-              Mentorship
-            </button>
-          ) : (
-            <button
+              type="button"
               onClick={() => setShowModal(true)}
-              className="w-full text-center py-1.5 rounded-md text-xs font-semibold text-slate-500 bg-slate-200/80 cursor-default"
+              className="py-1.5 px-2.5 rounded-md text-xs font-semibold text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 transition-colors cursor-pointer text-center"
             >
-              Busy
+              Profile
             </button>
-          )}
+
+            {activeRole === 'alumni' ? (
+              <Link
+                to={`/messages?userId=${alumniId}`}
+                className="py-1.5 px-2.5 rounded-md text-xs font-semibold text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 transition-colors inline-flex items-center justify-center gap-1"
+              >
+                <MessageSquare className="w-3 h-3 text-slate-500" />
+                <span>Message</span>
+              </Link>
+            ) : alumni.isAvailableForMentorship ? (
+              <button
+                onClick={() => navigate(`/request-mentorship/${alumniId}`)}
+                className="py-1.5 px-2 rounded-md text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                Mentorship
+              </button>
+            ) : null}
+          </div>
+
+          <ConnectionButton userId={alumniId} targetUser={alumni} size="sm" />
         </div>
       </div>
 

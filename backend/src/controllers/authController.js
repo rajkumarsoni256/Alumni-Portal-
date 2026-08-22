@@ -40,6 +40,28 @@ const register = async (req, res, next) => {
   }
 };
 
+const registerStudent = async (req, res, next) => {
+  try {
+    const payload = { ...(req.body || {}) };
+    delete payload.role;
+    const userResponse = await authService.register({ ...payload, role: 'STUDENT' });
+    return successResponse(res, userResponse, 'Registration successful. Please check your email for the verification code.', 201);
+  } catch (err) {
+    next(err);
+  }
+};
+
+const registerAlumni = async (req, res, next) => {
+  try {
+    const payload = { ...(req.body || {}) };
+    delete payload.role;
+    const userResponse = await authService.register({ ...payload, role: 'ALUMNI' });
+    return successResponse(res, userResponse, 'Your registration request has been sent to the JU Connect team for approval.', 201);
+  } catch (err) {
+    next(err);
+  }
+};
+
 const initiateStudentRegistration = async (req, res, next) => {
   try {
     const result = await authService.initiateStudentRegistration(req.body || {});
@@ -254,6 +276,8 @@ const getCurrentUser = async (req, res, next) => {
 
 module.exports = {
   register,
+  registerStudent,
+  registerAlumni,
   initiateStudentRegistration,
   verifyStudentRegistrationOTP,
   verifyEmail,

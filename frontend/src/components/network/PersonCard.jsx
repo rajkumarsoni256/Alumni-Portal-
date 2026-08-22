@@ -1,52 +1,17 @@
-import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { MapPin, Clock, Check } from 'lucide-react';
-import { useApp } from '../../context/AppContext';
+import React, { useState } from 'react';
+import { MapPin } from 'lucide-react';
 import { AlumniProfileModal } from '../profile/AlumniProfileModal';
 import { UserAvatar } from '../common/UserAvatar';
+import { ConnectionButton } from '../common/ConnectionButton';
 
 export const PersonCard = ({ person }) => {
-  const { toggleConnectUser, myConnections } = useApp();
-  const [localStatus, setLocalStatus] = useState(person?.connectionStatus || 'none');
   const [showModal, setShowModal] = useState(false);
-
-  useEffect(() => {
-    let status = person?.connectionStatus || 'none';
-    const targetIdStr = String(person?.id || person?.userId || person?.user_id || '').toLowerCase();
-    const targetNameStr = String(person?.name || person?.fullName || '').trim().toLowerCase();
-
-    if (myConnections && myConnections.length > 0) {
-      const isAlreadyConnected = myConnections.some(c => {
-        const cId = String(c.id || c.userId || c.user_id || '').toLowerCase();
-        const cName = String(c.name || c.fullName || '').trim().toLowerCase();
-        return (
-          (targetIdStr && cId && targetIdStr === cId) ||
-          (targetNameStr && cName && targetNameStr === cName)
-        );
-      });
-      if (isAlreadyConnected) {
-        status = 'connected';
-      }
-    }
-    setLocalStatus(status);
-  }, [person?.connectionStatus, person?.id, person?.userId, person?.name, person?.fullName, myConnections]);
 
   if (!person) return null;
 
-  const isConnected = localStatus === 'connected' || localStatus === 'CONNECTED';
-  const isPending = localStatus === 'pending' || localStatus === 'pending_outgoing' || localStatus === 'PENDING_OUTGOING';
   const isAlumni = Boolean(person.isAlumni || person.role?.toLowerCase() === 'alumni');
-
-  const profilePath = `/alumni/${person.id}`;
-
-  const handleConnectClick = async () => {
-    if (isConnected || isPending) return;
-    setLocalStatus('pending_outgoing');
-    const res = await toggleConnectUser(person.id);
-    if (!res) {
-      setLocalStatus(person?.connectionStatus || 'none');
-    }
-  };
+  const personName = person.name || person.fullName || person.full_name || 'JECRC Member';
+  const personId = person.id || person.userId || person.user_id;
 
   return (
     <>
@@ -61,8 +26,8 @@ export const PersonCard = ({ person }) => {
               className="relative shrink-0 cursor-pointer"
             >
               <UserAvatar
-                src={person.avatar}
-                name={person.name}
+                src={person.avatar || person.avatarUrl || person.avatar_url}
+                name={personName}
                 className="w-12 h-12 group-hover:ring-2 group-hover:ring-red-600/20 transition-all"
               />
               {isAlumni && (
@@ -81,7 +46,7 @@ export const PersonCard = ({ person }) => {
                   onClick={() => setShowModal(true)}
                   className="text-sm font-bold text-slate-900 hover:text-red-700 hover:underline truncate block text-left cursor-pointer"
                 >
-                  {person.name}
+                  {personName}
                 </button>
                 
                 {/* Subtle Role Badge */}
@@ -98,7 +63,7 @@ export const PersonCard = ({ person }) => {
 
               {/* Headline / Current Role */}
               <p className="text-xs text-slate-700 font-medium line-clamp-1 leading-snug">
-                {person.headline || person.currentRole || (isAlumni ? `Alumni @ ${person.company}` : 'JECRC Student')}
+                {person.headline || person.currentRole || (isAlumni ? `Alumni @ ${person.company || 'JECRC'}` : 'JECRC Student')}
               </p>
 
               {/* Batch & Department Info */}
@@ -136,7 +101,7 @@ export const PersonCard = ({ person }) => {
           )}
         </div>
 
-        {/* Dual Action Row: View Profile Modal + Connect */}
+        {/* Dual Action Row: View Profile Modal + Reusable ConnectionButton */}
         <div className="pt-2 border-t border-slate-100 grid grid-cols-2 gap-2">
           <button
             type="button"
@@ -146,31 +111,7 @@ export const PersonCard = ({ person }) => {
             View Profile
           </button>
 
-          <button
-            type="button"
-            onClick={handleConnectClick}
-            className={`text-center py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer flex items-center justify-center gap-1 shadow-2xs ${
-              isConnected
-                ? 'bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200'
-                : isPending
-                ? 'bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100'
-                : 'bg-red-700 text-white hover:bg-red-800'
-            }`}
-          >
-            {isConnected ? (
-              <>
-                <Check className="w-3.5 h-3.5" />
-                <span>Connected</span>
-              </>
-            ) : isPending ? (
-              <>
-                <Clock className="w-3.5 h-3.5" />
-                <span>Request Sent</span>
-              </>
-            ) : (
-              <span>Connect</span>
-            )}
-          </button>
+          <ConnectionButton userId={personId} targetUser={person} size="sm" />
         </div>
 
       </div>
