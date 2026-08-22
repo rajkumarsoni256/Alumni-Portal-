@@ -9,9 +9,7 @@ const JWT_STORAGE_KEY = 'jecrc_community_jwt';
 
 let inMemoryToken = null;
 
-export const getAuthToken = () => {
-  return inMemoryToken || localStorage.getItem(JWT_STORAGE_KEY);
-};
+export const getAuthToken = () => inMemoryToken || localStorage.getItem(JWT_STORAGE_KEY);
 
 export const setAuthToken = (token) => {
   if (token) {
@@ -28,24 +26,14 @@ export const clearAuthToken = () => {
   localStorage.removeItem(JWT_STORAGE_KEY);
 };
 
-/**
- * Resolve relative media/upload path to absolute backend URL
- * @param {string} urlStr
- * @returns {string|null}
- */
 export const resolveMediaUrl = (urlStr) => {
   if (!urlStr || typeof urlStr !== 'string') return null;
   const clean = urlStr.trim();
-  if (clean.startsWith('http://') || clean.startsWith('https://') || clean.startsWith('data:') || clean.startsWith('blob:')) {
-    return clean;
-  }
+  if (clean.startsWith('http://') || clean.startsWith('https://') || clean.startsWith('data:') || clean.startsWith('blob:')) return clean;
   const cleanPath = clean.startsWith('/') ? clean : `/${clean}`;
   return `${API_BASE_URL}${cleanPath}`;
 };
 
-/**
- * Custom Error class capturing API error responses
- */
 export class ApiError extends Error {
   constructor(message, status, errorCode = null, errors = null) {
     super(message);
@@ -56,20 +44,18 @@ export class ApiError extends Error {
   }
 }
 
-// Single-refresh lock & promise queue to handle multiple concurrent 401s cleanly
+// Single refresh lock prevents a dashboard burst of expired-token requests
+// from rotating the refresh token multiple times concurrently.
 let isRefreshing = false;
 let refreshPromise = null;
 
 const refreshAccessToken = async () => {
-  if (isRefreshing && refreshPromise) {
-    return refreshPromise;
-  }
+  if (isRefreshing && refreshPromise) return refreshPromise;
 
   isRefreshing = true;
   refreshPromise = (async () => {
     try {
-      const url = `${API_BASE_URL}/api/v1/auth/refresh`;
-      const response = await fetch(url, {
+      const response = await fetch(`${API_BASE_URL}/api/v1/auth/refresh`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -80,13 +66,11 @@ const refreshAccessToken = async () => {
       }
 
       const data = await response.json();
-      const newAccessToken = data?.data?.accessToken || data?.accessToken;
+      const newAccessToken = data?.data?.accessToken || data?.accessToken || data?.data?.token || data?.token;
+      if (!newAccessToken) throw new Error('No access token in refresh response');
 
-      if (newAccessToken) {
-        setAuthToken(newAccessToken);
-        return newAccessToken;
-      }
-      throw new Error('No access token in refresh response');
+      setAuthToken(newAccessToken);
+      return newAccessToken;
     } catch (err) {
       clearAuthToken();
       if (typeof window !== 'undefined') {
@@ -102,9 +86,6 @@ const refreshAccessToken = async () => {
   return refreshPromise;
 };
 
-/**
- * Generic request wrapper using native fetch with silent token refresh interceptor
- */
 export const request = async (endpoint, options = {}) => {
   const token = getAuthToken();
   const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
@@ -122,26 +103,20 @@ export const request = async (endpoint, options = {}) => {
       }
     });
     const queryString = searchParams.toString();
-    if (queryString) {
-      url += (url.includes('?') ? '&' : '?') + queryString;
-    }
+    if (queryString) url += (url.includes('?') ? '&' : '?') + queryString;
   }
 
   const isFormData = typeof options.body === 'object' && options.body instanceof FormData;
-
   const headers = {
     ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
     ...options.headers,
   };
-
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
+  if (token) headers.Authorization = `Bearer ${token}`;
 
   const config = {
     ...options,
     headers,
-    credentials: 'include', // Ensure HttpOnly cookies are passed with cross-origin & credentials requests
+    credentials: 'include',
   };
 
   if (config.body && typeof config.body === 'object' && !isFormData) {
@@ -155,34 +130,31 @@ export const request = async (endpoint, options = {}) => {
     throw new ApiError('Unable to connect to backend service. Please ensure the server is running.', 0, 'NETWORK_ERROR');
   }
 
-  // Intercept 401 Unauthorized for Access Token Expiration & Silent Refresh
-  if (response.status === 401) {
-    const isAuthEndpoint =
-      cleanEndpoint.includes('/auth/login') ||
-      cleanEndpoint.includes('/auth/refresh') ||
-      cleanEndpoint.includes('/auth/register') ||
-      cleanEndpoint.includes('/auth/google') ||
-      cleanEndpoint.includes('/auth/verify-email') ||
-      cleanEndpoint.includes('/auth/resend-verification') ||
-      cleanEndpoint.includes('/auth/student/verify-otp');
+  const isAuthEndpoint =
+    cleanEndpoint.includes('/auth/login') ||
+    cleanEndpoint.includes('/auth/refresh') ||
+    cleanEndpoint.includes('/auth/register') ||
+    cleanEndpoint.includes('/auth/google') ||
+    cleanEndpoint.includes('/auth/verify-email') ||
+    cleanEndpoint.includes('/auth/resend-verification') ||
+    cleanEndpoint.includes('/auth/student/verify-otp');
 
-    if (!isAuthEndpoint && !options._isRetry) {
-      try {
-        const newAccessToken = await refreshAccessToken();
-        // Retry the original request once with the new access token
-        return await request(endpoint, {
-          ...options,
-          _isRetry: true,
-          headers: {
-            ...options.headers,
-            Authorization: `Bearer ${newAccessToken}`,
-          },
-        });
-      } catch (refreshErr) {
-        // Refresh failed (e.g. 10-day session expired or session revoked)
-        let message = 'Your session has expired. Please log in again.';
-        throw new ApiError(message, 401, 'SESSION_EXPIRED');
-      }
+  // IMPORTANT: only attempt silent refresh when the request actually carried
+  // an access token. This prevents logged-out/public pages from calling
+  // /auth/refresh and producing "Refresh token is required" noise.
+  if (response.status === 401 && token && !isAuthEndpoint && !options._isRetry) {
+    try {
+      const newAccessToken = await refreshAccessToken();
+      return await request(endpoint, {
+        ...options,
+        _isRetry: true,
+        headers: {
+          ...options.headers,
+          Authorization: `Bearer ${newAccessToken}`,
+        },
+      });
+    } catch (refreshErr) {
+      throw new ApiError('Your session has expired. Please log in again.', 401, 'SESSION_EXPIRED');
     }
   }
 
@@ -191,7 +163,7 @@ export const request = async (endpoint, options = {}) => {
   if (contentType && contentType.includes('application/json')) {
     try {
       data = await response.json();
-    } catch (e) {
+    } catch {
       data = null;
     }
   }
@@ -199,18 +171,12 @@ export const request = async (endpoint, options = {}) => {
   if (!response.ok) {
     let defaultMessage = `HTTP error ${response.status}`;
     if (response.status === 401) {
-      const isAuthEndpoint =
-        cleanEndpoint.includes('/auth/login') ||
-        cleanEndpoint.includes('/auth/register') ||
-        cleanEndpoint.includes('/auth/google') ||
-        cleanEndpoint.includes('/auth/verify-email') ||
-        cleanEndpoint.includes('/auth/resend-verification');
-
       defaultMessage = isAuthEndpoint
         ? 'Invalid email or password.'
         : 'Session expired or unauthorized. Please log in again.';
 
-      if (!isAuthEndpoint) {
+      // Do not broadcast session-expired when the user was never authenticated.
+      if (!isAuthEndpoint && token) {
         clearAuthToken();
         if (typeof window !== 'undefined') {
           window.dispatchEvent(new CustomEvent('auth:session-expired'));
@@ -227,11 +193,9 @@ export const request = async (endpoint, options = {}) => {
     const message = (data && data.message) || defaultMessage;
     const errorCode = (data && data.errorCode) || 'UNKNOWN_ERROR';
     const errors = (data && data.errors) || null;
-
     throw new ApiError(message, response.status, errorCode, errors);
   }
 
-  // Handle standard ApiResponse wrapper: { success: true, message: '...', data: T }
   if (data && typeof data === 'object' && 'success' in data) {
     if (data.data !== undefined && data.data !== null) {
       if (Array.isArray(data.data)) {
@@ -253,11 +217,7 @@ export const request = async (endpoint, options = {}) => {
         if (data.message) arrayResult.message = data.message;
         return arrayResult;
       }
-      if (typeof data.data === 'object') {
-        if (data.message && !data.data.message) {
-          data.data.message = data.message;
-        }
-      }
+      if (typeof data.data === 'object' && data.message && !data.data.message) data.data.message = data.message;
       return data.data;
     }
     return data;
