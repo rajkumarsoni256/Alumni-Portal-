@@ -312,73 +312,87 @@ export const AppProvider = ({ children }) => {
     const initializeAuthSession = async () => {
       setAuthStatus('INITIALIZING');
       setIsLoading(true);
-      let token = authService.getToken();
 
-      // If token is missing, attempt silent refresh with HttpOnly cookie first
-      if (!token) {
-        try {
-          const refreshRes = await authService.refreshToken();
-          if (refreshRes && (refreshRes.token || refreshRes.accessToken)) {
-            token = refreshRes.token || refreshRes.accessToken;
-          }
-        } catch {
-          token = null;
-        }
-      }
+      // Emergency Watchdog Timer: Force setIsLoading(false) if session restore hangs > 5s
+      const watchdogTimer = setTimeout(() => {
+        setIsLoading(false);
+      }, 5000);
 
-      if (token) {
-        try {
-          const user = await authService.getCurrentUser();
-          if (user && user.id) {
-            const normalizedRole = (user.role || 'STUDENT').toLowerCase();
-            const isComplete = user.profileComplete !== false;
-            setAuthUser(user);
-            setActiveRole(normalizedRole);
-            setIsAuthenticated(true);
+      try {
+        let token = authService.getToken();
 
-            // Phase 1: Core user session data
-            await Promise.allSettled([
-              fetchUserProfile(),
-              fetchUserSettings(),
-            ]);
-
-            // Phase 2: Stagger secondary dashboard widgets & unread counts
-            setTimeout(() => {
-              Promise.allSettled([
-                fetchSuggestedPeople(),
-                fetchIncomingConnectionRequests(),
-                fetchMyConnections(),
-                fetchNotifications(),
-                fetchEvents(),
-                fetchMentorshipRequests(),
-                refreshUnreadMessagesCount(user.id),
-              ]);
-            }, 100);
-
-            if (user.role?.toUpperCase() === 'ADMIN' || isComplete) {
-              setAuthStatus('AUTHENTICATED');
-            } else {
-              setAuthStatus('ONBOARDING');
+        // If token is missing, attempt silent refresh with HttpOnly cookie first
+        if (!token) {
+          try {
+            const refreshRes = await authService.refreshToken();
+            if (refreshRes && (refreshRes.token || refreshRes.accessToken)) {
+              token = refreshRes.token || refreshRes.accessToken;
             }
-          } else {
+          } catch {
+            token = null;
+          }
+        }
+
+        if (token) {
+          try {
+            const user = await authService.getCurrentUser();
+            if (user && user.id) {
+              const normalizedRole = (user.role || 'STUDENT').toLowerCase();
+              const isComplete = user.profileComplete !== false;
+              setAuthUser(user);
+              setActiveRole(normalizedRole);
+              setIsAuthenticated(true);
+
+              // Phase 1: Core user session data
+              await Promise.allSettled([
+                fetchUserProfile(),
+                fetchUserSettings(),
+              ]);
+
+              // Phase 2: Stagger secondary dashboard widgets & unread counts
+              setTimeout(() => {
+                Promise.allSettled([
+                  fetchSuggestedPeople(),
+                  fetchIncomingConnectionRequests(),
+                  fetchMyConnections(),
+                  fetchNotifications(),
+                  fetchEvents(),
+                  fetchMentorshipRequests(),
+                  refreshUnreadMessagesCount(user.id),
+                ]);
+              }, 100);
+
+              if (user.role?.toUpperCase() === 'ADMIN' || isComplete) {
+                setAuthStatus('AUTHENTICATED');
+              } else {
+                setAuthStatus('ONBOARDING');
+              }
+            } else {
+              authService.clearToken();
+              setIsAuthenticated(false);
+              setAuthStatus('UNAUTHENTICATED');
+              setUserProfile(null);
+            }
+          } catch (err) {
+            console.warn('Failed to restore authentication session:', err);
             authService.clearToken();
             setIsAuthenticated(false);
             setAuthStatus('UNAUTHENTICATED');
             setUserProfile(null);
           }
-        } catch (err) {
-          console.warn('Failed to restore authentication session:', err);
-          authService.clearToken();
+        } else {
           setIsAuthenticated(false);
           setAuthStatus('UNAUTHENTICATED');
           setUserProfile(null);
         }
-      } else {
+      } catch (err) {
+        console.warn('Unhandled session initialization error:', err);
         setIsAuthenticated(false);
         setAuthStatus('UNAUTHENTICATED');
-        setUserProfile(null);
+      } finally {
+        clearTimeout(watchdogTimer);
+        setIsLoading(false);
       }
-      setIsLoading(false);
     };
 
     initializeAuthSession();
