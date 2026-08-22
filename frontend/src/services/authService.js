@@ -1,6 +1,6 @@
 /**
  * JECRC Community — Real Authentication Service
- * Communicates with Spring Boot backend via /api/v1/auth
+ * Communicates with Express backend via /api/v1/auth
  */
 
 import { apiClient, setAuthToken, clearAuthToken, getAuthToken } from './apiClient';
@@ -22,15 +22,29 @@ export const authService = {
   /**
    * User login with email and password
    */
-  login: async ({ email, password }) => {
+  login: async ({ email, password, rememberMe = true }) => {
     const response = await apiClient.post('/api/v1/auth/login', {
       email: email.trim().toLowerCase(),
       password,
+      rememberMe,
     });
-    // Response structure: { token: 'JWT...', user: { id, email, role } }
-    if (response && response.token) {
-      setAuthToken(response.token);
+    if (response && (response.token || response.accessToken)) {
+      setAuthToken(response.token || response.accessToken);
     }
+    return response;
+  },
+
+  /**
+   * Silently restore an authenticated session using the HttpOnly refresh cookie.
+   * The refresh token never becomes accessible to JavaScript.
+   */
+  refreshToken: async () => {
+    const response = await apiClient.post('/api/v1/auth/refresh');
+    const token = response?.accessToken || response?.token;
+    if (!token) {
+      throw new Error('No access token returned by refresh endpoint');
+    }
+    setAuthToken(token);
     return response;
   },
 
@@ -42,8 +56,8 @@ export const authService = {
       idToken,
       role: role ? String(role).toUpperCase() : undefined,
     });
-    if (response && response.token) {
-      setAuthToken(response.token);
+    if (response && (response.token || response.accessToken)) {
+      setAuthToken(response.token || response.accessToken);
     }
     return response;
   },
@@ -75,6 +89,8 @@ export const authService = {
   resetPassword: async ({ token, newPassword }) => {
     const response = await apiClient.post('/api/v1/auth/reset-password', {
       token,
+      code: email,
+      email,
       newPassword,
     });
     return response;
@@ -89,14 +105,11 @@ export const authService = {
 
     try {
       const response = await apiClient.get('/api/v1/auth/me');
-      // Response structure: { user: { id, email, role } } or unwrapped user
       if (response && response.user) {
         return response.user;
       }
       return response;
     } catch (err) {
-      // If token is invalid or expired (401/403), clear local state
-      clearAuthToken();
       throw err;
     }
   },
