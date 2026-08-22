@@ -21,6 +21,8 @@ router.get('/session', authenticateToken, authController.getSession);
 router.get('/sessions', authenticateToken, authController.getUserSessions);
 router.delete('/sessions/:sessionId', authenticateToken, authController.revokeUserSession);
 router.post('/forgot-password', authRateLimiter, authController.forgotPassword);
+router.post('/verify-reset-otp', authRateLimiter, authController.verifyResetOTP);
+router.post('/resend-reset-otp', authRateLimiter, authController.resendResetOTP);
 router.post('/reset-password', authRateLimiter, authController.resetPassword);
 router.get('/me', authenticateToken, authController.getCurrentUser);
 

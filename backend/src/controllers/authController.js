@@ -254,12 +254,32 @@ const forgotPassword = async (req, res, next) => {
   }
 };
 
+const verifyResetOTP = async (req, res, next) => {
+  try {
+    const { email, otp } = req.body;
+    const result = await authService.verifyResetOTP({ email, otp });
+    return successResponse(res, result, 'OTP verified successfully');
+  } catch (err) {
+    next(err);
+  }
+};
+
+const resendResetOTP = async (req, res, next) => {
+  try {
+    const { email } = req.body;
+    const message = await authService.resendResetOTP({ email });
+    return successResponse(res, null, message);
+  } catch (err) {
+    next(err);
+  }
+};
+
 const resetPassword = async (req, res, next) => {
   try {
-    const { token, code, email, newPassword } = req.body;
-    await authService.resetPassword({ token, code, email, newPassword });
+    const { resetToken, newPassword } = req.body;
+    const message = await authService.resetPassword({ resetToken, newPassword });
     clearRefreshCookie(res);
-    return successResponse(res, null, 'Password reset successfully. You may now log in with your new password.');
+    return successResponse(res, null, message);
   } catch (err) {
     next(err);
   }
@@ -291,6 +311,8 @@ module.exports = {
   getUserSessions,
   revokeUserSession,
   forgotPassword,
+  verifyResetOTP,
+  resendResetOTP,
   resetPassword,
   getCurrentUser,
 };

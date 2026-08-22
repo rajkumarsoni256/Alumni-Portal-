@@ -624,7 +624,7 @@ export const AppProvider = ({ children }) => {
   const sendForgotPasswordLink = async (email) => {
     try {
       const res = await authService.forgotPassword(email);
-      showNotification(res?.message || 'Password reset link sent to your email');
+      showNotification(res?.message || 'Verification code sent to your email');
       return res;
     } catch (err) {
       showNotification(err?.message || 'Failed to request password reset', 'error');
@@ -632,9 +632,31 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  const resetUserPassword = async ({ email, token, newPassword }) => {
+  const verifyResetOTP = async ({ email, otp }) => {
     try {
-      const res = await authService.resetPassword({ email, token, newPassword });
+      const res = await authService.verifyResetOTP({ email, otp });
+      showNotification('Verification code verified! Create your new password.', 'success');
+      return res;
+    } catch (err) {
+      showNotification(err?.message || 'Invalid or expired verification code', 'error');
+      throw err;
+    }
+  };
+
+  const resendResetOTP = async (email) => {
+    try {
+      const res = await authService.resendResetOTP(email);
+      showNotification(res?.message || 'New verification code sent');
+      return res;
+    } catch (err) {
+      showNotification(err?.message || 'Failed to resend code', 'error');
+      throw err;
+    }
+  };
+
+  const resetUserPassword = async ({ resetToken, newPassword }) => {
+    try {
+      const res = await authService.resetPassword({ resetToken, newPassword });
       showNotification(res?.message || 'Password reset successfully! Please log in with your new password.');
       return res;
     } catch (err) {
@@ -1017,6 +1039,8 @@ export const AppProvider = ({ children }) => {
         verifyUserEmail,
         resendVerificationCode,
         sendForgotPasswordLink,
+        verifyResetOTP,
+        resendResetOTP,
         resetUserPassword,
         completeUserOnboarding,
         logoutUser,

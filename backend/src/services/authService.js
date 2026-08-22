@@ -839,111 +839,196 @@ const authenticateWithGoogle = async ({ idToken, requestedRole, req }) => {
 };
 
 const forgotPassword = async ({ email }) => {
-  const normalizedEmail = normalizeEmail(email);
-
-  const userResult = await db.query(
-    `SELECT u.id, u.email, u.account_status, p.full_name
-     FROM users u
-     LEFT JOIN user_profiles p ON u.id = p.user_id
-     WHERE u.email = $1`,
-    [normalizedEmail]
-  );
-
-  if (userResult.rows.length > 0) {
-    const user = userResult.rows[0];
-    if (user.account_status === 'ACTIVE') {
-      const resetToken = crypto.randomUUID();
-      const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 mins
-
-      await db.query(
-        `INSERT INTO password_reset_tokens (id, user_id, token, expires_at, used)
-         VALUES ($1, $2, $3, $4, false)`,
-        [crypto.randomUUID(), user.id, resetToken, expiresAt]
-      );
-
-      // Trigger 6-digit OTP code & link reset email (non-blocking)
-      emailService.sendPasswordResetCode(normalizedEmail, user.id, user.full_name, resetToken)
-        .catch((err) => console.warn('[Password Reset Email Warning]', err.message));
-    }
-  }
-
-  return 'If an account exists for this email, password reset instructions have been sent';
-};
-
-const resetPassword = async ({ token, code, email, newPassword }) => {
-  if (!newPassword || newPassword.length < 6) {
-    const error = new Error('Password must be at least 6 characters long');
+  if (!email || !email.trim()) {
+    const error = new Error('Email address is required');
     error.statusCode = 400;
     error.errorCode = 'VALIDATION_ERROR';
     throw error;
   }
 
-  let targetUserId = null;
-  let targetUserEmail = null;
-  let targetUserName = null;
+  const normalizedEmail = normalizeEmail(email);
+  const userResult = await db.query(
+    `SELECT u.id, u.email, u.account_status, p.full_name
+     FROM users u
+     LEFT JOIN user_profiles p ON u.id = p.user_id
+     WHERE LOWER(u.email) = $1 OR LOWER(u.institutional_email) = $1 LIMIT 1`,
+    [normalizedEmail]
+  );
 
-  // 1. Try 6-digit code verification
-  if (code && email) {
-    const cleanEmail = normalizeEmail(email);
-    const otpResult = await emailService.verifyOTPCode({ email: cleanEmail, code, purpose: 'PASSWORD_RESET' });
-    targetUserId = otpResult.userId;
-    targetUserEmail = cleanEmail;
-  } else if (token && token.trim()) {
-    // 2. Try token link verification
-    const tokenResult = await db.query(
-      `SELECT pr.id, pr.user_id, pr.expires_at, pr.used, u.email, p.full_name
-       FROM password_reset_tokens pr
-       JOIN users u ON pr.user_id = u.id
-       LEFT JOIN user_profiles p ON u.id = p.user_id
-       WHERE pr.token = $1`,
-      [token.trim()]
-    );
+  if (userResult.rows.length === 0) {
+    logger.info('AUTH', `Password reset requested for ${normalizedEmail} - User email not found in database`);
+    const error = new Error(`No registered account found with email '${normalizedEmail}'. Please check your email or create an account.`);
+    error.statusCode = 404;
+    error.errorCode = 'USER_NOT_FOUND';
+    throw error;
+  }
 
-    if (tokenResult.rows.length === 0) {
-      const error = new Error('Invalid or unrecognized password reset token');
-      error.statusCode = 400;
-      error.errorCode = 'INVALID_TOKEN';
-      throw error;
-    }
+  const user = userResult.rows[0];
+  if (user.account_status !== 'ACTIVE') {
+    logger.info('AUTH', `Password reset requested for ${normalizedEmail} - Account status is '${user.account_status}'`);
+    const error = new Error(`Your account is currently pending approval or inactive. Password reset is not available.`);
+    error.statusCode = 403;
+    error.errorCode = 'ACCOUNT_NOT_ACTIVE';
+    throw error;
+  }
 
-    const tokenRecord = tokenResult.rows[0];
-    if (tokenRecord.used) {
-      const error = new Error('Password reset token has already been used');
-      error.statusCode = 400;
-      error.errorCode = 'INVALID_TOKEN';
-      throw error;
-    }
+  // Dispatch 6-digit OTP password reset email (non-blocking)
+  emailService.sendPasswordResetCode(normalizedEmail, user.id, user.full_name)
+    .catch((err) => console.warn('[Password Reset Email Warning]', err.message));
 
-    if (new Date(tokenRecord.expires_at) < new Date()) {
-      const error = new Error('Password reset token has expired. Please request a new password reset.');
-      error.statusCode = 400;
-      error.errorCode = 'TOKEN_EXPIRED';
-      throw error;
-    }
+  return 'Verification code sent to your email.';
+};
 
-    targetUserId = tokenRecord.user_id;
-    targetUserEmail = tokenRecord.email;
-    targetUserName = tokenRecord.full_name;
+const verifyResetOTP = async ({ email, otp }) => {
+  if (!email || !otp) {
+    const error = new Error('Email and 6-digit OTP verification code are required');
+    error.statusCode = 400;
+    error.errorCode = 'VALIDATION_ERROR';
+    throw error;
+  }
 
-    await db.query('UPDATE password_reset_tokens SET used = true WHERE id = $1', [tokenRecord.id]);
-  } else {
-    const error = new Error('Verification code or reset token is required');
+  const normalizedEmail = normalizeEmail(email);
+  const result = await emailService.verifyOTPCode({
+    email: normalizedEmail,
+    code: otp,
+    purpose: 'PASSWORD_RESET',
+  });
+
+  const jti = crypto.randomUUID();
+
+  // Store in password_reset_otps table for single-use verification
+  await db.query(
+    `INSERT INTO password_reset_otps (id, user_id, otp_hash, expires_at, verified_at)
+     VALUES ($1, $2, 'VERIFIED', NOW() + INTERVAL '10 minutes', NOW())`,
+    [jti, result.userId]
+  );
+
+  // Issue short-lived authorization reset token (10 min TTL)
+  const resetToken = jwt.sign(
+    { userId: result.userId, purpose: 'PASSWORD_RESET', jti },
+    JWT_SECRET,
+    { expiresIn: '10m' }
+  );
+
+  return { success: true, resetToken };
+};
+
+const resendResetOTP = async ({ email }) => {
+  if (!email || !email.trim()) {
+    const error = new Error('Email address is required');
+    error.statusCode = 400;
+    error.errorCode = 'VALIDATION_ERROR';
+    throw error;
+  }
+
+  const normalizedEmail = normalizeEmail(email);
+  const userResult = await db.query(
+    `SELECT u.id, u.email, u.account_status, p.full_name
+     FROM users u
+     LEFT JOIN user_profiles p ON u.id = p.user_id
+     WHERE LOWER(u.email) = $1 OR LOWER(u.institutional_email) = $1 LIMIT 1`,
+    [normalizedEmail]
+  );
+
+  if (userResult.rows.length === 0) {
+    const error = new Error(`No registered account found with email '${normalizedEmail}'.`);
+    error.statusCode = 404;
+    error.errorCode = 'USER_NOT_FOUND';
+    throw error;
+  }
+
+  const user = userResult.rows[0];
+  if (user.account_status !== 'ACTIVE') {
+    const error = new Error(`Your account is currently pending approval or inactive.`);
+    error.statusCode = 403;
+    error.errorCode = 'ACCOUNT_NOT_ACTIVE';
+    throw error;
+  }
+
+  await emailService.sendPasswordResetCode(normalizedEmail, user.id, user.full_name);
+  return 'A new verification code has been sent to your email.';
+};
+
+const resetPassword = async ({ resetToken, newPassword }) => {
+  if (!newPassword || newPassword.length < 8) {
+    const error = new Error('Password must be at least 8 characters long');
+    error.statusCode = 400;
+    error.errorCode = 'VALIDATION_ERROR';
+    throw error;
+  }
+
+  if (!/[A-Z]/.test(newPassword) || !/[a-z]/.test(newPassword) || !/\d/.test(newPassword)) {
+    const error = new Error('Password must contain at least 1 uppercase letter, 1 lowercase letter, and 1 number');
+    error.statusCode = 400;
+    error.errorCode = 'WEAK_PASSWORD';
+    throw error;
+  }
+
+  if (!resetToken || !resetToken.trim()) {
+    const error = new Error('Password reset authorization token is required');
     error.statusCode = 400;
     error.errorCode = 'INVALID_TOKEN';
     throw error;
   }
 
+  let decoded;
+  try {
+    decoded = jwt.verify(resetToken.trim(), JWT_SECRET);
+  } catch {
+    const error = new Error('Password reset token is invalid or has expired. Please request a new code.');
+    error.statusCode = 400;
+    error.errorCode = 'TOKEN_EXPIRED';
+    throw error;
+  }
+
+  if (decoded.purpose !== 'PASSWORD_RESET' || !decoded.userId) {
+    const error = new Error('Invalid reset token purpose');
+    error.statusCode = 400;
+    error.errorCode = 'INVALID_TOKEN';
+    throw error;
+  }
+
+  // Prevent token re-use
+  if (decoded.jti) {
+    const tokenCheck = await db.query(
+      `SELECT id, used_at FROM password_reset_otps WHERE id = $1`,
+      [decoded.jti]
+    );
+
+    if (tokenCheck.rows.length === 0 || tokenCheck.rows[0].used_at) {
+      const error = new Error('Password reset token has already been used or is invalid');
+      error.statusCode = 400;
+      error.errorCode = 'INVALID_TOKEN';
+      throw error;
+    }
+
+    await db.query(`UPDATE password_reset_otps SET used_at = NOW() WHERE id = $1`, [decoded.jti]);
+  }
+
+  const userResult = await db.query(
+    `SELECT u.id, u.email, p.full_name FROM users u LEFT JOIN user_profiles p ON u.id = p.user_id WHERE u.id = $1`,
+    [decoded.userId]
+  );
+
+  if (userResult.rows.length === 0) {
+    const error = new Error('User account not found');
+    error.statusCode = 404;
+    error.errorCode = 'RESOURCE_NOT_FOUND';
+    throw error;
+  }
+
+  const user = userResult.rows[0];
   const passwordHash = await bcrypt.hash(newPassword, 10);
-  await db.query('UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2', [passwordHash, targetUserId]);
+  await db.query('UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2', [passwordHash, user.id]);
 
   // Security Hardening: Revoke all active sessions on password change
-  await sessionService.revokeAllUserSessions(targetUserId, 'PASSWORD_CHANGED').catch(() => {});
+  await sessionService.revokeAllUserSessions(user.id, 'PASSWORD_RESET').catch(() => {});
 
   // Trigger Security Alert Email: Password Changed (non-blocking)
-  if (targetUserEmail) {
-    emailService.sendPasswordChangedAlert(targetUserEmail, targetUserId, { userName: targetUserName })
-      .catch((err) => console.warn('[Password Changed Alert Warning]', err.message));
-  }
+  emailService.sendPasswordChangedAlert(user.email, user.id, { userName: user.full_name })
+    .catch((err) => console.warn('[Password Changed Alert Warning]', err.message));
+
+  return 'Password reset successfully. Please log in with your new password.';
 };
 
 const getCurrentUser = async (user) => {
@@ -1012,6 +1097,8 @@ module.exports = {
   authenticateWithGoogle,
   loginWithGoogle: authenticateWithGoogle,
   forgotPassword,
+  verifyResetOTP,
+  resendResetOTP,
   resetPassword,
   getCurrentUser,
 };
